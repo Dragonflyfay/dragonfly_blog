@@ -3,7 +3,9 @@ package com.dragonfly.controller;
 import com.dragonfly.pojo.Result;
 import com.dragonfly.pojo.User;
 import com.dragonfly.service.UserService;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.Mapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,12 +20,14 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/user")
+@Validated
 public class UserController {
     //注入对象
     @Autowired
     private UserService userService;
     @PostMapping ("/register")
-    public Result register(String username, String password){
+    //用Spring Validation注解对参数进行校验，要求用户名和密码必须是5-16位的非空字符串
+    public Result register(@Pattern(regexp="^\\S(5,16)$") String username, @Pattern(regexp="^\\S(5,16)$")String password){
         //查询用户
         User u=userService.findByUserName(username);
         //判断

@@ -3,6 +3,7 @@ package com.dragonfly.service.impl;
 import com.dragonfly.mapper.UserMapper;
 import com.dragonfly.pojo.User;
 import com.dragonfly.service.UserService;
+import com.dragonfly.utils.Md5Utils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -28,8 +29,11 @@ public class UserServiceImpl implements UserService {
     @Override
     public void register(String username, String password) {
         //加密处理  Md5加密
+        String md5String = Md5Utils.getMD5String(password);
 
-        //
+
+        //添加
+        userMapper.add(username,md5String);
 
     }
 }
