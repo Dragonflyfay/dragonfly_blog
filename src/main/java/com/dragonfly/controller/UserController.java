@@ -3,13 +3,17 @@ package com.dragonfly.controller;
 import com.dragonfly.pojo.Result;
 import com.dragonfly.pojo.User;
 import com.dragonfly.service.UserService;
+import com.dragonfly.utils.JwtUtil;
+import com.dragonfly.utils.Md5Utils;
 import jakarta.validation.constraints.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.Mapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 描述：
@@ -27,7 +31,7 @@ public class UserController {
     private UserService userService;
     @PostMapping ("/register")
     //用Spring Validation注解对参数进行校验，要求用户名和密码必须是5-16位的非空字符串
-    public Result register(@Pattern(regexp="^\\S(5,16)$") String username, @Pattern(regexp="^\\S(5,16)$")String password){
+    public Result register(@Pattern(regexp="^\\S{5,16}$") String username, @Pattern(regexp="^\\S{5,16}$")String password){
         //查询用户
         User u=userService.findByUserName(username);
         //判断
@@ -42,6 +46,31 @@ public class UserController {
 
 
 
+
+
         //注册
+    }
+    @PostMapping ("/login")
+    public Result<String> login(@Pattern(regexp="^\\S{5,16}$") String username, @Pattern(regexp="^\\S{5,16}$")String password){
+        //根据用户名查询用户
+        User loginUser=userService.findByUserName(username);
+
+
+        //判断用户是否存在
+        if(loginUser==null){
+            return Result.error("用户名错误");
+        }
+
+        //判断密码是否正确，loginUser对象中的密码是经过MD5加密的
+        if(Md5Utils.getMD5String( password).equals(loginUser.getPassword())){
+            //密码正确，生成JWT令牌并返回
+            Map<String,Object> claims=new HashMap<>();
+            claims.put("id",loginUser.getId());
+            claims.put("username",loginUser.getUsername());
+            String token= JwtUtil.genToken(claims);
+            return Result.success(token);
+        }
+        return Result.error("密码错误");
+
     }
 }
