@@ -5,6 +5,7 @@ import com.dragonfly.pojo.User;
 import com.dragonfly.service.UserService;
 import com.dragonfly.utils.JwtUtil;
 import com.dragonfly.utils.Md5Utils;
+import com.dragonfly.utils.ThreadLocalUtil;
 import jakarta.validation.constraints.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
@@ -73,11 +74,12 @@ public class UserController {
     }
 
     @GetMapping("/userInfo")
-    public Result<User> userInfo(@RequestHeader(name="Authorization") String token){
+    public Result<User> userInfo(/*@RequestHeader(name="Authorization") String token*/){
         //根据用户名查询用户
-        Map<String,Object> map=JwtUtil.parseToken(token);
-        String username = (String)map.get("username");
-
+        /*Map<String,Object> map=JwtUtil.parseToken(token);
+        String username = (String)map.get("username");*/
+        Map<String,Object> map=ThreadLocalUtil.get();
+        String username=(String)map.get("username");
         User user=userService.findByUserName(username);
         return Result.success(user);
 
