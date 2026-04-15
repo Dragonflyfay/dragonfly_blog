@@ -85,4 +85,21 @@ public class UserController {
 
 
     }
+    @PutMapping("/update")
+    public Result update (@RequestBody @Validated User user){//@RequestBody注解将请求体中的JSON数据映射为User对象
+
+        /*//获取当前用户名
+        Map<String,Object> map=ThreadLocalUtil.get();
+        String username=(String)map.get("username");
+        //根据用户名查询用户
+        User loginUser=userService.findByUserName(username);
+        //判断用户是否存在
+        if(loginUser==null){
+            return Result.error("用户不存在");
+        }
+        //更新用户信息
+        user.setId(loginUser.getId());*/
+        userService.update(user);
+        return Result.success();
+    }
 }

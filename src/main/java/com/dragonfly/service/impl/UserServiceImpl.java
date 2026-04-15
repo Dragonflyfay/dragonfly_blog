@@ -7,6 +7,8 @@ import com.dragonfly.utils.Md5Utils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 /**
  * 描述：
  *
@@ -34,6 +36,14 @@ public class UserServiceImpl implements UserService {
 
         //添加
         userMapper.add(username,md5String);
+
+    }
+
+    @Override
+    public void update(User user) {
+        //更新  最近修改时间
+        user.setUpdateTime(LocalDateTime.now());
+        userMapper.update(user);
 
     }
 }
