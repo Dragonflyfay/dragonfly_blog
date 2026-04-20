@@ -19,4 +19,7 @@ public interface UserService {
 
     //修改用户信息
     void update(User user);
+
+    //修改用户头像
+    void updateAvatar(String avatarUrl);
 }
