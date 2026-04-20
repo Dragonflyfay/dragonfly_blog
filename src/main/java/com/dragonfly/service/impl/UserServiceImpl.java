@@ -4,10 +4,14 @@ import com.dragonfly.mapper.UserMapper;
 import com.dragonfly.pojo.User;
 import com.dragonfly.service.UserService;
 import com.dragonfly.utils.Md5Utils;
+import com.dragonfly.utils.ThreadLocalUtil;
+import net.minidev.json.writer.UpdaterMapper;
+import org.apache.ibatis.annotations.Update;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * 描述：
@@ -46,4 +50,13 @@ public class UserServiceImpl implements UserService {
         userMapper.update(user);
 
     }
+
+    @Override
+    public void updateAvatar(String avatarUrl) {
+        Map<String,Object> map =ThreadLocalUtil.get();
+        Integer id = (Integer)map.get("id");
+        userMapper.updateAvatar(avatarUrl,id);
+    }
+
+
 }

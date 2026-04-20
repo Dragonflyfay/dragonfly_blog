@@ -7,6 +7,7 @@ import com.dragonfly.utils.JwtUtil;
 import com.dragonfly.utils.Md5Utils;
 import com.dragonfly.utils.ThreadLocalUtil;
 import jakarta.validation.constraints.Pattern;
+import org.hibernate.validator.constraints.URL;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -100,6 +101,12 @@ public class UserController {
         //更新用户信息
         user.setId(loginUser.getId());*/
         userService.update(user);
+        return Result.success();
+    }
+    @PutMapping("/updateAvatar")
+    public Result updateAvatar(@RequestParam @URL String avatarUrl){
+        //校验头像URL必须是一个有效的URL地址
+        userService.updateAvatar(avatarUrl);
         return Result.success();
     }
 }
