@@ -22,4 +22,7 @@ public interface UserService {
 
     //修改用户头像
     void updateAvatar(String avatarUrl);
+
+    //更新密码
+    void updatePwd(String newPwd);
 }
