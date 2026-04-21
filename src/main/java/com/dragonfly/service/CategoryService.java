@@ -20,4 +20,7 @@ public interface CategoryService {
 
     //根据id查询分类信息
     Category detail(Integer id);
+
+    //更新分类信息
+    void update(Category category);
 }

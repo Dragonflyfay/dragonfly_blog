@@ -23,7 +23,7 @@ public class CategoryController {
     @Autowired
     private CategoryService categoryService;
     @PostMapping
-    public Result add(@RequestBody @Validated Category category){
+    public Result add(@RequestBody @Validated(Category.Add.class) Category category){
         categoryService.add(category);
         return Result.success();
     }
@@ -36,6 +36,13 @@ public class CategoryController {
     public Result<Category> detail(Integer id){//接受前端的参数
         Category category=categoryService.detail(id);
         return Result.success(category);
+
+    }
+
+    @PutMapping
+    public Result update(@RequestBody @Validated(Category.Update.class) Category category){
+        categoryService.update(category);
+        return Result.success();
 
     }
 }
