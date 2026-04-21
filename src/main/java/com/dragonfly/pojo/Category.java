@@ -1,5 +1,6 @@
 package com.dragonfly.pojo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 
@@ -17,6 +18,8 @@ public class Category {
     private Integer sortOrder;
     private Integer articlesCount;
     private Integer createUser;
+    @JsonFormat(pattern="yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
+    @JsonFormat(pattern="yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updateTime;
 }
