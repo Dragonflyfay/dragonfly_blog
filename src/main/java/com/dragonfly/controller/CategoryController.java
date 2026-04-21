@@ -32,4 +32,10 @@ public class CategoryController {
         List<Category> cs=categoryService.list();
         return Result.success(cs);
     }
+    @GetMapping("/detail")
+    public Result<Category> detail(Integer id){//接受前端的参数
+        Category category=categoryService.detail(id);
+        return Result.success(category);
+
+    }
 }
