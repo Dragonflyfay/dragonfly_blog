@@ -12,7 +12,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import java.util.Map;
 
 /**
- * 描述：
+ * 描述：拦截器
  *
  * @param
  * @author 蜻蜓大王
