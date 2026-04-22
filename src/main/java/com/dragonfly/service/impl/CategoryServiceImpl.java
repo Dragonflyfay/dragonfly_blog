@@ -55,4 +55,19 @@ public class CategoryServiceImpl implements CategoryService {
         category.setUpdateTime(LocalDateTime.now());
         categoryMapper.update(category);
     }
+
+    @Override
+    public void delete(Integer id) {
+        Map<String,Object> map=ThreadLocalUtil.get();
+        Integer userId=(Integer)map.get("id");
+        //
+        Category category=categoryMapper.findById(id);
+        if(category==null){
+            throw new RuntimeException("要删除的分类不存在");
+        }
+        if(!category.getCreateUser().equals(userId)){
+            throw new RuntimeException("没有权限,只能删除自己创建的分类");
+        }
+        categoryMapper.delete(id,userId);
+    }
 }
