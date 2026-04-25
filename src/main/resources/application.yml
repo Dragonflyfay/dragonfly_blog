@@ -4,6 +4,11 @@ spring:
     url: jdbc:mysql://localhost:3306/dragonfly_blog
     username: root
     password: 123456
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
 mybatis:
   configuration:
     map-underscore-to-camel-case: true #开启驼峰命名和下滑线命名转换
