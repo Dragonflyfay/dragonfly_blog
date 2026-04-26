@@ -37,8 +37,8 @@ public class JwtTest {
     public void testParse(){
         //定义字符串，模拟用户传递过来的token
         String token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" +
-                ".eyJ1c2VyIjp7ImlkIjoxLCJ1c2VybmFtZSI6IuWwj-icu-ickyJ9LCJleHAiOjE3NzU1MTA1MDZ9" +
-                ".Z87vXaRm8_TXz686sU_jCcc_ITDR3nU0k_0SWadu520";
+                ".eyJ1c2VyIjp7ImlkIjoxLCJ1c2VybmFtZSI6IuWwj-icu-ickyJ9LCJleHAiOjE3NzcxNTI0NTR9" +
+                ".FL1NEzT8sSQNMaoySOAXxcwYeJj-HNamFqwmLxZJewQ";
         JWTVerifier jwtVerifier = JWT.require(Algorithm.HMAC256("dragonfly")).build();
         DecodedJWT decodeJWT = jwtVerifier.verify(token);//验证token，生成一个解析后的JWT对象
         Map<String, Claim> claims = decodeJWT.getClaims();//获取解析后所有的载荷
