@@ -9,12 +9,15 @@ import com.dragonfly.utils.ThreadLocalUtil;
 import jakarta.validation.constraints.Pattern;
 import org.hibernate.validator.constraints.URL;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 描述：
@@ -30,6 +33,8 @@ public class UserController {
     //注入对象
     @Autowired
     private UserService userService;
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @PostMapping("/register")
     //用Spring Validation注解对参数进行校验，要求用户名和密码必须是5-16位的非空字符串
@@ -68,6 +73,9 @@ public class UserController {
             claims.put("id", loginUser.getId());
             claims.put("username", loginUser.getUsername());
             String token = JwtUtil.genToken(claims);
+            //把token存储到redis 中
+            ValueOperations<String, String> operations = stringRedisTemplate.opsForValue();
+            operations.set(token,token,12, TimeUnit.HOURS);//与登录令牌一样，设置12小时有效期
             return Result.success(token);
         }
         return Result.error("密码错误");
@@ -114,7 +122,7 @@ public class UserController {
 
 
     @PatchMapping("/updatePwd")
-    public Result updatePwd(@RequestBody Map<String, String> params) {
+    public Result updatePwd(@RequestBody Map<String, String> params,@RequestHeader("Authorization") String token) {
         //1.校验参数
         String oldPwd = params.get("old_pwd");
         String newPwd = params.get("new_pwd");
@@ -138,6 +146,9 @@ public class UserController {
         }
         //2.调用Service完成密码更新
         userService.updatePwd(newPwd);
+        //更新密码成功之后，要删除对应的token
+        ValueOperations<String, String> operations = stringRedisTemplate.opsForValue();
+        operations.getOperations().delete(token);
         return Result.success();
 
     }

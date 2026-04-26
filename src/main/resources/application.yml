@@ -8,7 +8,27 @@ spring:
     redis:
       host: localhost
       port: 6379
+#  profiles:
+#    group:
+#      "dev": devServer,devDB,devSelf
+#    active: dev
 
+
+
+
+
+#      通用信息  ，指定生效的多环境
+#多环境下的共性属性
+#特定环境中的配置信息和通用信息冲突了，特定环境中的配置生效
+#  profiles:
+#    active:
+#server:
+#  servlet:
+#    context-path: /aaa
+#---
+#  config:
+#    activate:
+#      on-profile:
 mybatis:
   configuration:
     map-underscore-to-camel-case: true #开启驼峰命名和下滑线命名转换
