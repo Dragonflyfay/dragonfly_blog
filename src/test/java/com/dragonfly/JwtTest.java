@@ -26,6 +26,7 @@ public class JwtTest {
         claims.put("id",1);
         claims.put("username","小蜻蜓");
         //生成JWT令牌
+        //
         String token= JWT.create()
                 .withClaim("user",claims)//添加载荷
                 .withExpiresAt(new Date(System.currentTimeMillis()+1000*60*60*12))//添加过期时间，12小时
