@@ -1,6 +1,9 @@
 <script setup>
 import { User, Lock } from '@element-plus/icons-vue'
+
 import { ref } from 'vue'
+//美化
+import { ElMessage } from 'element-plus'
 
 const isRegister = ref(false)
 
@@ -32,6 +35,37 @@ const rules = {
     { min: 5, max: 16, message: '长度为5-16非空字符', trigger: 'blur' },
   ],
   rePassword: [{ validator: checkrePassword, trigger: 'blur' }],
+}
+
+//调用后台接口，实现注册
+import { userRegisterService, userLoginService } from '@/api/user'
+const register = async () => {
+  try {
+    let result = await userRegisterService(registerData.value)
+    console.log('注册接口返回:', result) // 调试用，查看实际返回结构
+
+    //拦截器已经处理了
+    ElMessage.success('注册成功')
+  } catch (error) {
+    console.error('注册请求异常:', error)
+  }
+}
+//绑定数据，复用注册表单的数据模型,v-model
+//表单数据校验
+//登录函数
+import { useRouter } from 'vue-router'
+const router = useRouter()
+const login = async () => {
+  //调用接口
+  try {
+    let result = await userLoginService(registerData.value)
+
+    ElMessage.success('登录成功')
+  } catch (err) {
+    console.error('登录请求异常：', err)
+  }
+  //跳转到首页  路由完成跳转
+  router.push('/')
 }
 </script>
 
@@ -67,7 +101,7 @@ const rules = {
         >
           <div class="form-header">
             <h1 class="form-title">注册账号</h1>
-            <p class="form-subtitle">加入蜻蜓笔记，开始你的创作之旅</p>
+            <p class="form-subtitle">加入dragonfly笔记,开始你的创作之旅</p>
           </div>
 
           <el-form-item prop="username">
@@ -100,14 +134,16 @@ const rules = {
           </el-form-item>
 
           <el-form-item>
-            <el-button class="auth-button" type="primary" size="large">注册新账号</el-button>
+            <el-button class="auth-button" type="primary" size="large" @click="register"
+              >注册新账号</el-button
+            >
           </el-form-item>
 
           <div class="form-footer">
             <span>已有账号？</span>
             <el-link
               type="primary"
-              :underline="false"
+              underline="hover"
               @click="isRegister = false"
               class="switch-link"
             >
@@ -117,20 +153,34 @@ const rules = {
         </el-form>
 
         <!-- 登录表单 -->
-        <el-form ref="form" size="large" autocomplete="off" v-else class="auth-form">
+        <el-form
+          ref="form"
+          size="large"
+          autocomplete="off"
+          v-else
+          class="auth-form"
+          :model="registerData"
+          :rules="rules"
+        >
           <div class="form-header">
             <h1 class="form-title">欢迎回来</h1>
             <p class="form-subtitle">很高兴再次见到你</p>
           </div>
 
-          <el-form-item>
-            <el-input :prefix-icon="User" placeholder="请输入用户名" class="custom-input" />
+          <el-form-item prop="username">
+            <el-input
+              :prefix-icon="User"
+              placeholder="请输入用户名"
+              class="custom-input"
+              v-model="registerData.username"
+            />
           </el-form-item>
 
-          <el-form-item>
+          <el-form-item prop="password">
             <el-input
               name="password"
               :prefix-icon="Lock"
+              v-model="registerData.password"
               type="password"
               placeholder="请输入密码"
               class="custom-input"
@@ -139,18 +189,20 @@ const rules = {
 
           <div class="login-options">
             <el-checkbox class="remember-checkbox">记住我</el-checkbox>
-            <el-link type="primary" :underline="false" class="forgot-link">忘记密码？</el-link>
+            <el-link type="primary" underline="hover" class="forgot-link">忘记密码？</el-link>
           </div>
 
           <el-form-item>
-            <el-button class="auth-button" type="primary" size="large">登录</el-button>
+            <el-button class="auth-button" type="primary" size="large" @click="login"
+              >登录</el-button
+            >
           </el-form-item>
 
           <div class="form-footer">
             <span>还没有账号？</span>
             <el-link
               type="primary"
-              :underline="false"
+              underline="hover"
               @click="isRegister = true"
               class="switch-link"
             >
@@ -242,7 +294,7 @@ const rules = {
 }
 
 .floating-emoji {
-  position: absolute;
+  position: absolute; //绝对定位
   font-size: 28px;
   opacity: 0.35;
   animation: float 6s infinite ease-in-out;
