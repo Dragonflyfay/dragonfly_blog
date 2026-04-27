@@ -40,5 +40,6 @@ public class User {
     private LocalDateTime lastLoginTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    private String role;
 
 }
