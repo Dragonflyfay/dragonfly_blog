@@ -13,7 +13,10 @@ import {
 } from '@element-plus/icons-vue'
 import avatar from '@/assets/default.png'
 import { ref } from 'vue'
+import router from '@/router'
+import { useRoute } from 'vue-router'
 
+const route = useRoute()
 const isDark = ref(false)
 const toggleTheme = () => {
   isDark.value = !isDark.value
@@ -35,20 +38,21 @@ const toggleTheme = () => {
       </div>
       <!-- 菜单栏 -->
       <el-menu
+        :default-active="route.path"
         active-text-color="#c5a3ff"
         background-color="transparent"
         text-color="rgba(255,255,255,0.75)"
         router
         class="custom-menu"
       >
-        <el-menu-item index="/category">
+        <el-menu-item index="/article/category">
           <el-icon><Management /></el-icon>
           <span>文章分类</span>
         </el-menu-item>
 
-        <el-menu-item index="/article">
+        <el-menu-item index="/article/manage">
           <el-icon><Promotion /></el-icon>
-          <span>文章管理</span>
+          <span>笔记管理</span>
         </el-menu-item>
 
         <!-- 可折叠 菜单 -->
@@ -58,15 +62,15 @@ const toggleTheme = () => {
             <el-icon><UserFilled /></el-icon>
             <span>个人中心</span>
           </template>
-          <el-menu-item index="/profile/info">
+          <el-menu-item index="/user/info">
             <el-icon><User /></el-icon>
             <span>基本资料</span>
           </el-menu-item>
-          <el-menu-item index="/profile/avatar">
+          <el-menu-item index="/user/avatar">
             <el-icon><Crop /></el-icon>
             <span>更换头像</span>
           </el-menu-item>
-          <el-menu-item index="/profile/password">
+          <el-menu-item index="/user/resetPassword">
             <el-icon><EditPen /></el-icon>
             <span>重置密码</span>
           </el-menu-item>
@@ -123,7 +127,9 @@ const toggleTheme = () => {
 
       <!-- 中间区域 -->
       <el-main>
-        <div class="content-container"></div>
+        <div class="content-container">
+          <router-view></router-view>
+        </div>
       </el-main>
 
       <!-- 底部区域 -->
