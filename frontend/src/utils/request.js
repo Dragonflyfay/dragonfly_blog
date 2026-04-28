@@ -1,5 +1,5 @@
 //定制请求的实例
-
+//拦截器
 //导入axios  npm install axios
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
@@ -9,24 +9,46 @@ import { ElMessage } from 'element-plus'
 const baseURL = '/api'
 const instance = axios.create({ baseURL })
 
+// import { useTokenStore } from '@/stores/token.js'
+// //添加请求拦截器
+// instance.interceptors.request.use(
+//   (config) => {
+//     //请求前的回调
+//     //添加token
+//     const tokenStore = useTokenStore()
+//     //判断有没有token
+//     if (tokenStore.token) {
+//       config.headers.Authorization = tokenStore.token
+//     }
+//     return config
+//   },
+//   (error) => {
+//     //请求错误的回调
+//     Promise.reject(error)
+//   },
+// )
+
 import { useTokenStore } from '@/stores/token.js'
 //添加请求拦截器
+//use里可以调用两个回调函数
 instance.interceptors.request.use(
   (config) => {
     //请求前的回调
     //添加token
     const tokenStore = useTokenStore()
-    //判断有没有token
+    //判断是否有
     if (tokenStore.token) {
       config.headers.Authorization = tokenStore.token
     }
     return config
   },
-  (error) => {
+  (err) => {
     //请求错误的回调
-    Promise.reject(error)
+    Promise.reject(err)
   },
 )
+// import { useRouter } from 'vue-router'
+import router from '@/router'
 //添加响应拦截器
 instance.interceptors.response.use(
   (result) => {
@@ -40,7 +62,24 @@ instance.interceptors.response.use(
     return Promise.reject(result.data)
   },
   (err) => {
-    ElMessage.error(err.message)
+    // //响应失败
+    // if (err.response.status === 401) {
+    //   ElMessage.error('请先登录')
+    //   const tokenStore = useTokenStore()
+    //   tokenStore.removeToken()
+    //   router.push('/login')
+    // } else {
+    //   ElMessage.error('服务异常')
+    // }
+
+    //判断响应状态码，如果401，跳转
+    if (err.response.status === 401) {
+      ElMessage.error('请先登录')
+      router.push('/login')
+    } else {
+      ElMessage.error(err.message)
+    }
+
     return Promise.reject(err) //异步的状态转化成失败的状态
   },
 )

@@ -1,19 +1,21 @@
 <script setup>
 import { User, Lock } from '@element-plus/icons-vue'
-
 import { ref } from 'vue'
-//美化
 import { ElMessage } from 'element-plus'
+import { userRegisterService, userLoginService } from '@/api/user'
+import { useTokenStore } from '@/stores/token.js'
+import { useRouter } from 'vue-router'
 
 const isRegister = ref(false)
+const rememberMe = ref(false)
+const formRef = ref()
 
-//定义响应式数据类型
 const registerData = ref({
   username: '',
   password: '',
   rePassword: '',
 })
-//校验密码的函数
+
 const checkrePassword = (rule, value, callback) => {
   if (value === '') {
     callback(new Error('请输入密码'))
@@ -24,7 +26,6 @@ const checkrePassword = (rule, value, callback) => {
   }
 }
 
-//定义表单规则
 const rules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
@@ -37,45 +38,36 @@ const rules = {
   rePassword: [{ validator: checkrePassword, trigger: 'blur' }],
 }
 
-//调用后台接口，实现注册
-import { userRegisterService, userLoginService } from '@/api/user'
-const register = async () => {
-  try {
-    let result = await userRegisterService(registerData.value)
-    console.log('注册接口返回:', result) // 调试用，查看实际返回结构
+const router = useRouter()
 
-    //拦截器已经处理了
-    ElMessage.success('注册成功')
-  } catch (error) {
-    console.error('注册请求异常:', error)
+const resetForm = () => {
+  registerData.value = {
+    username: '',
+    password: '',
+    rePassword: '',
   }
 }
-//绑定数据，复用注册表单的数据模型,v-model
-//表单数据校验
-//登录函数
-import { useTokenStore } from '@/stores/token.js'
 
-import { useRouter } from 'vue-router'
-const router = useRouter()
+const register = async () => {
+  let result = await userLoginService(registerData.value)
+  ElMessage.success('注册成功')
+}
+//登录函数
 const tokenStore = useTokenStore()
 const login = async () => {
-  //调用接口
-  try {
-    let result = await userLoginService(registerData.value)
-
-    const token = result?.data
-    if (!token) {
-      ElMessage.error('登录成功但未获取到令牌')
-      return
-    }
-
-    ElMessage.success('登录成功')
-    //把得到的token存储到pinia
-    tokenStore.setToken(token)
-    //跳转到首页  路由完成跳转
-    router.push('/')
-  } catch (err) {
-    console.error('登录请求异常：', err.message)
+  let result = await userLoginService(registerData.value)
+  ElMessage.success('登录成功')
+  // 保存token,pinia存储
+  tokenStore.setToken(result.data)
+  //跳转到首页 路由完成跳转
+  router.push('/')
+}
+//清空数据模型的数据
+const clearRegisterData = () => {
+  registerData.value = {
+    username: '',
+    password: '',
+    rePassword: '',
   }
 }
 </script>
@@ -102,7 +94,7 @@ const login = async () => {
       <div class="form-area">
         <!-- 注册表单 -->
         <el-form
-          ref="form"
+          ref="formRef"
           size="large"
           autocomplete="off"
           v-if="isRegister"
@@ -155,7 +147,12 @@ const login = async () => {
             <el-link
               type="primary"
               underline="hover"
-              @click="isRegister = false"
+              @click="
+                () => {
+                  isRegister = false
+                  clearRegisterData()
+                }
+              "
               class="switch-link"
             >
               去登录 →
@@ -165,7 +162,7 @@ const login = async () => {
 
         <!-- 登录表单 -->
         <el-form
-          ref="form"
+          ref="formRef"
           size="large"
           autocomplete="off"
           v-else
@@ -199,7 +196,7 @@ const login = async () => {
           </el-form-item>
 
           <div class="login-options">
-            <el-checkbox class="remember-checkbox">记住我</el-checkbox>
+            <el-checkbox v-model="rememberMe" class="remember-checkbox">记住我</el-checkbox>
             <el-link type="primary" underline="hover" class="forgot-link">忘记密码？</el-link>
           </div>
 
@@ -214,7 +211,12 @@ const login = async () => {
             <el-link
               type="primary"
               underline="hover"
-              @click="isRegister = true"
+              @click="
+                () => {
+                  isRegister = true
+                  clearRegisterData()
+                }
+              "
               class="switch-link"
             >
               立即注册 →
