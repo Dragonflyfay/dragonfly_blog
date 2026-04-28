@@ -1,6 +1,6 @@
 <script setup>
 import { Edit, Delete } from '@element-plus/icons-vue'
-import { ref } from 'vue'
+import { ref,onMounted ,watch} from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 
@@ -57,15 +57,41 @@ const handleCellMouseLeave = (row, column, cell, event) => {}
 
 //声明一个异步函数
 import { articleCategoryListService } from '@/api/article'
+import {useTokenStore} from "@/stores/token.js";
 const router = useRouter()
+const tokenStore=useTokenStore()
 const articleCategoryList = async () => {
-  let result = await articleCategoryListService()
-  categorys.value = result.data
+  // 检查是否有 token，没有则不请求
+  if (!tokenStore.token) {
+    console.warn('未登录，跳过加载分类数据')
+    categorys.value=[]
+    loading.value = false
+    return
+  }
+  try {
+    loading.value=true
+    let result = await articleCategoryListService()
+    categorys.value = result.data
+  } catch (error) {
+    console.error(error)
+    categorys.value=[]
+  }finally{
+    loading.value = false
+  }
 }
+watch(()=>tokenStore.token,(newToken)=>{
+  if (newToken) {
+    articleCategoryList()
+  }
+
+})
+
 
 // 使用onMounted确保在组件挂载后执行数据加载
 
-articleCategoryList()
+onMounted(()=>{
+  articleCategoryList()
+})
 </script>
 
 <template>

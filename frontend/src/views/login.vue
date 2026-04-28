@@ -53,7 +53,7 @@ const register = async () => {
 //绑定数据，复用注册表单的数据模型,v-model
 //表单数据校验
 //登录函数
-import { useTokenStore } from '@/stores/token'
+import { useTokenStore } from '@/stores/token.js'
 
 import { useRouter } from 'vue-router'
 const router = useRouter()
@@ -63,13 +63,19 @@ const login = async () => {
   try {
     let result = await userLoginService(registerData.value)
 
+    const token = result?.data
+    if (!token) {
+      ElMessage.error('登录成功但未获取到令牌')
+      return
+    }
+
     ElMessage.success('登录成功')
     //把得到的token存储到pinia
-    tokenStore.setToken(result.data.token)
+    tokenStore.setToken(token)
     //跳转到首页  路由完成跳转
     router.push('/')
   } catch (err) {
-    console.error('登录请求异常：', err)
+    console.error('登录请求异常：', err.message)
   }
 }
 </script>
