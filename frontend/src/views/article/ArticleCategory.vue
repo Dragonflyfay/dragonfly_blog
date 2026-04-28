@@ -1,518 +1,374 @@
 <script setup>
+import {
+  articleCategoryListService,
+  articleCategoryAddService,
+  articleCategoryUpdateService,
+  articleCategoryDeleteService,
+} from '@/api/article'
 import { Edit, Delete } from '@element-plus/icons-vue'
-import { ref,onMounted ,watch} from 'vue'
-import { ElMessage } from 'element-plus'
-import { useRouter } from 'vue-router'
-
-// 原始数据（不动）
+import { ref } from 'vue'
 const categorys = ref([
-  //   {
-  //     id: 3,
-  //     categoryName: '美食',
-  //     categoryAlias: 'my',
-  //     createTime: '2023-09-02 12:06:59',
-  //     updateTime: '2023-09-02 12:06:59',
-  //   },
-  //   {
-  //     id: 4,
-  //     categoryName: '娱乐',
-  //     categoryAlias: 'yl',
-  //     createTime: '2023-09-02 12:08:16',
-  //     updateTime: '2023-09-02 12:08:16',
-  //   },
-  //   {
-  //     id: 5,
-  //     categoryName: '军事',
-  //     categoryAlias: 'js',
-  //     createTime: '2023-09-02 12:08:33',
-  //     updateTime: '2023-09-02 12:08:33',
-  //   },
+  {
+    id: 3,
+    categoryName: '美食',
+    categoryAlias: 'my',
+    createTime: '2023-09-02 12:06:59',
+    updateTime: '2023-09-02 12:06:59',
+  },
+  {
+    id: 4,
+    categoryName: '娱乐',
+    categoryAlias: 'yl',
+    createTime: '2023-09-02 12:08:16',
+    updateTime: '2023-09-02 12:08:16',
+  },
+  {
+    id: 5,
+    categoryName: '军事',
+    categoryAlias: 'js',
+    createTime: '2023-09-02 12:08:33',
+    updateTime: '2023-09-02 12:08:33',
+  },
 ])
-const loading = ref(true) //加载状态
-
-// 可选：为不同分类设置渐变色小圆点（装饰用途）
-const getCategoryGradient = (name) => {
-  const gradients = {
-    美食: 'linear-gradient(135deg, #F8B4D9, #FF9A9E)',
-    娱乐: 'linear-gradient(135deg, #A8E6CF, #7EE0B5)',
-    军事: 'linear-gradient(135deg, #C5A3FF, #B583FF)',
-  }
-  return gradients[name] || 'linear-gradient(135deg, #E0C3FF, #C5A3FF)'
-}
-
-// 纯粹的美化动画状态（hover效果）
-const onIconHover = (row, type, isHover) => {
-  // 不添加任何功能，仅用于样式控制，此处不做逻辑处理，但可以通过类名变化（已在样式内处理悬浮伪类）
-  // 留空满足无功能添加要求，但模板tooltip已存在视觉增强
-}
-
-// 表格行的悬浮样式（class）
-const tableRowClassName = ({ row, rowIndex }) => {
-  return 'custom-table-row'
-}
-
-// 鼠标进入/离开表格单元格（无实际功能，仅用于可能的事件预留）
-const handleCellMouseEnter = (row, column, cell, event) => {}
-const handleCellMouseLeave = (row, column, cell, event) => {}
-
-//声明一个异步函数
-import { articleCategoryListService } from '@/api/article'
-import {useTokenStore} from "@/stores/token.js";
-const router = useRouter()
-const tokenStore=useTokenStore()
+//声明一个异步的函数
 const articleCategoryList = async () => {
-  // 检查是否有 token，没有则不请求
-  if (!tokenStore.token) {
-    console.warn('未登录，跳过加载分类数据')
-    categorys.value=[]
-    loading.value = false
-    return
-  }
+  let res = await articleCategoryListService()
+  categorys.value = res.data
+}
+articleCategoryList()
+
+//控制添加分类弹窗
+const dialogVisible = ref(false)
+const title = ref('')
+
+//添加分类数据模型
+const categoryModel = ref({
+  categoryName: '',
+  categoryAlias: '',
+})
+//添加分类表单校验
+const rules = {
+  categoryName: [{ required: true, message: '请输入分类名称', trigger: 'blur' }],
+  categoryAlias: [{ required: true, message: '请输入分类别名', trigger: 'blur' }],
+}
+//访问后台，添加文章分类
+import { ElMessage } from 'element-plus'
+const addCategory = async () => {
+  //调用接口
+  let result = await articleCategoryAddService(categoryModel.value)
+  ElMessage.success(result.message ? result.message : '添加成功')
+
+  //再次访问后台接口，查询所有分类
+  articleCategoryList()
+  //隐藏弹窗
+  dialogVisible.value = false
+}
+//展示编辑弹窗
+const showDialog = (row) => {
+  dialogVisible.value = true
+  title.value = '编辑分类'
+  //数据拷贝、
+  categoryModel.value.categoryName = row.categoryName
+  categoryModel.value.categoryAlias = row.categoryAlias
+  //扩展id属性，将来需要传递给后台，完成分类的修改
+  categoryModel.value.id = row.id
+}
+
+//编辑分类
+const updateCategory = async () => {
+  //调用接口
+  let result = await articleCategoryUpdateService(categoryModel.value)
+
+  ElMessage.success(result.message ? result.message : '修改成功')
+  articleCategoryList()
+  dialogVisible.value = false
+}
+
+//删除分类
+import { ElMessageBox } from 'element-plus'
+const deleteCategory = (row) => {
   try {
-    loading.value=true
-    let result = await articleCategoryListService()
-    categorys.value = result.data
-  } catch (error) {
-    console.error(error)
-    categorys.value=[]
-  }finally{
-    loading.value = false
+    ElMessageBox.confirm('你确认要删除该分类信息吗', '温馨提示', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+      .then(async () => {
+        // 调用接口
+        let result = await articleCategoryDeleteService(row.id)
+        ElMessage.success(result.message ? result.message : '删除成功')
+        ElMessage({
+          type: 'success',
+          message: '删除成功',
+        })
+        //刷新列表
+        articleCategoryList()
+      })
+      .catch(() => {
+        ElMessage({
+          type: 'info',
+          message: '你取消了删除',
+        })
+      })
+  } catch (err) {
+    if (err !== 'cancel') {
+      console.error('删除失败:', error)
+      ElMessage.error('删除失败')
+    }
   }
 }
-watch(()=>tokenStore.token,(newToken)=>{
-  if (newToken) {
-    articleCategoryList()
-  }
-
-})
-
-
-// 使用onMounted确保在组件挂载后执行数据加载
-
-onMounted(()=>{
-  articleCategoryList()
-})
 </script>
-
 <template>
-  <div class="category-container">
-    <!-- 顶部装饰与标题区 -->
-    <div class="category-header">
-      <div class="header-title-section">
-        <div class="title-decoration">
-          <span class="decoration-dot"></span>
-          <span class="decoration-dot"></span>
+  <el-card class="page-container">
+    <template #header>
+      <div class="header">
+        <span class="title">文章分类</span>
+        <div class="extra">
+          <el-button
+            type="primary"
+            @click="
+              () => {
+                dialogVisible = true
+                title = '添加分类'
+              }
+            "
+            class="add-btn"
+            >添加分类</el-button
+          >
         </div>
-        <h1 class="category-title">文章分类</h1>
-        <p class="category-subtitle">用标签记录生活，让灵感有序安放</p>
       </div>
-      <div class="header-extra">
-        <el-button class="add-category-btn" type="primary" size="large">
-          <span class="btn-text">+ 添加分类</span>
-        </el-button>
-      </div>
-    </div>
-
-    <!-- 表格卡片区 -->
-    <div class="category-table-wrapper">
-      <el-table
-        :data="categorys"
-        style="width: 100%"
-        class="custom-table"
-        :row-class-name="tableRowClassName"
-        @cell-mouse-enter="handleCellMouseEnter"
-        @cell-mouse-leave="handleCellMouseLeave"
-      >
-        <!-- 序号列（美化后置为标签样式） -->
-        <el-table-column label="序号" width="80" type="index">
-          <template #default="{ $index }">
-            <div class="index-badge">
-              <span class="index-number">{{ $index + 1 }}</span>
-            </div>
-          </template>
-        </el-table-column>
-
-        <!-- 分类名称 -->
-        <el-table-column label="分类名称" prop="categoryName" align="left">
-          <template #default="{ row }">
-            <div class="category-name-cell">
-              <span
-                class="category-icon"
-                :style="{ backgroundImage: getCategoryGradient(row.categoryName) }"
-              ></span>
-              <span class="category-name-text">{{ row.categoryName }}</span>
-            </div>
-          </template>
-        </el-table-column>
-
-        <!-- 分类别名 -->
-        <el-table-column label="分类别名" prop="categoryAlias" align="left">
-          <template #default="{ row }">
-            <div class="category-alias">
-              <span class="alias-label">{{ row.categoryAlias }}</span>
-            </div>
-          </template>
-        </el-table-column>
-
-        <!-- 操作按钮（美化后悬浮动效） -->
-        <el-table-column label="操作" width="140" align="center" fixed="right">
-          <template #default="{ row }">
-            <div class="action-buttons">
-              <el-tooltip content="编辑分类" placement="top" effect="customized">
-                <el-button
-                  :icon="Edit"
-                  circle
-                  class="action-btn edit-btn"
-                  @mouseenter="onIconHover(row, 'edit', true)"
-                  @mouseleave="onIconHover(row, 'edit', false)"
-                ></el-button>
-              </el-tooltip>
-              <el-tooltip content="删除分类" placement="top" effect="customized">
-                <el-button
-                  :icon="Delete"
-                  circle
-                  class="action-btn delete-btn"
-                  @mouseenter="onIconHover(row, 'delete', true)"
-                  @mouseleave="onIconHover(row, 'delete', false)"
-                ></el-button>
-              </el-tooltip>
-            </div>
-          </template>
-        </el-table-column>
-
-        <!-- 空状态自定义（变得更可爱了） -->
-        <template #empty>
-          <div class="custom-empty">
-            <div class="empty-emoji">📭</div>
-            <p class="empty-text">还没有分类噢～</p>
-            <p class="empty-hint">点击「添加分类」开始整理你的笔记世界吧 ✨</p>
-          </div>
+    </template>
+    <el-table :data="categorys" style="width: 100%" stripe class="table">
+      <el-table-column label="序号" width="100" type="index"> </el-table-column>
+      <el-table-column label="分类名称" prop="categoryName"></el-table-column>
+      <el-table-column label="分类别名" prop="categoryAlias"></el-table-column>
+      <el-table-column label="创建时间" prop="createTime"></el-table-column>
+      <el-table-column label="更新时间" prop="updateTime"></el-table-column>
+      <el-table-column label="操作" width="150">
+        <template #default="{ row }">
+          <el-button
+            :icon="Edit"
+            circle
+            plain
+            type="primary"
+            @click="showDialog(row)"
+            class="edit-btn"
+          ></el-button>
+          <el-button
+            :icon="Delete"
+            circle
+            plain
+            type="danger"
+            @click="deleteCategory(row)"
+            class="delete-btn"
+          ></el-button>
         </template>
-      </el-table>
-    </div>
-
-    <!-- 底部分类小提示（装饰） -->
-    <div class="category-footer">
-      <span class="footer-emoji">🌸</span>
-      <span>共 {{ categorys.length }} 个分类，陪伴你的每一次记录</span>
-      <span class="footer-emoji">🦋</span>
-    </div>
-  </div>
+      </el-table-column>
+      <template #empty>
+        <el-empty description="没有数据" />
+      </template>
+    </el-table>
+    <!-- 添加分类弹窗 -->
+    <el-dialog v-model="dialogVisible" :title="title" width="400px" center class="dialog">
+      <el-form
+        :model="categoryModel"
+        :rules="rules"
+        label-width="100px"
+        style="padding-right: 30px"
+        class="form"
+      >
+        <el-form-item label="分类名称" prop="categoryName">
+          <el-input
+            v-model="categoryModel.categoryName"
+            minlength="1"
+            maxlength="10"
+            class="custom-input"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="分类别名" prop="categoryAlias">
+          <el-input
+            v-model="categoryModel.categoryAlias"
+            minlength="1"
+            maxlength="15"
+            class="custom-input"
+          ></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="dialogVisible = false" class="cancel-btn">取消</el-button>
+          <el-button
+            type="primary"
+            @click="title == '添加分类' ? addCategory() : updateCategory()"
+            class="confirm-btn"
+          >
+            确认
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+  </el-card>
 </template>
 
 <style lang="scss" scoped>
-// 整体容器背景延续之前的浪漫通透感
-.category-container {
-  padding: 8px 0;
-  background: transparent;
-}
+.page-container {
+  min-height: 100%;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(4px);
 
-// 头部区域设计（类似之前 header 部的拉风感）
-.category-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 28px;
-  padding: 0 8px;
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 
-  .header-title-section {
-    position: relative;
-
-    .title-decoration {
-      position: absolute;
-      top: -8px;
-      left: -12px;
-      display: flex;
-      gap: 6px;
-
-      .decoration-dot {
-        width: 6px;
-        height: 6px;
-        background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-        border-radius: 50%;
-        opacity: 0.7;
-      }
-      .decoration-dot:nth-child(2) {
-        width: 10px;
-        height: 10px;
-        opacity: 0.4;
-      }
-    }
-
-    .category-title {
-      font-size: 28px;
+    .title {
+      font-size: 22px;
       font-weight: 700;
-      margin: 0 0 6px 0;
-      background: linear-gradient(135deg, #c5a3ff, #f8b4d9, #a8e6cf);
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      display: inline-block;
-    }
-
-    .category-subtitle {
-      font-size: 13px;
-      color: #a09abf;
-      margin: 0;
-      letter-spacing: 0.5px;
     }
   }
 
-  .header-extra {
-    .add-category-btn {
-      background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
-      border: none;
-      border-radius: 48px;
-      padding: 10px 28px;
-      font-weight: 500;
-      color: white;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 12px rgba(197, 163, 255, 0.2);
-
-      .btn-text {
-        font-size: 14px;
-        letter-spacing: 0.5px;
-      }
-
-      &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(197, 163, 255, 0.35);
-      }
-    }
-  }
-}
-
-// 表格容器（毛玻璃透明卡）
-.category-table-wrapper {
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(12px);
-  border-radius: 32px;
-  padding: 4px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
-  transition: all 0.3s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
-  }
-}
-
-// 自定义表格样式
-.custom-table {
-  --el-table-bg-color: transparent;
-  --el-table-tr-bg-color: transparent;
-  --el-table-header-bg-color: rgba(197, 163, 255, 0.08);
-  --el-table-border-color: rgba(197, 163, 255, 0.2);
-  --el-table-text-color: #4a3a6e;
-  --el-table-row-hover-bg-color: rgba(197, 163, 255, 0.12);
-  border-radius: 28px;
-  overflow: hidden;
-
-  :deep(.el-table__header-wrapper) {
-    th {
-      font-size: 15px;
-      font-weight: 600;
-      color: #b18ed8;
-      background: rgba(197, 163, 255, 0.08);
-      border-bottom: 1px solid rgba(197, 163, 255, 0.2);
-      padding: 16px 0;
-    }
-  }
-
-  :deep(.el-table__body-wrapper) {
-    tr {
-      transition: all 0.2s ease;
-    }
-    td {
-      border-bottom: 1px solid rgba(197, 163, 255, 0.08);
-      padding: 18px 0;
-    }
-  }
-}
-
-// 序号小标识
-.index-badge {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
-  .index-number {
-    width: 28px;
-    height: 28px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(197, 163, 255, 0.2);
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #c5a3ff;
-    transition: all 0.2s;
-  }
-}
-
-// 分类名称装饰球 + 文字
-.category-name-cell {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  .category-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 16px;
-    background-size: cover;
-    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.02);
-    transition: transform 0.2s;
-  }
-
-  .category-name-text {
-    font-size: 16px;
-    font-weight: 500;
-    color: #3d2f5e;
-    letter-spacing: 0.3px;
-  }
-}
-
-// 分类别名的小标签
-.category-alias {
-  .alias-label {
-    background: rgba(168, 230, 207, 0.25);
-    padding: 4px 12px;
-    border-radius: 40px;
-    font-size: 13px;
-    color: #77aa8b;
-    font-weight: 500;
-    backdrop-filter: blur(2px);
-    transition: all 0.2s;
-  }
-}
-
-// 操作按钮圆润可爱
-.action-buttons {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-
-  .action-btn {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(4px);
-    border: 1px solid rgba(197, 163, 255, 0.3);
-    transition: all 0.2s ease;
-
-    &.edit-btn {
-      --el-button-icon-color: #c5a3ff;
-      color: #c5a3ff;
-
-      &:hover {
-        background: #c5a3ff;
-        border-color: #c5a3ff;
-        transform: scale(1.08);
-        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
-        --el-button-icon-color: white;
-        color: white;
-      }
-    }
-
-    &.delete-btn {
-      --el-button-icon-color: #f8b4d9;
-      color: #f8b4d9;
-
-      &:hover {
-        background: #f8b4d9;
-        border-color: #f8b4d9;
-        transform: scale(1.08);
-        box-shadow: 0 4px 12px rgba(248, 180, 217, 0.3);
-        --el-button-icon-color: white;
-        color: white;
-      }
-    }
-  }
-}
-
-// 空状态（可爱风）
-.custom-empty {
-  text-align: center;
-  padding: 48px 0;
-
-  .empty-emoji {
-    font-size: 64px;
-    margin-bottom: 16px;
-    opacity: 0.7;
-  }
-
-  .empty-text {
-    font-size: 18px;
-    font-weight: 500;
-    color: #c5a3ff;
-    margin: 8px 0;
-  }
-
-  .empty-hint {
-    font-size: 13px;
-    color: #b0a8cd;
-    margin: 4px 0;
-  }
-}
-
-// 底部小装饰
-.category-footer {
-  margin-top: 24px;
-  text-align: center;
-  font-size: 12px;
-  color: #b7acd6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 12px;
-
-  .footer-emoji {
+  .add-btn {
+    background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
+    border: none;
+    border-radius: 48px;
+    padding: 10px 20px;
     font-size: 14px;
-    opacity: 0.6;
-    animation: gentleFloat 3s infinite ease;
-  }
-}
+    font-weight: 500;
+    color: white;
+    transition: all 0.3s ease;
 
-@keyframes gentleFloat {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-
-// 深色模式自适应（不主动添加深色切换功能，但兼容父组件 dark-mode 类）
-:deep(.layout-container.dark-mode) .category-container {
-  .category-header .category-title {
-    background: linear-gradient(135deg, #e0c3ff, #ffc8e6, #b5e6d0);
-  }
-
-  .category-table-wrapper {
-    background: rgba(30, 30, 50, 0.7);
-    backdrop-filter: blur(14px);
-  }
-
-  .custom-table {
-    --el-table-text-color: #d9ceff;
-    .category-name-text {
-      color: #e2d3ff;
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
     }
-    .alias-label {
-      background: rgba(168, 230, 207, 0.3);
-      color: #aee0c8;
+
+    &:active {
+      transform: translateY(0);
     }
   }
 
-  .custom-empty .empty-text {
-    color: #e0c3ff;
+  .table {
+    border-radius: 12px;
+    overflow: hidden;
+
+    :deep(.el-table__header) {
+      th {
+        background-color: #f8f3ff;
+        color: #6a4a9c;
+        font-weight: 600;
+      }
+    }
   }
 
-  .category-footer {
-    color: #9b8abb;
+  .edit-btn,
+  .delete-btn {
+    transition: all 0.3s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .edit-btn {
+    background: linear-gradient(135deg, #a8e6cf 0%, #c2f5e9 100%);
+    border-color: #a8e6cf;
+    color: #2c665a;
+  }
+
+  .delete-btn {
+    background: linear-gradient(135deg, #ff9e9e 0%, #ffbaba 100%);
+    border-color: #ff9e9e;
+    color: #8a1c1c;
+  }
+
+  .dialog {
+    border-radius: 20px;
+    overflow: hidden;
+
+    :deep(.el-dialog__header) {
+      background: linear-gradient(135deg, #f8b4d9 0%, #c5a3ff 100%);
+      padding: 20px;
+
+      .el-dialog__title {
+        color: white;
+        font-weight: 600;
+      }
+    }
+
+    :deep(.el-dialog__body) {
+      padding: 20px;
+    }
+  }
+
+  .custom-input {
+    :deep(.el-input__wrapper) {
+      border-radius: 48px;
+      padding: 8px 20px;
+      background-color: #faf7ff;
+      border: 1px solid #f0e5ff;
+      transition: all 0.3s ease;
+      box-shadow: none;
+
+      &:hover {
+        border-color: #d9b8ff;
+        background-color: #fff;
+      }
+
+      &.is-focus {
+        border-color: #c5a3ff;
+        background-color: #fff;
+        box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.12);
+      }
+    }
+
+    :deep(.el-input__prefix) {
+      margin-right: 12px;
+      color: #c5a3ff;
+    }
+  }
+
+  .cancel-btn {
+    border-radius: 48px;
+    padding: 10px 20px;
+    font-weight: 500;
+    color: #c5a3ff;
+    border-color: #c5a3ff;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background-color: #f8f3ff;
+      transform: translateY(-2px);
+    }
+  }
+
+  .confirm-btn {
+    background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
+    border: none;
+    border-radius: 48px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    transition: all 0.3s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
   }
 }
 </style>
