@@ -27,7 +27,7 @@ const toggleTheme = () => {
 }
 
 const handleCommand = (command) => {
-  switch(command) {
+  switch (command) {
     case 'profile':
       router.push('/user/info')
       break
@@ -93,8 +93,8 @@ const handleCommand = (command) => {
         </el-sub-menu>
       </el-menu>
       <div class="aside-footer">
-        <div class="floating-emoji-mini">✨</div>
-        <div class="floating-emoji-mini">🦋</div>
+        <div class="floating-emoji-mini"></div>
+        <div class="floating-emoji-mini"></div>
       </div>
     </el-aside>
     <!-- 右侧主区域 -->
@@ -155,18 +155,145 @@ const handleCommand = (command) => {
 .layout-container {
   height: 100vh;
   background: linear-gradient(145deg, #f5f0ff 0%, #e8ddf8 50%, #fce4ec 100%);
+  transition: all 0.3s ease;
+
+  &.dark-mode {
+    background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+
+    .el-header {
+      background-color: rgba(30, 30, 46, 0.96);
+      border-bottom: 1px solid #2d2d44;
+
+      .greeting-text {
+        color: #e0e0e0;
+      }
+
+      .username-display {
+        color: #c5a3ff;
+      }
+    }
+
+    .el-main {
+      background: linear-gradient(145deg, #1e1e2e 0%, #252538 100%);
+    }
+
+    .el-footer {
+      background-color: rgba(30, 30, 46, 0.96);
+      border-top: 1px solid #2d2d44;
+      color: #a0a0b0;
+    }
+  }
 
   .el-aside {
-    background-color: #232323;
+    background: linear-gradient(180deg, #2d2d44 0%, #1e1e2e 100%);
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(197, 163, 255, 0.1) 0%, transparent 70%);
+      animation: rotate 20s linear infinite;
+      pointer-events: none;
+    }
 
     &__logo {
       height: 120px;
-      background: url('@/assets/logo.png') no-repeat center / 120px auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: transparent;
+
+      .logo-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+
+        .logo-img {
+          width: 40px;
+          height: 40px;
+          object-fit: contain;
+          filter: drop-shadow(0 2px 8px rgba(197, 163, 255, 0.3));
+        }
+
+        .logo-text {
+          font-size: 20px;
+          font-weight: 700;
+          background: linear-gradient(135deg, #c5a3ff, #f8b4d9, #a8e6cf);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          letter-spacing: 1px;
+        }
+      }
+
+      .logo-slogan {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+        letter-spacing: 2px;
+      }
     }
 
-    .el-menu {
+    .custom-menu {
       border-right: none;
+      background: transparent;
       --el-menu-active-color: #c5a3ff;
+
+      :deep(.el-menu-item) {
+        margin: 8px 12px;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: rgba(197, 163, 255, 0.15);
+          transform: translateX(4px);
+        }
+
+        &.is-active {
+          background: linear-gradient(135deg, rgba(197, 163, 255, 0.2), rgba(248, 180, 217, 0.2));
+          box-shadow: 0 4px 12px rgba(197, 163, 255, 0.2);
+        }
+      }
+
+      :deep(.el-sub-menu__title) {
+        margin: 8px 12px;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: rgba(197, 163, 255, 0.15);
+        }
+      }
+    }
+
+    .aside-footer {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+
+      .floating-emoji-mini {
+        width: 6px;
+        height: 6px;
+        background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+        border-radius: 50%;
+        opacity: 0.4;
+        animation: float 3s ease-in-out infinite;
+
+        &:nth-child(2) {
+          animation-delay: 1.5s;
+        }
+      }
     }
   }
 
@@ -175,48 +302,140 @@ const handleCommand = (command) => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
+    padding: 0 24px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     border-bottom: 1px solid #f0e5ff;
+    backdrop-filter: blur(10px);
 
-    .welcome-text {
-      font-size: 18px;
-      font-weight: 600;
-      background: linear-gradient(135deg, #c5a3ff, #f8b4d9, #a8e6cf);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-
-    .el-dropdown__box {
+    .header-left {
       display: flex;
       align-items: center;
+      gap: 20px;
 
-      .el-icon {
-        color: #c5a3ff;
-        margin-left: 10px;
+      .greeting {
+        .greeting-text {
+          font-size: 16px;
+          color: #666;
+          transition: color 0.3s ease;
+        }
+
+        .username-display {
+          font-size: 18px;
+          font-weight: 600;
+          background: linear-gradient(135deg, #c5a3ff, #f8b4d9, #a8e6cf);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+        }
       }
 
-      &:active,
-      &:focus {
-        outline: none;
+      .theme-toggle {
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        &:hover {
+          background: rgba(197, 163, 255, 0.1);
+          transform: rotate(180deg);
+        }
+
+        .el-icon {
+          font-size: 20px;
+          color: #c5a3ff;
+        }
+      }
+    }
+
+    .user-dropdown {
+      .el-dropdown__box {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        padding: 6px 12px;
+        border-radius: 48px;
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: rgba(197, 163, 255, 0.1);
+        }
+
+        .user-avatar {
+          border: 2px solid #c5a3ff;
+          box-shadow: 0 2px 8px rgba(197, 163, 255, 0.3);
+        }
+
+        .user-name {
+          font-size: 14px;
+          color: #333;
+          font-weight: 500;
+        }
+
+        .dropdown-icon {
+          color: #c5a3ff;
+          font-size: 14px;
+        }
+
+        &:active,
+        &:focus {
+          outline: none;
+        }
       }
     }
   }
 
   .el-main {
-    padding: 20px;
+    padding: 24px;
     background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
+    min-height: calc(100vh - 180px);
+
+    .content-container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
   }
 
   .el-footer {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     font-size: 14px;
     color: #666;
     background-color: rgba(255, 255, 255, 0.96);
     border-top: 1px solid #f0e5ff;
+    padding: 16px;
+    backdrop-filter: blur(10px);
+
+    .footer-dot {
+      color: #c5a3ff;
+      font-size: 12px;
+    }
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-10px);
+    opacity: 0.7;
   }
 }
 </style>
