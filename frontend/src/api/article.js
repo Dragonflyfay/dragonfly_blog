@@ -1,6 +1,5 @@
 import request from '@/utils/request.js'
-import { useTokenStore } from '@/stores/token'
-//文章列表查询
+//文章分类列表查询
 export const articleCategoryListService = () => {
   // const tokenStore = useTokenStore()
   //pinia中获取的响应式数据都不需要.value 获取token
@@ -13,8 +12,24 @@ export const articleCategoryAddService = (categoryData) => {
   return request.post('/category', categoryData)
 }
 export const articleCategoryDeleteService = (id) => {
-  return request.delete(`/category`,{params:{id}})
+  return request.delete(`/category`, { params: { id } })
 }
 export const articleCategoryUpdateService = (categoryData) => {
   return request.put(`/category`, categoryData)
+}
+
+//文章列表查询
+export const articleListService = (params) => {
+  return request.get('/article', { params: params })
+}
+
+export const uploadFileWithSts = async (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return request.post('/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
 }

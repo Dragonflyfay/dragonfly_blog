@@ -1,34 +1,53 @@
 package com.dragonfly.controller;
 
+import com.aliyuncs.sts.model.v20150401.AssumeRoleResponse;
 import com.dragonfly.pojo.Result;
+import com.dragonfly.service.StsService;
 import com.dragonfly.utils.AliOssUtil;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.awt.font.MultipleMaster;
-import java.io.File;
-import java.io.IOException;
 import java.util.UUID;
 
-/**
- * 描述：
- *
- * @param
- * @author 蜻蜓大王
- * @date 2026/4/24 20:18
- */
 @RestController
 public class FileUploadController {
-    @PostMapping("/upload")
-    public Result<String> upload(MultipartFile file) throws Exception {
-        //把文件的内容保存到本地的磁盘上
-        String originalFilename = file.getOriginalFilename();
-        //保证文件的名称唯一
-        String fileName = UUID.randomUUID().toString()+originalFilename.substring(originalFilename.lastIndexOf("."));
-        //file.transferTo(new File("C:\\Users\\15041\\Desktop\\File\\"+fileName));
-        String url=AliOssUtil.uploadFile(fileName,file.getInputStream());
-        return Result.success(url);//上传到服务器之后的URL地址
 
+    @PostMapping("/upload")
+    public Result<String> upload(@RequestParam("file") MultipartFile file) {
+        try {
+            if (file == null || file.isEmpty()) {
+                return Result.error("上传文件不能为空");
+            }
+
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename == null || originalFilename.isEmpty()) {
+                return Result.error("文件名不能为空");
+            }
+
+            int lastDotIndex = originalFilename.lastIndexOf(".");
+            String suffix = lastDotIndex >= 0 ? originalFilename.substring(lastDotIndex) : "";
+            String fileName = UUID.randomUUID().toString() + suffix;
+
+            AssumeRoleResponse stsResponse = StsService.getStsCredential();
+            String accessKeyId = stsResponse.getCredentials().getAccessKeyId();
+            String accessKeySecret = stsResponse.getCredentials().getAccessKeySecret();
+            String securityToken = stsResponse.getCredentials().getSecurityToken();
+
+            String url = AliOssUtil.uploadFileWithSts(
+                    fileName,
+                    file.getInputStream(),
+                    accessKeyId,
+                    accessKeySecret,
+                    securityToken
+            );
+
+            return Result.success(url);
+        } catch (IllegalStateException e) {
+            return Result.error("服务配置错误：" + e.getMessage());
+        } catch (Exception e) {
+            return Result.error("文件上传失败：" + e.getMessage());
+        }
     }
 }
