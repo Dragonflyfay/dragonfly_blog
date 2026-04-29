@@ -16,8 +16,8 @@ import java.util.List;
 public interface ArticleMapper {
 
     //新增
-    @Insert("insert into article (title,content,cover_img,state,category_id,create_user,create_time,update_time)"+
-            "values(#{title},#{content},#{coverImg},#{state},#{categoryId},#{createUser},#{createTime},#{updateTime})")
+    @Insert("insert into article (title,summary,content,cover_img,video_url,state,is_top,is_original,source_url,category_id,create_user,publish_time,create_time,update_time) "+
+            "values(#{title},#{summary},#{content},#{coverImg},#{videoUrl},#{state},#{isTop},#{isOriginal},#{sourceUrl},#{categoryId},#{createUser},#{publishTime},#{createTime},#{updateTime})")
     void add(Article article);
 
     //列表查询, 用mapper封装参数

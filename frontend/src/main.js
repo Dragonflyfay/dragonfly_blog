@@ -13,11 +13,16 @@ import { createPinia } from 'pinia'
 
 import { createPersistedState } from 'pinia-persistedstate-plugin'
 
+// 导入中文语言包
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
+
 const app = createApp(App)
 const pinia = createPinia()
 const persist = createPersistedState()
 pinia.use(persist)
 app.use(pinia)
 app.use(router)
-app.use(ElementPlus)
+app.use(ElementPlus, {
+  locale: zhCn,
+})
 app.mount('#app')
