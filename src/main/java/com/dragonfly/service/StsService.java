@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class StsService {
 
-    private static final String ACCESS_KEY_ID = System.getenv("OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_ID");
+    private static final String ACCESS_KEY_ID = System.getenv("OSS_ACCESS_KEY_ID ");
     private static final String ACCESS_KEY_SECRET = System.getenv("OSS_ACCESS_KEY_SECRET");
     private static final String ROLE_ARN = System.getenv("STS_ROLE_ARN");
     private static final String REGION = System.getenv("OSS_REGION") != null ?
