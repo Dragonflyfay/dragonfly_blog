@@ -1,40 +1,42 @@
-package com.dragonfly.utils;
+package com.dragonfly;
 
+/**
+ * 描述：oss测试
+ *
+ * @param
+ * @author 蜻蜓大王
+ * @date 2026/5/1 23:20
+ */
 import com.aliyun.oss.*;
-import com.aliyun.oss.common.auth.CredentialsProviderFactory;
-import com.aliyun.oss.common.auth.DefaultCredentialProvider;
-import com.aliyun.oss.common.auth.EnvironmentVariableCredentialsProvider;
+import com.aliyun.oss.common.auth.*;
 import com.aliyun.oss.common.comm.SignVersion;
-import com.aliyun.oss.model.PutObjectRequest;
-import com.aliyun.oss.model.PutObjectResult;
-
+import com.aliyun.oss.model.*;
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
 
-public class AliOssUtil {
-    private static final String ENDPOINT = "oss-cn-beijing.aliyuncs.com";
-    // 从环境变量中获取访问凭证。运行本代码示例之前，请确保已设置环境变量OSS_ACCESS_KEY_ID和OSS_ACCESS_KEY_SECRET。
-    private static final EnvironmentVariableCredentialsProvider CREDENTIALSPROVIDER = CredentialsProviderFactory.newEnvironmentVariableCredentialsProvider();
-    // 填写Bucket名称，例如examplebucket。
-    private static final String BUCKETNAME = "dragonfly-blog";
-    // 填写Object完整路径，完整路径中不能包含Bucket名称，例如exampledir/exampleobject.txt。
-    private static final String OBJECTNAME = "002.png";
-    // 填写Bucket所在地域。以华东1（杭州）为例，Region填写为cn-hangzhou。
-    private static final String REGION = "cn-beijing";
-    public static String  uploadFile(String objectName, InputStream in ) throws Exception {
+public class Demo {
+
+    public static void main(String[] args) throws Exception {
         // Endpoint以华东1（杭州）为例，其它Region请按实际情况填写。
-        String url="";
+        String endpoint = "oss-cn-beijing.aliyuncs.com";
+        // 从环境变量中获取访问凭证。运行本代码示例之前，请确保已设置环境变量OSS_ACCESS_KEY_ID和OSS_ACCESS_KEY_SECRET。
+        EnvironmentVariableCredentialsProvider credentialsProvider = CredentialsProviderFactory.newEnvironmentVariableCredentialsProvider();
+        // 填写Bucket名称，例如examplebucket。
+        String bucketName = "dragonfly-blog";
+        // 填写Object完整路径，完整路径中不能包含Bucket名称，例如exampledir/exampleobject.txt。
+        String objectName = "002.png";
+        // 填写Bucket所在地域。以华东1（杭州）为例，Region填写为cn-hangzhou。
+        String region = "cn-beijing";
 
         // 创建OSSClient实例。
         // 当OSSClient实例不再使用时，调用shutdown方法以释放资源。
         ClientBuilderConfiguration clientBuilderConfiguration = new ClientBuilderConfiguration();
         clientBuilderConfiguration.setSignatureVersion(SignVersion.V4);
         OSS ossClient = OSSClientBuilder.create()
-                .endpoint(ENDPOINT)
-                .credentialsProvider(CREDENTIALSPROVIDER)
+                .endpoint(endpoint)
+                .credentialsProvider(credentialsProvider)
                 .clientConfiguration(clientBuilderConfiguration)
-                .region(REGION)
+                .region(region)
                 .build();
 
         try {
@@ -42,7 +44,7 @@ public class AliOssUtil {
             String content = "Hello OSS，你好世界";
 
             // 创建PutObjectRequest对象。
-            PutObjectRequest putObjectRequest = new PutObjectRequest(BUCKETNAME, OBJECTNAME, new FileInputStream("C:\\\\Users\\\\15041\\\\Desktop\\\\imags\\\\001.png"));
+            PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, objectName, new FileInputStream("C:\\\\Users\\\\15041\\\\Desktop\\\\imags\\\\001.png"));
 
             // 如果需要上传时设置存储类型和访问权限，请参考以下示例代码。
             // ObjectMetadata metadata = new ObjectMetadata();
@@ -52,7 +54,6 @@ public class AliOssUtil {
 
             // 上传字符串。
             PutObjectResult result = ossClient.putObject(putObjectRequest);
-            url="https://"+BUCKETNAME+".oss-cn-beijing.aliyuncs.com/"+OBJECTNAME;
         } catch (OSSException oe) {
             System.out.println("Caught an OSSException, which means your request made it to OSS, "
                     + "but was rejected with an error response for some reason.");
@@ -70,7 +71,5 @@ public class AliOssUtil {
                 ossClient.shutdown();
             }
         }
-        return url;
     }
-
 }

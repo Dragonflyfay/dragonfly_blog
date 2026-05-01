@@ -87,6 +87,7 @@ const onCurrentChange = (num) => {
   articleList()
 }
 //回显文章分类
+
 import { articleCategoryListService, articleListService } from '@/api/article.js'
 const articleCategoryList = async () => {
   let result = await articleCategoryListService()
@@ -144,41 +145,11 @@ const articleModel = ref({
 import { QuillEditor } from '@vueup/vue-quill'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
-import {uploadFileWithSts} from "@/api/article.js";
 
-const uploadCover = async (file) => {
-  const isImage=file.type.startsWith('image/')
-  const isLt5M=file.size/1024/1024<5
 
-  if(!isImage){
-    ElMessage.error('只能上传图片文件！')
-    return false
-  }
-  if(!isLt5M){
-    ElMessage.error('图片文件不能大于5M')
-    return false
-  }
-  try {
-    const result = await uploadFileWithSts(file)
-    if (result.code === 0) {
-      articleModel.value.coverImg = result.data
-      ElMessage.success('上传成功')
-    } else {
-      ElMessage.error(result.message || '上传失败')
-    }
-    return false
-  } catch (error) {
-    ElMessage.error(error.message || '上传失败')
-    return false
-  }
-}
 
-const handleCoverChange = async (uploadFile) => {
-  if (!uploadFile?.raw) {
-    return
-  }
-  await uploadCover(uploadFile.raw)
-}
+
+
 </script>
 <template>
   <el-card class="page-container">
