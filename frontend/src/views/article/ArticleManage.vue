@@ -88,7 +88,7 @@ const onCurrentChange = (num) => {
 }
 //回显文章分类
 
-import { articleCategoryListService, articleListService } from '@/api/article.js'
+import { articleCategoryListService, articleListService, articleAddService } from '@/api/article.js'
 const articleCategoryList = async () => {
   let result = await articleCategoryListService()
   categorys.value = result.data
@@ -118,12 +118,9 @@ const articleList = async () => {
       //循环分类列表
       if (article.categoryId == categorys.value[j].id) {
         article.categoryName = categorys.value[j].categoryName
-        found = true
-        break
+      } else {
+        article.categoryName = '未分类'
       }
-    }
-    if (!found) {
-      article.categoryName = '未分类'
     }
   }
 }
@@ -145,179 +142,741 @@ const articleModel = ref({
 import { QuillEditor } from '@vueup/vue-quill'
 import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
-
-
-
-
-
+//导入token
+import { useTokenStore } from '@/stores/token.js'
+const tokenStore = useTokenStore()
+//上传成功的回调
+const uploadSuccess = (result) => {
+  articleModel.value.coverImg = result.data
+  console.log(result.data)
+}
+//添加文章
+const addArticle = async (clickState) => {
+  //把发布状态赋值到文章模型
+  articleModel.value.state = clickState
+  //调用接口
+  let result = await articleAddService(articleModel.value)
+  if (result.code == 200) {
+    ElMessage.success('添加成功')
+    visibleDrawer.value = false
+    articleList()
+  } else {
+    ElMessage.error('添加失败')
+  }
+}
 </script>
 <template>
-  <el-card class="page-container">
-    <template #header>
-      <div class="header">
-        <span>文章管理</span>
-        <div class="extra">
-          <el-button type="primary" @click="visibleDrawer = true">添加文章</el-button>
+  <div class="article-manage-container">
+    <!-- 顶部装饰区 -->
+    <div class="page-header">
+      <div class="header-title-section">
+        <div class="title-decoration">
+          <span class="decoration-dot"></span>
+          <span class="decoration-dot"></span>
+          <span class="decoration-dot"></span>
         </div>
+        <h1 class="page-title">笔记管理</h1>
+        <p class="page-subtitle">记录灵感，整理思绪，让每一篇笔记都闪闪发光 ✨</p>
       </div>
-    </template>
-    <!-- 搜索表单 -->
-    <el-form inline>
-      <el-form-item label="文章分类：">
-        <el-select placeholder="请选择" v-model="categoryId">
-          <el-option v-for="c in categorys" :key="c.id" :label="c.categoryName" :value="c.id">
-          </el-option>
-        </el-select>
-      </el-form-item>
+      <div class="header-extra">
+        <el-button class="add-btn" type="primary" size="large" @click="visibleDrawer = true">
+          <span class="btn-text">+ 写笔记</span>
+        </el-button>
+      </div>
+    </div>
 
-      <el-form-item label="发布状态：">
-        <el-select placeholder="请选择" v-model="state">
-          <el-option label="已发布" value="已发布"></el-option>
-          <el-option label="草稿" value="草稿"></el-option>
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="articleList">搜索</el-button>
-        <el-button
-          @click="
-            ;() => {
-              categoryId = ''
-              state = ''
-            }
-          "
-          >重置</el-button
-        >
-      </el-form-item>
-    </el-form>
-    <!-- 文章列表 -->
-    <el-table :data="articles" style="width: 100%">
-      <el-table-column label="文章标题" width="400" prop="title"></el-table-column>
-      <el-table-column label="分类" prop="categoryName"></el-table-column>
-      <el-table-column label="发表时间" prop="createTime"> </el-table-column>
-      <el-table-column label="状态" prop="state"></el-table-column>
-      <el-table-column label="操作" width="100">
-        <template #default="{ row }">
-          <el-button :icon="Edit" circle plain type="primary"></el-button>
-          <el-button :icon="Delete" circle plain type="danger"></el-button>
-        </template>
-      </el-table-column>
-      <template #empty>
-        <el-empty description="没有数据" />
-      </template>
-    </el-table>
-    <!-- 分页条 -->
-    <el-pagination
-      v-model:current-page="pageNum"
-      v-model:page-size="pageSize"
-      :page-sizes="[3, 5, 10, 15]"
-      layout="jumper, total, sizes, prev, pager, next"
-      background
-      :total="total"
-      @size-change="onSizeChange"
-      @current-change="onCurrentChange"
-      style="margin-top: 20px; justify-content: flex-end"
-    />
-    <!-- 抽屉 -->
-    <el-drawer v-model="visibleDrawer" title="添加文章" direction="rtl" size="50%">
-      <!-- 添加文章表单 -->
-      <el-form :model="articleModel" label-width="100px">
-        <el-form-item label="文章标题">
-          <el-input v-model="articleModel.title" placeholder="请输入标题"></el-input>
-        </el-form-item>
+    <!-- 搜索卡片 -->
+    <div class="search-card">
+      <div class="search-title">
+        <span class="search-emoji">🔍</span>
+        <span>筛选笔记</span>
+      </div>
+      <el-form inline class="search-form">
         <el-form-item label="文章分类">
-          <el-select placeholder="请选择" v-model="articleModel.categoryId">
+          <el-select placeholder="请选择分类" v-model="categoryId" class="custom-select">
             <el-option v-for="c in categorys" :key="c.id" :label="c.categoryName" :value="c.id">
             </el-option>
           </el-select>
         </el-form-item>
-        <el-form-item label="文章封面">
-          <!-- 
-            auto-upload:是否自动上传
-            action:设置服务器接口路径
-            name:设置上传文件的字段名
-            headers:设置请求头
-            on_success:设置上传成功的回调函数
 
+        <el-form-item label="发布状态">
+          <el-select placeholder="请选择状态" v-model="state" class="custom-select">
+            <el-option label="已发布" value="已发布"></el-option>
+            <el-option label="草稿" value="草稿"></el-option>
+          </el-select>
+        </el-form-item>
 
-            
-            
-            -->
-          <el-upload
-            class="avatar-uploader"
-            :auto-upload="false"
-            :show-file-list="false"
-            :on-change="handleCoverChange"
-          >
-            <img v-if="articleModel.coverImg" :src="articleModel.coverImg" class="avatar" />
-            <el-icon v-else class="avatar-uploader-icon">
-              <Plus />
-            </el-icon>
-          </el-upload>
-        </el-form-item>
-        <el-form-item label="文章内容">
-          <!-- 富文本编辑器 -->
-          <div class="editor">
-            <quill-editor theme="snow" v-model:content="articleModel.content" contentType="html">
-            </quill-editor>
-          </div>
-        </el-form-item>
         <el-form-item>
-          <el-button type="primary">发布</el-button>
-          <el-button type="info">草稿</el-button>
+          <el-button class="search-btn" @click="articleList">搜索</el-button>
+          <el-button
+            class="reset-btn"
+            @click="
+              () => {
+                categoryId = ''
+                state = ''
+              }
+            "
+            >重置</el-button
+          >
         </el-form-item>
       </el-form>
-    </el-drawer>
-  </el-card>
-</template>
-<style lang="scss" scoped>
-.page-container {
-  min-height: 100%;
-  box-sizing: border-box;
+    </div>
 
-  .header {
+    <!-- 表格卡片 -->
+    <div class="table-card">
+      <el-table :data="articles" style="width: 100%" class="custom-table">
+        <el-table-column label="文章标题" width="400" prop="title">
+          <template #default="{ row }">
+            <div class="title-cell">
+              <span class="title-icon">📄</span>
+              <span class="title-text">{{ row.title }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="分类" prop="categoryName">
+          <template #default="{ row }">
+            <span class="category-tag">{{ row.categoryName }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="发表时间" prop="createTime">
+          <template #default="{ row }">
+            <div class="time-cell">
+              <span>📅</span>
+              <span>{{ row.createTime }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" prop="state">
+          <template #default="{ row }">
+            <span
+              class="status-badge"
+              :class="{
+                'status-draft': row.state === '草稿',
+                'status-published': row.state === '已发布',
+              }"
+            >
+              {{ row.state }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120">
+          <template #default="{ row }">
+            <div class="action-buttons">
+              <el-tooltip content="编辑" placement="top" effect="customized">
+                <el-button :icon="Edit" circle class="action-btn edit-btn"></el-button>
+              </el-tooltip>
+              <el-tooltip content="删除" placement="top" effect="customized">
+                <el-button :icon="Delete" circle class="action-btn delete-btn"></el-button>
+              </el-tooltip>
+            </div>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="custom-empty">
+            <div class="empty-emoji">📭</div>
+            <p class="empty-text">还没有笔记哦</p>
+            <p class="empty-hint">点击「写笔记」开始记录你的美好生活吧 ✨</p>
+          </div>
+        </template>
+      </el-table>
+
+      <!-- 分页 -->
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pageNum"
+          v-model:page-size="pageSize"
+          :page-sizes="[3, 5, 10, 15]"
+          layout="jumper, total, sizes, prev, pager, next"
+          background
+          :total="total"
+          @size-change="onSizeChange"
+          @current-change="onCurrentChange"
+        />
+      </div>
+    </div>
+
+    <!-- 底部分隔装饰 -->
+    <div class="page-footer">
+      <span class="footer-emoji">💜</span>
+      <span>共 {{ total }} 篇笔记，记录你的每一次灵感</span>
+      <span class="footer-emoji">✨</span>
+    </div>
+
+    <!-- 抽屉 - 添加文章 -->
+    <el-drawer
+      v-model="visibleDrawer"
+      title="写笔记"
+      direction="rtl"
+      size="50%"
+      class="custom-drawer"
+    >
+      <div class="drawer-content">
+        <el-form :model="articleModel" label-width="100px" class="drawer-form">
+          <el-form-item label="文章标题">
+            <el-input
+              v-model="articleModel.title"
+              placeholder="给笔记起个名字吧"
+              class="custom-input"
+            ></el-input>
+          </el-form-item>
+
+          <el-form-item label="文章分类">
+            <el-select
+              placeholder="选择分类"
+              v-model="articleModel.categoryId"
+              class="custom-select"
+            >
+              <el-option v-for="c in categorys" :key="c.id" :label="c.categoryName" :value="c.id">
+              </el-option>
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="文章封面">
+            <el-upload
+              class="avatar-uploader"
+              :auto-upload="true"
+              :show-file-list="false"
+              action="/api/upload"
+              name="file"
+              :headers="{ Authorization: tokenStore.token }"
+              :on-success="uploadSuccess"
+            >
+              <img
+                v-if="articleModel.coverImg"
+                :src="articleModel.coverImg"
+                class="cover-preview"
+              />
+              <div v-else class="upload-placeholder">
+                <el-icon class="upload-icon"><Plus /></el-icon>
+                <span>点击上传封面</span>
+              </div>
+            </el-upload>
+          </el-form-item>
+
+          <el-form-item label="文章内容">
+            <div class="editor-wrapper">
+              <quill-editor theme="snow" v-model:content="articleModel.content" contentType="html">
+              </quill-editor>
+            </div>
+          </el-form-item>
+
+          <el-form-item>
+            <div class="form-actions">
+              <el-button class="publish-btn" type="primary" @click="addArticle('已发布')"
+                >发布</el-button
+              >
+              <el-button class="draft-btn" @click="addArticle('草稿')">存草稿</el-button>
+            </div>
+          </el-form-item>
+        </el-form>
+      </div>
+    </el-drawer>
+  </div>
+</template>
+
+<style lang="scss" scoped>
+.article-manage-container {
+  min-height: calc(100vh - 120px);
+  padding: 20px;
+}
+
+// 页面头部
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  padding: 24px 28px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+
+  .header-title-section {
+    position: relative;
+
+    .title-decoration {
+      position: absolute;
+      top: -12px;
+      left: -16px;
+      display: flex;
+      gap: 6px;
+
+      .decoration-dot {
+        width: 6px;
+        height: 6px;
+        background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+        border-radius: 50%;
+        opacity: 0.7;
+
+        &:nth-child(2) {
+          width: 10px;
+          height: 10px;
+          opacity: 0.4;
+        }
+
+        &:nth-child(3) {
+          width: 14px;
+          height: 14px;
+          opacity: 0.2;
+        }
+      }
+    }
+
+    .page-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0 0 6px 0;
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9, #a8e6cf);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .page-subtitle {
+      font-size: 13px;
+      color: #a09abf;
+      margin: 0;
+      letter-spacing: 0.5px;
+    }
+  }
+
+  .add-btn {
+    background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
+    border: none;
+    border-radius: 48px;
+    padding: 12px 32px;
+    font-weight: 500;
+    color: white;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(197, 163, 255, 0.2);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
+    }
+
+    .btn-text {
+      font-size: 14px;
+    }
+  }
+}
+
+// 搜索卡片
+.search-card {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 24px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+
+  .search-title {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-  }
-}
-.el-select {
-  --el-select-width: 220px;
-}
-/* 抽屉样式 */
-.avatar-uploader {
-  :deep() {
-    .avatar {
-      width: 178px;
-      height: 178px;
-      display: block;
-    }
+    gap: 8px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #c5a3ff;
 
-    .el-upload {
-      border: 1px dashed var(--el-border-color);
-      border-radius: 6px;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-      transition: var(--el-transition-duration-fast);
-    }
-
-    .el-upload:hover {
-      border-color: var(--el-color-primary);
-    }
-
-    .el-icon.avatar-uploader-icon {
-      font-size: 28px;
-      color: #8c939d;
-      width: 178px;
-      height: 178px;
-      text-align: center;
+    .search-emoji {
+      font-size: 18px;
     }
   }
+
+  .search-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+
+    :deep(.el-form-item__label) {
+      color: #6a4a9c;
+      font-weight: 500;
+    }
+
+    .custom-select {
+      width: 180px;
+    }
+
+    .search-btn {
+      background: linear-gradient(135deg, #c5a3ff 0%, #b583ff 100%);
+      border: none;
+      border-radius: 48px;
+      padding: 8px 24px;
+      color: white;
+      transition: all 0.3s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+      }
+    }
+
+    .reset-btn {
+      background: linear-gradient(135deg, #a8e6cf 0%, #90e0c0 100%);
+      border: none;
+      border-radius: 48px;
+      padding: 8px 24px;
+      color: white;
+      transition: all 0.3s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(168, 230, 207, 0.3);
+      }
+    }
+  }
 }
-.editor {
-  width: 100%;
-  :deep(.ql-editor) {
-    min-height: 200px;
+
+// 表格卡片
+.table-card {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+
+  .custom-table {
+    border-radius: 16px;
+    overflow: hidden;
+
+    :deep(.el-table__header) {
+      th {
+        background: linear-gradient(135deg, #f8f3ff 0%, #faf7ff 100%);
+        color: #6a4a9c;
+        font-weight: 600;
+      }
+    }
+
+    :deep(.el-table__body) {
+      tr {
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: rgba(197, 163, 255, 0.08);
+        }
+      }
+    }
+
+    .title-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      .title-icon {
+        font-size: 18px;
+      }
+
+      .title-text {
+        font-weight: 500;
+        color: #333;
+      }
+    }
+
+    .category-tag {
+      display: inline-block;
+      padding: 4px 12px;
+      background: linear-gradient(135deg, #e0c3ff, #c5a3ff);
+      border-radius: 20px;
+      color: white;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .time-cell {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #999;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+
+      &.status-published {
+        background: linear-gradient(135deg, #a8e6cf, #7ee0b5);
+        color: #2c665a;
+      }
+
+      &.status-draft {
+        background: linear-gradient(135deg, #ffd6a8, #ffc88a);
+        color: #8a5a1c;
+      }
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+
+      .action-btn {
+        transition: all 0.3s ease;
+
+        &:hover {
+          transform: translateY(-2px) scale(1.1);
+        }
+      }
+
+      .edit-btn {
+        background: linear-gradient(135deg, #a8e6cf 0%, #c2f5e9 100%);
+        border-color: #a8e6cf;
+        color: #2c665a;
+
+        &:hover {
+          box-shadow: 0 4px 12px rgba(168, 230, 207, 0.4);
+        }
+      }
+
+      .delete-btn {
+        background: linear-gradient(135deg, #ff9e9e 0%, #ffbaba 100%);
+        border-color: #ff9e9e;
+        color: #8a1c1c;
+
+        &:hover {
+          box-shadow: 0 4px 12px rgba(255, 158, 158, 0.4);
+        }
+      }
+    }
+  }
+
+  .pagination-wrapper {
+    margin-top: 24px;
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
+// 空状态
+.custom-empty {
+  padding: 60px 20px;
+  text-align: center;
+
+  .empty-emoji {
+    font-size: 48px;
+    margin-bottom: 16px;
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .empty-text {
+    font-size: 16px;
+    color: #666;
+    margin: 0 0 8px 0;
+    font-weight: 500;
+  }
+
+  .empty-hint {
+    font-size: 13px;
+    color: #999;
+    margin: 0;
+  }
+}
+
+// 底部装饰
+.page-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding: 16px;
+  font-size: 13px;
+  color: #a09abf;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+
+  .footer-emoji {
+    font-size: 14px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+}
+
+// 抽屉样式
+.custom-drawer {
+  :deep(.el-drawer__header) {
+    background: linear-gradient(135deg, #f8b4d9 0%, #c5a3ff 100%);
+    color: white;
+    margin-bottom: 0;
+    padding: 20px 24px;
+
+    .el-drawer__title {
+      font-weight: 600;
+    }
+
+    .el-drawer__close-btn {
+      color: white;
+    }
+  }
+
+  :deep(.el-drawer__body) {
+    padding: 24px;
+    background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
+  }
+}
+
+.drawer-content {
+  .drawer-form {
+    .custom-input {
+      :deep(.el-input__wrapper) {
+        border-radius: 48px;
+        padding: 8px 20px;
+        background-color: #faf7ff;
+        border: 1px solid #f0e5ff;
+        transition: all 0.3s ease;
+        box-shadow: none;
+
+        &:hover {
+          border-color: #d9b8ff;
+          background-color: #fff;
+        }
+
+        &.is-focus {
+          border-color: #c5a3ff;
+          background-color: #fff;
+          box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.12);
+        }
+      }
+    }
+
+    .custom-select {
+      width: 100%;
+    }
+
+    .avatar-uploader {
+      .cover-preview {
+        width: 200px;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.2);
+      }
+
+      .upload-placeholder {
+        width: 200px;
+        height: 120px;
+        background: linear-gradient(135deg, #faf7ff 0%, #f0e5ff 100%);
+        border: 2px dashed #c5a3ff;
+        border-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+
+        &:hover {
+          border-color: #f8b4d9;
+          background: linear-gradient(135deg, #fff 0%, #faf7ff 100%);
+        }
+
+        .upload-icon {
+          font-size: 24px;
+          color: #c5a3ff;
+        }
+
+        span {
+          font-size: 12px;
+          color: #999;
+        }
+      }
+    }
+
+    .editor-wrapper {
+      width: 100%;
+
+      :deep(.ql-editor) {
+        min-height: 200px;
+        border-radius: 12px;
+      }
+
+      :deep(.ql-toolbar) {
+        border-radius: 12px 12px 0 0;
+        border-color: #f0e5ff;
+      }
+
+      :deep(.ql-container) {
+        border-radius: 0 0 12px 12px;
+        border-color: #f0e5ff;
+      }
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 16px;
+
+      .publish-btn {
+        background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
+        border: none;
+        border-radius: 48px;
+        padding: 10px 32px;
+        transition: all 0.3s ease;
+
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(197, 163, 255, 0.4);
+        }
+      }
+
+      .draft-btn {
+        background: linear-gradient(135deg, #a8e6cf 0%, #c2f5e9 100%);
+        border: none;
+        border-radius: 48px;
+        padding: 10px 32px;
+        transition: all 0.3s ease;
+
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(168, 230, 207, 0.4);
+        }
+      }
+    }
+  }
+}
+
+// 动画
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+// 全局样式覆盖
+:deep(.el-pagination) {
+  .btn-prev,
+  .btn-next,
+  .el-pager li {
+    border-radius: 12px !important;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: linear-gradient(135deg, #c5a3ff20, #f8b4d920) !important;
+    }
+  }
+
+  .el-pager li.is-active {
+    background: linear-gradient(135deg, #c5a3ff, #f8b4d9) !important;
+    color: white !important;
   }
 }
 </style>

@@ -14,10 +14,8 @@ import { useTokenStore } from '@/stores/token.js'
 const router = useRouter()
 const tokenStore = useTokenStore()
 
-// 原始数据（不动）
 const categorys = ref([])
 
-// 可选：为不同分类设置渐变色小圆点（装饰用途）
 const getCategoryGradient = (name) => {
   const gradients = {
     美食: 'linear-gradient(135deg, #F8B4D9, #FF9A9E)',
@@ -27,21 +25,6 @@ const getCategoryGradient = (name) => {
   return gradients[name] || 'linear-gradient(135deg, #E0C3FF, #C5A3FF)'
 }
 
-// 纯粹的美化动画状态（hover效果）
-const onIconHover = (row, type, isHover) => {
-  // 不添加任何功能，仅用于样式控制
-}
-
-// 表格行的悬浮样式（class）
-const tableRowClassName = ({ row, rowIndex }) => {
-  return 'custom-table-row'
-}
-
-// 鼠标进入/离开表格单元格（无实际功能，仅用于可能的事件预留）
-const handleCellMouseEnter = (row, column, cell, event) => {}
-const handleCellMouseLeave = (row, column, cell, event) => {}
-
-//声明一个异步函数
 const articleCategoryList = async () => {
   try {
     let result = await articleCategoryListService()
@@ -51,9 +34,7 @@ const articleCategoryList = async () => {
   }
 }
 
-// 使用onMounted确保在组件挂载后执行数据加载
 onMounted(() => {
-  // 检查是否有token，如果没有则重定向到登录页
   if (!tokenStore.token) {
     router.push('/login')
     return
@@ -61,85 +42,64 @@ onMounted(() => {
   articleCategoryList()
 })
 
-//控制添加分类弹窗
 const dialogVisible = ref(false)
 const title = ref('')
 
-//添加分类数据模型
 const categoryModel = ref({
   categoryName: '',
   categoryAlias: '',
 })
-//添加分类表单校验
+
 const rules = {
   categoryName: [{ required: true, message: '请输入分类名称', trigger: 'blur' }],
   categoryAlias: [{ required: true, message: '请输入分类别名', trigger: 'blur' }],
 }
-//访问后台，添加文章分类
+
 const addCategory = async () => {
-  //调用接口
   let result = await articleCategoryAddService(categoryModel.value)
   ElMessage.success(result.message ? result.message : '添加成功')
-
-  //再次访问后台接口，查询所有分类
   articleCategoryList()
-  //隐藏弹窗
   dialogVisible.value = false
 }
-//展示编辑弹窗
+
 const showDialog = (row) => {
   dialogVisible.value = true
   title.value = '编辑分类'
-  //数据拷贝、
   categoryModel.value.categoryName = row.categoryName
   categoryModel.value.categoryAlias = row.categoryAlias
-  //扩展id属性，将来需要传递给后台，完成分类的修改
   categoryModel.value.id = row.id
 }
 
-//编辑分类
 const updateCategory = async () => {
-  //调用接口
   let result = await articleCategoryUpdateService(categoryModel.value)
-
   ElMessage.success(result.message ? result.message : '修改成功')
   articleCategoryList()
   dialogVisible.value = false
 }
 
-//删除分类
 import { ElMessageBox } from 'element-plus'
 const deleteCategory = (row) => {
-  try {
-    ElMessageBox.confirm('你确认要删除该分类信息吗', '温馨提示', {
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      type: 'warning',
+  ElMessageBox.confirm('你确认要删除该分类信息吗', '温馨提示', {
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(async () => {
+      let result = await articleCategoryDeleteService(row.id)
+      ElMessage.success(result.message ? result.message : '删除成功')
+      articleCategoryList()
     })
-      .then(async () => {
-        // 调用接口
-        let result = await articleCategoryDeleteService(row.id)
-        ElMessage.success(result.message ? result.message : '删除成功')
-        //刷新列表
-        articleCategoryList()
+    .catch(() => {
+      ElMessage({
+        type: 'info',
+        message: '你取消了删除',
       })
-      .catch(() => {
-        ElMessage({
-          type: 'info',
-          message: '你取消了删除',
-        })
-      })
-  } catch (err) {
-    if (err !== 'cancel') {
-      console.error('删除失败:', err)
-      ElMessage.error('删除失败')
-    }
-  }
+    })
 }
 </script>
+
 <template>
   <div class="category-container">
-    <!-- 顶部装饰与标题区 -->
     <div class="category-header">
       <div class="header-title-section">
         <div class="title-decoration">
@@ -147,7 +107,7 @@ const deleteCategory = (row) => {
           <span class="decoration-dot"></span>
         </div>
         <h1 class="category-title">文章分类</h1>
-        <p class="category-subtitle">用标签记录生活，让灵感有序安放</p>
+        <p class="category-subtitle">用标签记录生活，让灵感有序安放 📝</p>
       </div>
       <div class="header-extra">
         <el-button
@@ -161,22 +121,13 @@ const deleteCategory = (row) => {
             }
           "
         >
-          <span class="btn-text">+ 添加分类</span>
+          <span class="btn-text">✨ 添加分类</span>
         </el-button>
       </div>
     </div>
 
-    <!-- 表格卡片区 -->
     <div class="category-table-wrapper">
-      <el-table
-        :data="categorys"
-        style="width: 100%"
-        class="custom-table"
-        :row-class-name="tableRowClassName"
-        @cell-mouse-enter="handleCellMouseEnter"
-        @cell-mouse-leave="handleCellMouseLeave"
-      >
-        <!-- 序号列（美化后置为标签样式） -->
+      <el-table :data="categorys" style="width: 100%" class="custom-table">
         <el-table-column label="序号" width="80" type="index">
           <template #default="{ $index }">
             <div class="index-badge">
@@ -185,7 +136,6 @@ const deleteCategory = (row) => {
           </template>
         </el-table-column>
 
-        <!-- 分类名称 -->
         <el-table-column label="分类名称" prop="categoryName" align="left">
           <template #default="{ row }">
             <div class="category-name-cell">
@@ -198,7 +148,6 @@ const deleteCategory = (row) => {
           </template>
         </el-table-column>
 
-        <!-- 分类别名 -->
         <el-table-column label="分类别名" prop="categoryAlias" align="left">
           <template #default="{ row }">
             <div class="category-alias">
@@ -207,27 +156,22 @@ const deleteCategory = (row) => {
           </template>
         </el-table-column>
 
-        <!-- 操作按钮（美化后悬浮动效） -->
         <el-table-column label="操作" width="140" align="center" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
-              <el-tooltip content="编辑分类" placement="top" effect="customized">
+              <el-tooltip content="编辑分类" placement="top">
                 <el-button
                   :icon="Edit"
                   circle
                   class="action-btn edit-btn"
-                  @mouseenter="onIconHover(row, 'edit', true)"
-                  @mouseleave="onIconHover(row, 'edit', false)"
                   @click="showDialog(row)"
                 ></el-button>
               </el-tooltip>
-              <el-tooltip content="删除分类" placement="top" effect="customized">
+              <el-tooltip content="删除分类" placement="top">
                 <el-button
                   :icon="Delete"
                   circle
                   class="action-btn delete-btn"
-                  @mouseenter="onIconHover(row, 'delete', true)"
-                  @mouseleave="onIconHover(row, 'delete', false)"
                   @click="deleteCategory(row)"
                 ></el-button>
               </el-tooltip>
@@ -235,7 +179,6 @@ const deleteCategory = (row) => {
           </template>
         </el-table-column>
 
-        <!-- 空状态自定义（变得更可爱了） -->
         <template #empty>
           <div class="custom-empty">
             <div class="empty-emoji">📝</div>
@@ -246,14 +189,12 @@ const deleteCategory = (row) => {
       </el-table>
     </div>
 
-    <!-- 底部分类小提示（装饰） -->
     <div class="category-footer">
       <span class="footer-emoji">💜</span>
       <span>共 {{ categorys.length }} 个分类，陪伴你的每一次记录</span>
       <span class="footer-emoji">✨</span>
     </div>
 
-    <!-- 添加分类弹窗 -->
     <el-dialog v-model="dialogVisible" :title="title" width="400px" center class="dialog">
       <el-form
         :model="categoryModel"
@@ -268,6 +209,7 @@ const deleteCategory = (row) => {
             minlength="1"
             maxlength="10"
             class="custom-input"
+            placeholder="请输入分类名称"
           ></el-input>
         </el-form-item>
         <el-form-item label="分类别名" prop="categoryAlias">
@@ -276,6 +218,7 @@ const deleteCategory = (row) => {
             minlength="1"
             maxlength="15"
             class="custom-input"
+            placeholder="请输入分类别名"
           ></el-input>
         </el-form-item>
       </el-form>
@@ -296,20 +239,22 @@ const deleteCategory = (row) => {
 </template>
 
 <style lang="scss" scoped>
-// 整体容器背景延续之前的浪漫通透感
 .category-container {
-  padding: 8px 0;
-  background: transparent;
-  min-height: calc(100vh - 180px);
+  min-height: calc(100vh - 60px);
+  padding: 20px;
+  background: linear-gradient(145deg, #f5f0ff 0%, #e8ddf8 50%, #fce4ec 100%);
 }
 
-// 头部区域设计（类似之前 header 部的拉风感）
 .category-header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   margin-bottom: 28px;
-  padding: 0 8px;
+  padding: 20px 28px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(10px);
 
   .header-title-section {
     position: relative;
@@ -348,11 +293,12 @@ const deleteCategory = (row) => {
 
     .category-subtitle {
       font-size: 13px;
-      color: #a09abf;
+      color: #b0a7c0;
       margin: 0;
       letter-spacing: 0.5px;
     }
   }
+
   .header-extra {
     .add-category-btn {
       background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
@@ -369,10 +315,6 @@ const deleteCategory = (row) => {
         box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
       }
 
-      &:active {
-        transform: translateY(0);
-      }
-
       .btn-text {
         font-size: 14px;
       }
@@ -380,21 +322,20 @@ const deleteCategory = (row) => {
   }
 }
 
-// 表格卡片区
 .category-table-wrapper {
-  background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
-  border-radius: 20px;
-  padding: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 30px;
+  padding: 24px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
+  backdrop-filter: blur(10px);
 
   .custom-table {
-    border-radius: 12px;
+    border-radius: 20px;
     overflow: hidden;
 
     :deep(.el-table__header) {
       th {
-        background-color: #f8f3ff;
+        background: linear-gradient(135deg, #f8f3ff 0%, #faf7ff 100%);
         color: #6a4a9c;
         font-weight: 600;
         font-size: 14px;
@@ -402,7 +343,7 @@ const deleteCategory = (row) => {
     }
 
     :deep(.el-table__body) {
-      tr.custom-table-row {
+      tr {
         transition: all 0.3s ease;
 
         &:hover {
@@ -412,11 +353,10 @@ const deleteCategory = (row) => {
       }
 
       td {
-        padding: 12px 0;
+        padding: 14px 0;
       }
     }
 
-    // 序号徽章
     .index-badge {
       display: inline-flex;
       align-items: center;
@@ -429,13 +369,8 @@ const deleteCategory = (row) => {
       font-weight: 600;
       font-size: 13px;
       box-shadow: 0 2px 8px rgba(197, 163, 255, 0.3);
-
-      .index-number {
-        line-height: 1;
-      }
     }
 
-    // 分类名称单元格
     .category-name-cell {
       display: flex;
       align-items: center;
@@ -452,24 +387,22 @@ const deleteCategory = (row) => {
       .category-name-text {
         font-size: 15px;
         font-weight: 500;
-        color: #333;
+        color: #4a4a6a;
       }
     }
 
-    // 分类别名
     .category-alias {
       .alias-label {
         display: inline-block;
-        padding: 4px 12px;
-        background: rgba(197, 163, 255, 0.1);
-        border-radius: 12px;
+        padding: 4px 14px;
+        background: rgba(197, 163, 255, 0.12);
+        border-radius: 20px;
         color: #c5a3ff;
         font-size: 13px;
         font-weight: 500;
       }
     }
 
-    // 操作按钮
     .action-buttons {
       display: flex;
       gap: 8px;
@@ -504,7 +437,6 @@ const deleteCategory = (row) => {
       }
     }
 
-    // 空状态
     .custom-empty {
       padding: 60px 20px;
       text-align: center;
@@ -517,21 +449,20 @@ const deleteCategory = (row) => {
 
       .empty-text {
         font-size: 16px;
-        color: #666;
+        color: #6a4a9c;
         margin: 0 0 8px 0;
         font-weight: 500;
       }
 
       .empty-hint {
         font-size: 13px;
-        color: #999;
+        color: #b0a7c0;
         margin: 0;
       }
     }
   }
 }
 
-// 底部分类提示
 .category-footer {
   display: flex;
   align-items: center;
@@ -540,9 +471,9 @@ const deleteCategory = (row) => {
   margin-top: 24px;
   padding: 16px;
   font-size: 14px;
-  color: #666;
+  color: #b0a7c0;
   background: rgba(255, 255, 255, 0.6);
-  border-radius: 12px;
+  border-radius: 48px;
   backdrop-filter: blur(10px);
 
   .footer-emoji {
@@ -551,9 +482,8 @@ const deleteCategory = (row) => {
   }
 }
 
-// 弹窗样式
 .dialog {
-  border-radius: 20px;
+  border-radius: 24px;
   overflow: hidden;
 
   :deep(.el-dialog__header) {
@@ -578,14 +508,15 @@ const deleteCategory = (row) => {
   }
 
   :deep(.el-dialog__body) {
-    padding: 20px;
+    padding: 24px;
+    background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
   }
 
   .form {
     .custom-input {
       :deep(.el-input__wrapper) {
         border-radius: 48px;
-        padding: 8px 20px;
+        padding: 6px 20px;
         background-color: #faf7ff;
         border: 1px solid #f0e5ff;
         transition: all 0.3s ease;
@@ -602,18 +533,13 @@ const deleteCategory = (row) => {
           box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.12);
         }
       }
-
-      :deep(.el-input__prefix) {
-        margin-right: 12px;
-        color: #c5a3ff;
-      }
     }
   }
 
   .dialog-footer {
     .cancel-btn {
       border-radius: 48px;
-      padding: 10px 20px;
+      padding: 10px 24px;
       font-weight: 500;
       color: #c5a3ff;
       border-color: #c5a3ff;
@@ -629,7 +555,7 @@ const deleteCategory = (row) => {
       background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
       border: none;
       border-radius: 48px;
-      padding: 10px 20px;
+      padding: 10px 24px;
       font-size: 14px;
       font-weight: 500;
       color: white;
@@ -639,15 +565,10 @@ const deleteCategory = (row) => {
         transform: translateY(-2px);
         box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
       }
-
-      &:active {
-        transform: translateY(0);
-      }
     }
   }
 }
 
-// 动画
 @keyframes float {
   0%,
   100% {
