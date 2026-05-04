@@ -14,36 +14,64 @@ import {
 import avatar from '@/assets/default.png'
 import { ref } from 'vue'
 import router from '@/router'
-import { useRoute } from 'vue-router'
-import { useTokenStore } from '@/stores/token.js'
-import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 
-const route = useRoute()
+import { ElMessage, ElMessageBox } from 'element-plus'
+
+const route = useRouter()
 const isDark = ref(false)
-const tokenStore = useTokenStore()
 
 const toggleTheme = () => {
   isDark.value = !isDark.value
 }
+import { useTokenStore } from '@/stores/token.js'
+const tokenStore = useTokenStore()
 
 const handleCommand = (command) => {
-  switch (command) {
-    case 'profile':
-      router.push('/user/info')
-      break
-    case 'avatar':
-      router.push('/user/avatar')
-      break
-    case 'password':
-      router.push('/user/resetPassword')
-      break
-    case 'logout':
-      tokenStore.removeToken()
-      router.push('/login')
-      ElMessage.success('已退出登录')
-      break
+  if (command === 'logout') {
+    ElMessageBox.confirm('你确认要退出吗', '温馨提示', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+      .then(() => {
+        // 退出登录
+        // 清空pinia存储的token和用户信息
+        tokenStore.removeToken()
+        userInfoStore.removeInfo()
+        // 跳转到登陆界面
+        router.push('/login')
+
+        ElMessage.success('退出登录成功')
+      })
+      .catch((error) => {
+        // 只有当用户真正取消操作时才显示此消息
+        if (error !== 'cancel' && error !== undefined) {
+          console.error('退出失败:', error)
+          ElMessage.error('退出失败')
+        } else {
+          ElMessage({
+            type: 'info',
+            message: '你取消了退出登录',
+          })
+        }
+      })
+  } else {
+    router.push('/user/' + command)
   }
 }
+
+//调用函数，获取用户详细信息
+import { userInfoService } from '@/api/user.js'
+import useUserInfoStore from '@/stores/userInfo.js'
+const userInfoStore = useUserInfoStore()
+const getUserInfo = async () => {
+  let reuslt = await userInfoService()
+
+  //存到pinia
+  userInfoStore.setInfo(reuslt.data)
+}
+getUserInfo()
 </script>
 
 <template>
@@ -103,29 +131,35 @@ const handleCommand = (command) => {
       <el-header>
         <div class="header-left">
           <div class="greeting">
-            <span class="greeting-text">下午好，</span>
-            <strong class="username-display">东哥</strong>
+            <span class="greeting-text">你好，</span>
+            <strong class="username-display">{{ userInfoStore.info.nickname }}</strong>
           </div>
           <div class="theme-toggle" @click="toggleTheme">
             <el-icon v-if="!isDark"><Sunny /></el-icon>
             <el-icon v-else><Moon /></el-icon>
           </div>
         </div>
+
+        <!--下拉菜单-->
+        <!--        command:条目被点击后触发，在事件函数上声明一个参数，接受条目对应的指令-->
         <el-dropdown placement="bottom-end" class="user-dropdown" @command="handleCommand">
           <span class="el-dropdown__box">
-            <el-avatar :src="avatar" class="user-avatar" />
-            <span class="user-name">东哥</span>
+            <el-avatar
+              :src="userInfoStore.info.userPic ? userInfoStore.info.userPic : avatar"
+              class="user-avatar"
+            />
+            <span class="user-name">{{ userInfoStore.info.nickname }}</span>
             <el-icon class="dropdown-icon"><CaretBottom /></el-icon>
           </span>
           <template #dropdown>
             <el-dropdown-menu class="custom-dropdown">
-              <el-dropdown-item command="profile">
+              <el-dropdown-item command="info">
                 <el-icon><User /></el-icon>基本资料
               </el-dropdown-item>
               <el-dropdown-item command="avatar">
                 <el-icon><Crop /></el-icon>更换头像
               </el-dropdown-item>
-              <el-dropdown-item command="password">
+              <el-dropdown-item command="resetPassword">
                 <el-icon><EditPen /></el-icon>重置密码
               </el-dropdown-item>
               <el-dropdown-item command="logout" divided>
