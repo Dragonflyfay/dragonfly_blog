@@ -62,25 +62,22 @@ instance.interceptors.response.use(
     return Promise.reject(result.data)
   },
   (err) => {
-    // //响应失败
-    // if (err.response.status === 401) {
-    //   ElMessage.error('请先登录')
-    //   const tokenStore = useTokenStore()
-    //   tokenStore.removeToken()
-    //   router.push('/login')
-    // } else {
-    //   ElMessage.error('服务异常')
-    // }
+    const status = err.response?.status
 
-    //判断响应状态码，如果401，跳转
-    if (err.response.status === 401) {
+    if (status === 401) {
       ElMessage.error('请先登录')
       router.push('/login')
+    } else if (status === 502 || status === 503 || status === 504) {
+      ElMessage.error(
+        '无法连接后端服务，请确认 Spring Boot 已在运行（开发环境默认 http://localhost:8080）',
+      )
+    } else if (!err.response) {
+      ElMessage.error('网络异常，请检查网络或后端是否可达')
     } else {
-      ElMessage.error(err.message)
+      ElMessage.error(err.message || '服务异常')
     }
 
-    return Promise.reject(err) //异步的状态转化成失败的状态
+    return Promise.reject(err)
   },
 )
 

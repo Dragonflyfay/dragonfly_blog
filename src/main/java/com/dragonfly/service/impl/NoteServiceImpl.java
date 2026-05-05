@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -26,7 +28,6 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public void add(Note note) {
-        // 补充属性值
         note.setCreateTime(LocalDateTime.now());
         note.setUpdateTime(LocalDateTime.now());
 
@@ -34,8 +35,40 @@ public class NoteServiceImpl implements NoteService {
         Integer userId = (Integer) map.get("id");
         note.setCreateUser(userId);
 
+        if ("已发布".equals(note.getState())) {
+            note.setPublishTime(LocalDateTime.now());
+        }
+        syncCoverIntoImages(note);
+        if (note.getViewsCount() == null) {
+            note.setViewsCount(0);
+        }
+        if (note.getLikesCount() == null) {
+            note.setLikesCount(0);
+        }
+        if (note.getCommentsCount() == null) {
+            note.setCommentsCount(0);
+        }
+        if (note.getFavoritesCount() == null) {
+            note.setFavoritesCount(0);
+        }
+
         noteMapper.add(note);
 
+    }
+
+    /** 封面优先写入图片列表首位，便于前端「小红书」封面展示 */
+    private void syncCoverIntoImages(Note note) {
+        if (note.getCoverImg() == null || note.getCoverImg().isEmpty()) {
+            return;
+        }
+        List<String> imgs = note.getImages();
+        if (imgs == null) {
+            imgs = new ArrayList<>();
+        }
+        LinkedHashSet<String> ordered = new LinkedHashSet<>();
+        ordered.add(note.getCoverImg());
+        ordered.addAll(imgs);
+        note.setImages(new ArrayList<>(ordered));
     }
 
     @Override
@@ -53,6 +86,10 @@ public class NoteServiceImpl implements NoteService {
     @Override
     public void update(Note note) {
         note.setUpdateTime(LocalDateTime.now());
+        if ("已发布".equals(note.getState()) && note.getPublishTime() == null) {
+            note.setPublishTime(LocalDateTime.now());
+        }
+        syncCoverIntoImages(note);
         noteMapper.update(note);
     }
 
@@ -74,20 +111,16 @@ public class NoteServiceImpl implements NoteService {
     }
 
     @Override
-    public PageBean<Note> pageList(Integer pageNum, Integer pageSize) {
+    public PageBean<Note> pageList(Integer pageNum, Integer pageSize, Integer topicId, String state) {
         Map<String, Object> map = ThreadLocalUtil.get();
         Integer userId = (Integer) map.get("id");
 
-        // 计算偏移量
         Integer offset = (pageNum - 1) * pageSize;
 
-        // 查询数据列表
-        List<Note> notes = noteMapper.listByPage(userId, offset, pageSize);
+        List<Note> notes = noteMapper.listByPage(userId, topicId, state, offset, pageSize);
 
-        // 查询总数
-        int total = noteMapper.countByUserId(userId);
+        int total = noteMapper.countByFilters(userId, topicId, state);
 
-        // 封装分页结果
         PageBean<Note> pageBean = new PageBean<>();
         pageBean.setTotal((long) total);
         pageBean.setItems(notes);
