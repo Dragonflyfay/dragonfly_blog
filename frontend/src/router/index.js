@@ -2,8 +2,8 @@ import { createWebHistory, createRouter } from 'vue-router'
 //导入组件
 import LoginVue from '@/views/Login.vue'
 import LayoutVue from '@/views/Layout.vue'
-import ArticleCategoryVue from '@/views/article/ArticleCategory.vue'
-import ArticleManageVue from '@/views/article/ArticleManage.vue'
+import NoteCategoryVue from '@/views/note/NoteCategory.vue'
+import NoteManageVue from '@/views/note/NoteManage.vue'
 import UserAvatarVue from '@/views/user/UserAvatar.vue'
 import UserInfo from '@/views/user/UserInfo.vue'
 import UserResetPasswordVue from '@/views/user/UserResetPassword.vue'
@@ -15,10 +15,10 @@ const routes = [
   {
     path: '/',
     component: LayoutVue,
-    redirect: '/article/manage',
+    redirect: '/note/manage',
     children: [
-      { path: '/article/category', component: ArticleCategoryVue },
-      { path: '/article/manage', component: ArticleManageVue },
+      { path: '/note/topic', component: NoteCategoryVue },
+      { path: '/note/manage', component: NoteManageVue },
       { path: '/user/avatar', component: UserAvatarVue },
       { path: '/user/info', component: UserInfo },
       { path: '/user/resetPassword', component: UserResetPasswordVue },

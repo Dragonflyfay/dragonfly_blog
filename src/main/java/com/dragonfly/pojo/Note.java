@@ -3,38 +3,48 @@ package com.dragonfly.pojo;
 import com.dragonfly.anno.State;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import lombok.Data;
-import org.hibernate.validator.constraints.URL;
 
 import java.time.LocalDateTime;
-@Data
 
-public class Article {
+/**
+ * 描述：笔记实体类
+ *
+ * @param
+ * @author 蜻蜓大王
+ * @date 2026/5/5 14:08
+ */
+@Data
+public class Note {
+
     private Integer id;
+
     @NotEmpty
-    @Pattern(regexp="^.{1,100}$")
     private String title;
-    private String summary;
+
     @NotEmpty
     private String content;
-    @NotEmpty
-    @URL
+
+    private String images; // JSON 字符串存储图片数组
+
+    @NotNull
+    private Integer topicId; // 对应数据库的 topic_id
+
+    private String location;
     private String coverImg;
-    private String videoUrl;
+
+
     @State
     private String state;
-    private Integer isTop;
-    private Integer isOriginal;
-    private String sourceUrl;
+
     private Integer viewsCount;
     private Integer likesCount;
     private Integer commentsCount;
     private Integer favoritesCount;
-    @NotNull
-    private Integer categoryId;
+
     private Integer createUser;
     private LocalDateTime publishTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
 }
