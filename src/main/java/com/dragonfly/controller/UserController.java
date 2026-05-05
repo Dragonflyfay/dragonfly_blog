@@ -72,6 +72,7 @@ public class UserController {
             Map<String, Object> claims = new HashMap<>();
             claims.put("id", loginUser.getId());
             claims.put("username", loginUser.getUsername());
+            claims.put("role", loginUser.getRole());
             String token = JwtUtil.genToken(claims);
             //把token存储到redis 中
             ValueOperations<String, String> operations = stringRedisTemplate.opsForValue();

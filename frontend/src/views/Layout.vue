@@ -93,11 +93,11 @@ getUserInfo()
         router
         class="custom-menu"
       >
-        <el-menu-item index="/article/category">
+        <el-menu-item index="/note/topic">
           <el-icon><Management /></el-icon>
-          <span>文章分类</span>
+          <span>话题分类</span>
         </el-menu-item>
-        <el-menu-item index="/article/manage">
+        <el-menu-item index="/note/manage">
           <el-icon><Promotion /></el-icon>
           <span>笔记管理</span>
         </el-menu-item>

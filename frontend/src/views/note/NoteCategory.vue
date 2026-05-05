@@ -1,22 +1,23 @@
+NEW_FILE_CODE
 <script setup>
 import {
-  articleCategoryListService,
-  articleCategoryAddService,
-  articleCategoryUpdateService,
-  articleCategoryDeleteService,
-} from '@/api/article'
+  topicListService,
+  topicAddService,
+  topicUpdateService,
+  topicDeleteService,
+} from '@/api/note.js'
 import { Edit, Delete } from '@element-plus/icons-vue'
-import { ref, onMounted, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useTokenStore } from '@/stores/token.js'
 
 const router = useRouter()
 const tokenStore = useTokenStore()
 
-const categorys = ref([])
+const topics = ref([])
 
-const getCategoryGradient = (name) => {
+const getTopicGradient = (name) => {
   const gradients = {
     美食: 'linear-gradient(135deg, #F8B4D9, #FF9A9E)',
     娱乐: 'linear-gradient(135deg, #A8E6CF, #7EE0B5)',
@@ -25,12 +26,12 @@ const getCategoryGradient = (name) => {
   return gradients[name] || 'linear-gradient(135deg, #E0C3FF, #C5A3FF)'
 }
 
-const articleCategoryList = async () => {
+const topicList = async () => {
   try {
-    let result = await articleCategoryListService()
-    categorys.value = result.data
+    let result = await topicListService()
+    topics.value = result.data
   } catch (error) {
-    console.error('获取分类列表失败:', error)
+    console.error('获取话题列表失败:', error)
   }
 }
 
@@ -39,62 +40,63 @@ onMounted(() => {
     router.push('/login')
     return
   }
-  articleCategoryList()
+  topicList()
 })
 
 const dialogVisible = ref(false)
 const title = ref('')
 
-const categoryModel = ref({
-  categoryName: '',
-  categoryAlias: '',
+const topicModel = ref({
+  topicName: '',
+  description: '',
+  coverImg: '',
 })
 
 const rules = {
-  categoryName: [{ required: true, message: '请输入分类名称', trigger: 'blur' }],
-  categoryAlias: [{ required: true, message: '请输入分类别名', trigger: 'blur' }],
+  topicName: [{ required: true, message: '请输入话题名称', trigger: 'blur' }],
+  description: [{ required: false, message: '请输入话题描述', trigger: 'blur' }],
 }
 
-const addCategory = async () => {
-  let result = await articleCategoryAddService(categoryModel.value)
+const addTopic = async () => {
+  let result = await topicAddService(topicModel.value)
   ElMessage.success(result.message ? result.message : '添加成功')
-  articleCategoryList()
+  topicList()
   dialogVisible.value = false
 }
 
 const showDialog = (row) => {
   dialogVisible.value = true
-  title.value = '编辑分类'
-  categoryModel.value.categoryName = row.categoryName
-  categoryModel.value.categoryAlias = row.categoryAlias
-  categoryModel.value.id = row.id
+  title.value = '编辑话题'
+  topicModel.value.topicName = row.topicName
+  topicModel.value.description = row.description
+  topicModel.value.coverImg = row.coverImg
+  topicModel.value.id = row.id
 }
 
-const updateCategory = async () => {
-  let result = await articleCategoryUpdateService(categoryModel.value)
+const updateTopic = async () => {
+  let result = await topicUpdateService(topicModel.value)
   ElMessage.success(result.message ? result.message : '修改成功')
-  articleCategoryList()
+  topicList()
   dialogVisible.value = false
 }
 
-import { ElMessageBox } from 'element-plus'
-const deleteCategory = (row) => {
-  ElMessageBox.confirm('你确认要删除该分类信息吗', '温馨提示', {
+const deleteTopic = (row) => {
+  ElMessageBox.confirm('你确认要删除该话题吗', '温馨提示', {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
     type: 'warning',
   })
-    .then(async () => {
-      let result = await articleCategoryDeleteService(row.id)
-      ElMessage.success(result.message ? result.message : '删除成功')
-      articleCategoryList()
-    })
-    .catch(() => {
-      ElMessage({
-        type: 'info',
-        message: '你取消了删除',
+      .then(async () => {
+        let result = await topicDeleteService(row.id)
+        ElMessage.success(result.message ? result.message : '删除成功')
+        topicList()
       })
-    })
+      .catch(() => {
+        ElMessage({
+          type: 'info',
+          message: '你取消了删除',
+        })
+      })
 }
 </script>
 
@@ -106,28 +108,28 @@ const deleteCategory = (row) => {
           <span class="decoration-dot"></span>
           <span class="decoration-dot"></span>
         </div>
-        <h1 class="category-title">文章分类</h1>
+        <h1 class="category-title">话题分类</h1>
         <p class="category-subtitle">用标签记录生活，让灵感有序安放 📝</p>
       </div>
       <div class="header-extra">
         <el-button
-          class="add-category-btn"
-          type="primary"
-          size="large"
-          @click="
+            class="add-category-btn"
+            type="primary"
+            size="large"
+            @click="
             () => {
               dialogVisible = true
-              title = '添加分类'
+              title = '添加话题'
             }
           "
         >
-          <span class="btn-text">✨ 添加分类</span>
+          <span class="btn-text">✨ 添加话题</span>
         </el-button>
       </div>
     </div>
 
     <div class="category-table-wrapper">
-      <el-table :data="categorys" style="width: 100%" class="custom-table">
+      <el-table :data="topics" style="width: 100%" class="custom-table">
         <el-table-column label="序号" width="80" type="index">
           <template #default="{ $index }">
             <div class="index-badge">
@@ -136,43 +138,49 @@ const deleteCategory = (row) => {
           </template>
         </el-table-column>
 
-        <el-table-column label="分类名称" prop="categoryName" align="left">
+        <el-table-column label="话题名称" prop="topicName" align="left">
           <template #default="{ row }">
             <div class="category-name-cell">
               <span
-                class="category-icon"
-                :style="{ backgroundImage: getCategoryGradient(row.categoryName) }"
+                  class="category-icon"
+                  :style="{ backgroundImage: getTopicGradient(row.topicName) }"
               ></span>
-              <span class="category-name-text">{{ row.categoryName }}</span>
+              <span class="category-name-text">{{ row.topicName }}</span>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="分类别名" prop="categoryAlias" align="left">
+        <el-table-column label="描述" prop="description" align="left">
           <template #default="{ row }">
             <div class="category-alias">
-              <span class="alias-label">{{ row.categoryAlias }}</span>
+              <span class="alias-label">{{ row.description || '暂无描述' }}</span>
             </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="笔记数量" prop="notesCount" align="center">
+          <template #default="{ row }">
+            <span class="count-badge">{{ row.notesCount || 0 }}</span>
           </template>
         </el-table-column>
 
         <el-table-column label="操作" width="140" align="center" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
-              <el-tooltip content="编辑分类" placement="top">
+              <el-tooltip content="编辑话题" placement="top">
                 <el-button
-                  :icon="Edit"
-                  circle
-                  class="action-btn edit-btn"
-                  @click="showDialog(row)"
+                    :icon="Edit"
+                    circle
+                    class="action-btn edit-btn"
+                    @click="showDialog(row)"
                 ></el-button>
               </el-tooltip>
-              <el-tooltip content="删除分类" placement="top">
+              <el-tooltip content="删除话题" placement="top">
                 <el-button
-                  :icon="Delete"
-                  circle
-                  class="action-btn delete-btn"
-                  @click="deleteCategory(row)"
+                    :icon="Delete"
+                    circle
+                    class="action-btn delete-btn"
+                    @click="deleteTopic(row)"
                 ></el-button>
               </el-tooltip>
             </div>
@@ -182,8 +190,8 @@ const deleteCategory = (row) => {
         <template #empty>
           <div class="custom-empty">
             <div class="empty-emoji">📝</div>
-            <p class="empty-text">还没有分类噢</p>
-            <p class="empty-hint">点击「添加分类」开始整理你的笔记世界吧 ✨</p>
+            <p class="empty-text">还没有话题噢</p>
+            <p class="empty-hint">点击「添加话题」开始整理你的笔记世界吧 ✨</p>
           </div>
         </template>
       </el-table>
@@ -191,34 +199,42 @@ const deleteCategory = (row) => {
 
     <div class="category-footer">
       <span class="footer-emoji">💜</span>
-      <span>共 {{ categorys.length }} 个分类，陪伴你的每一次记录</span>
+      <span>共 {{ topics.length }} 个话题，陪伴你的每一次记录</span>
       <span class="footer-emoji">✨</span>
     </div>
 
     <el-dialog v-model="dialogVisible" :title="title" width="400px" center class="dialog">
       <el-form
-        :model="categoryModel"
-        :rules="rules"
-        label-width="100px"
-        style="padding-right: 30px"
-        class="form"
+          :model="topicModel"
+          :rules="rules"
+          label-width="100px"
+          style="padding-right: 30px"
+          class="form"
       >
-        <el-form-item label="分类名称" prop="categoryName">
+        <el-form-item label="话题名称" prop="topicName">
           <el-input
-            v-model="categoryModel.categoryName"
-            minlength="1"
-            maxlength="10"
-            class="custom-input"
-            placeholder="请输入分类名称"
+              v-model="topicModel.topicName"
+              minlength="1"
+              maxlength="20"
+              class="custom-input"
+              placeholder="请输入话题名称"
           ></el-input>
         </el-form-item>
-        <el-form-item label="分类别名" prop="categoryAlias">
+        <el-form-item label="话题描述" prop="description">
           <el-input
-            v-model="categoryModel.categoryAlias"
-            minlength="1"
-            maxlength="15"
-            class="custom-input"
-            placeholder="请输入分类别名"
+              v-model="topicModel.description"
+              type="textarea"
+              :rows="3"
+              maxlength="100"
+              class="custom-input"
+              placeholder="请输入话题描述（可选）"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="封面图片" prop="coverImg">
+          <el-input
+              v-model="topicModel.coverImg"
+              class="custom-input"
+              placeholder="请输入封面图片URL（可选）"
           ></el-input>
         </el-form-item>
       </el-form>
@@ -226,9 +242,9 @@ const deleteCategory = (row) => {
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false" class="cancel-btn">取消</el-button>
           <el-button
-            type="primary"
-            @click="title == '添加分类' ? addCategory() : updateCategory()"
-            class="confirm-btn"
+              type="primary"
+              @click="title == '添加话题' ? addTopic() : updateTopic()"
+              class="confirm-btn"
           >
             确认
           </el-button>
@@ -403,6 +419,16 @@ const deleteCategory = (row) => {
       }
     }
 
+    .count-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: linear-gradient(135deg, #a8e6cf, #7ee0b5);
+      border-radius: 20px;
+      color: #2c665a;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
     .action-buttons {
       display: flex;
       gap: 8px;
@@ -532,6 +558,10 @@ const deleteCategory = (row) => {
           background-color: #fff;
           box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.12);
         }
+      }
+
+      :deep(textarea) {
+        border-radius: 12px;
       }
     }
   }

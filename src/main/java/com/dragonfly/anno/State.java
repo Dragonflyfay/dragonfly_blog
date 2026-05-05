@@ -25,7 +25,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 public @interface State {
     // 校验失败错误提示信息
-    String message() default "state的值只能是已发布，草稿或者是已下架";
+    String message() default "state的值只能是已发布，草稿";
     // 指定分组
     Class<?>[] groups() default {};
 
