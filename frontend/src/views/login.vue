@@ -2,9 +2,11 @@
 import { User, Lock } from '@element-plus/icons-vue'
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { userRegisterService, userLoginService } from '@/api/user'
+import { userRegisterService, userLoginService, userInfoService } from '@/api/user'
 import { useTokenStore } from '@/stores/token.js'
+import useUserInfoStore from '@/stores/userInfo.js'
 import { useRouter } from 'vue-router'
+import { canEnterAdmin, normalizeRole } from '@/utils/roles'
 
 const isRegister = ref(false)
 const rememberMe = ref(false)
@@ -38,6 +40,12 @@ const rules = {
   rePassword: [{ validator: checkrePassword, trigger: 'blur' }],
 }
 
+// 登录页无「确认密码」表单项，不应校验 rePassword
+const loginRules = {
+  username: rules.username,
+  password: rules.password,
+}
+
 const router = useRouter()
 
 const resetForm = () => {
@@ -48,19 +56,32 @@ const resetForm = () => {
   }
 }
 
-const register = async () => {
-  let result = await userLoginService(registerData.value)
-  ElMessage.success('注册成功')
-}
-//登录函数
 const tokenStore = useTokenStore()
+const userInfoStore = useUserInfoStore()
+
+const register = async () => {
+  try {
+    await formRef.value?.validate()
+    await userRegisterService(registerData.value)
+    ElMessage.success('注册成功')
+  } catch {
+    // 校验失败或请求失败；失败提示已在 request 拦截器中处理
+  }
+}
+
 const login = async () => {
-  let result = await userLoginService(registerData.value)
-  ElMessage.success('登录成功')
-  // 保存token,pinia存储
-  tokenStore.setToken(result.data)
-  //跳转到首页 路由完成跳转
-  router.push('/')
+  try {
+    await formRef.value?.validate()
+    const result = await userLoginService(registerData.value)
+    tokenStore.setToken(result.data)
+    const infoResult = await userInfoService()
+    userInfoStore.setInfo(infoResult.data)
+    ElMessage.success('登录成功')
+    const r = normalizeRole(infoResult.data?.role)
+    router.push(canEnterAdmin(r) ? '/admin/home' : '/home')
+  } catch {
+    // 校验失败或请求失败；失败提示已在 request 拦截器中处理
+  }
 }
 //清空数据模型的数据
 const clearRegisterData = () => {
@@ -168,7 +189,7 @@ const clearRegisterData = () => {
           v-else
           class="auth-form"
           :model="registerData"
-          :rules="rules"
+          :rules="loginRules"
         >
           <div class="form-header">
             <h1 class="form-title">欢迎回来</h1>

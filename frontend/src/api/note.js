@@ -26,9 +26,9 @@ export const noteListService = (params) => {
   return request.get('/note', { params: params })
 }
 
-// 笔记分页查询
-export const notePageListService = (pageNum, pageSize) => {
-  return request.get('/note/page', { params: { pageNum, pageSize } })
+// 笔记分页查询（支持 topicId、state 筛选）
+export const notePageListService = (params) => {
+  return request.get('/note/page', { params })
 }
 
 // 笔记添加

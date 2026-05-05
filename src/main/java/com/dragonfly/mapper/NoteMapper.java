@@ -17,7 +17,7 @@ public interface NoteMapper {
 
     // 新增笔记
     @Insert("INSERT INTO note (title, content, images, topic_id, location, state, create_user, publish_time, create_time, update_time) " +
-            "VALUES (#{title}, #{content}, #{images}, #{topicId}, #{location}, #{state}, #{createUser}, #{publishTime}, #{createTime}, #{updateTime})")
+            "VALUES (#{title}, #{content}, #{images, typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}, #{topicId}, #{location}, #{state}, #{createUser}, #{publishTime}, #{createTime}, #{updateTime})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     void add(Note note);
 
@@ -30,7 +30,7 @@ public interface NoteMapper {
     Note findById(Integer id);
 
     // 更新笔记
-    @Update("UPDATE note SET title = #{title}, content = #{content}, images = #{images}, topic_id = #{topicId}, " +
+    @Update("UPDATE note SET title = #{title}, content = #{content}, images =  #{images, typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}, topic_id = #{topicId}, " +
             "location = #{location}, state = #{state}, publish_time = #{publishTime}, update_time = #{updateTime} " +
             "WHERE id = #{id}")
     void update(Note note);
@@ -39,11 +39,27 @@ public interface NoteMapper {
     @Delete("DELETE FROM note WHERE id = #{id} AND create_user = #{userId}")
     void delete(Integer id, Integer userId);
 
-    // 分页查询笔记
-    @Select("SELECT * FROM note WHERE create_user = #{userId} LIMIT #{offset}, #{pageSize}")
-    List<Note> listByPage(@Param("userId") Integer userId, @Param("offset") Integer offset, @Param("pageSize") Integer pageSize);
+    // 分页查询笔记（可选话题、状态筛选，按更新时间倒序）
+    @Select("<script>" +
+            "SELECT * FROM note WHERE create_user = #{userId} " +
+            "<if test='topicId != null'> AND topic_id = #{topicId} </if>" +
+            "<if test='state != null and state != \"\"'> AND state = #{state} </if>" +
+            "ORDER BY COALESCE(update_time, create_time) DESC " +
+            "LIMIT #{offset}, #{pageSize}" +
+            "</script>")
+    List<Note> listByPage(@Param("userId") Integer userId,
+                          @Param("topicId") Integer topicId,
+                          @Param("state") String state,
+                          @Param("offset") Integer offset,
+                          @Param("pageSize") Integer pageSize);
 
-    // 统计笔记数量
-    @Select("SELECT COUNT(*) FROM note WHERE create_user = #{userId}")
-    int countByUserId(Integer userId);
+    // 统计笔记数量（与分页筛选条件一致）
+    @Select("<script>" +
+            "SELECT COUNT(*) FROM note WHERE create_user = #{userId} " +
+            "<if test='topicId != null'> AND topic_id = #{topicId} </if>" +
+            "<if test='state != null and state != \"\"'> AND state = #{state} </if>" +
+            "</script>")
+    int countByFilters(@Param("userId") Integer userId,
+                       @Param("topicId") Integer topicId,
+                       @Param("state") String state);
 }

@@ -97,7 +97,11 @@
       <artifactId>aliyun-java-sdk-core</artifactId>
       <version>4.7.8</version>
     </dependency>
-
+    <!-- Jackson for JSON处理 -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
 
 
 
