@@ -73,9 +73,10 @@ const login = async () => {
   try {
     await formRef.value?.validate()
     const result = await userLoginService(registerData.value)
-    tokenStore.setToken(result.data)
+    tokenStore.setToken(result.data,rememberMe.value)
     const infoResult = await userInfoService()
-    userInfoStore.setInfo(infoResult.data)
+
+    userInfoStore.setInfo(infoResult.data,rememberMe.value)
     ElMessage.success('登录成功')
     const r = normalizeRole(infoResult.data?.role)
     router.push(canEnterAdmin(r) ? '/admin/home' : '/home')
