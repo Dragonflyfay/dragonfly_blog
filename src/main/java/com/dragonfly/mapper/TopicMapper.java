@@ -39,6 +39,10 @@ public interface TopicMapper {
     @Delete("DELETE FROM topic WHERE id = #{id}")
     void delete(Integer id);
 
+    //级联处理
+    @Select("SELECT COUNT(*) FROM note WHERE topic_id = #{topicId} AND state = '已发布'")
+    int countPublishedNotesByTopicId(Integer topicId);
+
     // 增加话题笔记数量
     @Update("UPDATE topic SET notes_count = notes_count + 1, update_time = NOW() WHERE id = #{topicId}")
     void incrementNotesCount(Integer topicId);

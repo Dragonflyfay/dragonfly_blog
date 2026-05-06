@@ -7,17 +7,13 @@ import java.util.List;
 
 /**
  * 描述：笔记数据访问接口
- *
- * @param
- * @author 蜻蜓大王
- * @date 2026/5/5 14:08
  */
 @Mapper
 public interface NoteMapper {
 
-    // 新增笔记
-    @Insert("INSERT INTO note (title, content, images, topic_id, location, state, create_user, publish_time, create_time, update_time) " +
-            "VALUES (#{title}, #{content}, #{images, typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}, #{topicId}, #{location}, #{state}, #{createUser}, #{publishTime}, #{createTime}, #{updateTime})")
+    // 新增笔记（支持图文和视频）
+    @Insert("INSERT INTO note (title, content, images, video, cover_img, note_category, topic_id, location, state, views_count, likes_count, comments_count, favorites_count, create_user, publish_time, create_time, update_time) " +
+            "VALUES (#{title}, #{content}, #{images, typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}, #{video}, #{coverImg}, #{noteCategory}, #{topicId}, #{location}, #{state}, #{viewsCount}, #{likesCount}, #{commentsCount}, #{favoritesCount}, #{createUser}, #{publishTime}, #{createTime}, #{updateTime})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     void add(Note note);
 
@@ -29,11 +25,11 @@ public interface NoteMapper {
     @Select("SELECT * FROM note WHERE id = #{id}")
     Note findById(Integer id);
 
-    // 更新笔记
-    @Update("UPDATE note SET title = #{title}, content = #{content}, images =  #{images, typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}, topic_id = #{topicId}, " +
-            "location = #{location}, state = #{state}, publish_time = #{publishTime}, update_time = #{updateTime} " +
+    @Update("UPDATE note SET title = #{title}, content = #{content}, images = #{images, typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}, video = #{video}, cover_img = #{coverImg}, note_category = #{noteCategory}, topic_id = #{topicId}, " +
+            "location = #{location}, state = #{state}, views_count = #{viewsCount}, likes_count = #{likesCount}, comments_count = #{commentsCount}, favorites_count = #{favoritesCount}, publish_time = #{publishTime}, update_time = #{updateTime} " +
             "WHERE id = #{id}")
     void update(Note note);
+
 
     // 删除笔记
     @Delete("DELETE FROM note WHERE id = #{id} AND create_user = #{userId}")

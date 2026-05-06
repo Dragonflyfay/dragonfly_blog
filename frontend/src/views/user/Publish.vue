@@ -17,17 +17,17 @@
         <!-- 媒体类型选择 -->
         <div class="media-type-selector">
           <div
-            class="media-type-item"
-            :class="{ active: mediaType === 'image' }"
-            @click="mediaType = 'image'"
+              class="media-type-item"
+              :class="{ active: mediaType === 'image' }"
+              @click="switchMediaType('image')"
           >
             <div class="type-icon">🖼️</div>
             <span>图文笔记</span>
           </div>
           <div
-            class="media-type-item"
-            :class="{ active: mediaType === 'video' }"
-            @click="mediaType = 'video'"
+              class="media-type-item"
+              :class="{ active: mediaType === 'video' }"
+              @click="switchMediaType('video')"
           >
             <div class="type-icon">🎬</div>
             <span>视频笔记</span>
@@ -44,10 +44,10 @@
 
           <div class="image-grid">
             <div
-              v-for="(img, index) in images"
-              :key="index"
-              class="image-item"
-              :style="{ backgroundImage: `url(${img})` }"
+                v-for="(img, index) in images"
+                :key="index"
+                class="image-item"
+                :style="{ backgroundImage: `url(${img})` }"
             >
               <div class="image-overlay">
                 <el-button circle size="small" class="delete-img-btn" @click="removeImage(index)">
@@ -60,16 +60,16 @@
               <div class="upload-icon">+</div>
               <span>上传图片</span>
               <input
-                ref="imageInput"
-                type="file"
-                accept="image/*"
-                multiple
-                style="display: none"
-                @change="handleImageUpload"
+                  ref="imageInput"
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  multiple
+                  style="display: none"
+                  @change="handleImageUpload"
               />
             </div>
           </div>
-          <p class="upload-hint">最多可上传9张图片，支持jpg/png格式</p>
+          <p class="upload-hint">最多可上传9张图片，支持jpg/png/gif/webp格式，单张不超过10MB</p>
         </div>
 
         <!-- 视频笔记上传区域 -->
@@ -83,14 +83,14 @@
             <div class="video-upload-icon">
               <el-icon :size="48"><VideoCamera /></el-icon>
             </div>
-            <span>点击上传视频</span>
-            <span class="video-hint">支持 mp4、mov 格式，大小不超过 500MB</span>
+            <span class="video-upload-text">点击上传视频</span>
+            <span class="video-hint">支持 mp4/mov/avi/flv/3gp 格式，大小不超过 500MB</span>
             <input
-              ref="videoInput"
-              type="file"
-              accept="video/*"
-              style="display: none"
-              @change="handleVideoUpload"
+                ref="videoInput"
+                type="file"
+                accept="video/mp4,video/quicktime,video/x-msvideo,video/x-flv,video/3gpp"
+                style="display: none"
+                @change="handleVideoUpload"
             />
           </div>
 
@@ -110,11 +110,11 @@
                   </div>
                 </div>
                 <input
-                  ref="coverInput"
-                  type="file"
-                  accept="image/*"
-                  style="display: none"
-                  @change="handleCoverUpload"
+                    ref="coverInput"
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    style="display: none"
+                    @change="handleCoverUpload"
                 />
               </div>
             </div>
@@ -125,21 +125,28 @@
         <el-form :model="noteForm" :rules="rules" ref="formRef" class="publish-form">
           <el-form-item prop="title">
             <el-input
-              v-model="noteForm.title"
-              placeholder="标题：一句话概括你的笔记内容..."
-              maxlength="50"
-              show-word-limit
-              class="title-input"
+                v-model="noteForm.title"
+                placeholder="标题：一句话概括你的笔记内容..."
+                maxlength="50"
+                show-word-limit
+                class="title-input"
             />
           </el-form-item>
 
           <el-form-item prop="content">
             <div class="editor-wrapper">
-              <quill-editor
-                theme="snow"
-                v-model:content="noteForm.content"
-                contentType="html"
-                placeholder="正文：详细描述你的笔记内容..."
+              <Toolbar
+                  class="editor-toolbar"
+                  :editor="editorRef"
+                  :defaultConfig="toolbarConfig"
+                  mode="simple"
+              />
+              <Editor
+                  class="editor-content"
+                  v-model="noteForm.content"
+                  :defaultConfig="editorConfig"
+                  mode="simple"
+                  @onCreated="handleCreated"
               />
             </div>
           </el-form-item>
@@ -163,10 +170,16 @@
 
         <!-- 操作按钮 -->
         <div class="action-buttons">
-          <el-button class="draft-btn" size="large" @click="saveAsDraft">
+          <el-button class="draft-btn" size="large" @click="saveAsDraft" :loading="submitting">
             <el-icon><Document /></el-icon> 存草稿
           </el-button>
-          <el-button class="publish-btn" type="primary" size="large" @click="publishNote">
+          <el-button
+              class="publish-btn"
+              type="primary"
+              size="large"
+              @click="publishNote"
+              :loading="submitting"
+          >
             <el-icon><Promotion /></el-icon> 发布笔记
           </el-button>
         </div>
@@ -176,7 +189,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, shallowRef, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Delete,
@@ -186,15 +199,18 @@ import {
   Document,
   Promotion,
 } from '@element-plus/icons-vue'
-import { QuillEditor } from '@vueup/vue-quill'
-import '@vueup/vue-quill/dist/vue-quill.snow.css'
+import '@wangeditor/editor/dist/css/style.css'
+import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
 import { useRouter } from 'vue-router'
 import { useTokenStore } from '@/stores/token.js'
 import { topicListService, noteAddService } from '@/api/note.js'
+import request from '@/utils/request.js'
+import axios from 'axios'
 
 const router = useRouter()
 const tokenStore = useTokenStore()
 const formRef = ref()
+const submitting = ref(false)
 
 const mediaType = ref('image') // image 或 video
 
@@ -220,13 +236,42 @@ const noteForm = reactive({
   location: '',
 })
 
+// 富文本编辑器相关
+const editorRef = shallowRef()
+const toolbarConfig = {}
+const editorConfig = {
+  placeholder: '正文：详细描述你的笔记内容...',
+  MENU_CONF: {
+    uploadImage: {
+      server: '/api/upload',
+      fieldName: 'file',
+      customInsert(res, insertFn) {
+        if (res.code === 0) {
+          insertFn(res.data, '', res.data)
+        }
+      }
+    }
+  }
+}
+
 // 表单验证规则
 const rules = {
   title: [
     { required: true, message: '请输入标题', trigger: 'blur' },
     { min: 1, max: 50, message: '标题长度1-50字符', trigger: 'blur' },
   ],
-  content: [{ required: true, message: '请输入正文内容', trigger: 'blur' }],
+  content: [
+    {
+      validator: (rule, value, callback) => {
+        if (!value || value === '<p><br></p>' || value.trim() === '') {
+          callback(new Error('请输入正文内容'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ],
   topicId: [{ required: true, message: '请选择话题', trigger: 'change' }],
 }
 
@@ -237,7 +282,24 @@ const getTopicList = async () => {
     topics.value = result.data || []
   } catch (error) {
     console.error('获取话题失败', error)
+    ElMessage.error('获取话题列表失败')
   }
+}
+
+// 切换媒体类型
+const switchMediaType = (type) => {
+  if (mediaType.value === type) return
+
+  if (type === 'video' && images.value.length > 0) {
+    ElMessage.warning('切换到视频模式将清空已上传的图片')
+    images.value = []
+  } else if (type === 'image' && videoUrl.value) {
+    ElMessage.warning('切换到图文模式将清空已上传的视频')
+    videoUrl.value = ''
+    videoCover.value = ''
+  }
+
+  mediaType.value = type
 }
 
 // 触发图片上传
@@ -261,23 +323,31 @@ const handleImageUpload = async (event) => {
       continue
     }
 
+    if (file.size > 10 * 1024 * 1024) {
+      ElMessage.warning(`图片 ${file.name} 超过10MB限制`)
+      continue
+    }
+
     const formData = new FormData()
     formData.append('file', file)
 
     try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
+      const result = await request.post('/upload', formData, {
         headers: {
-          Authorization: tokenStore.token,
-        },
-        body: formData,
+          'Content-Type': 'multipart/form-data'
+        }
       })
-      const result = await response.json()
       if (result.code === 0) {
         images.value.push(result.data)
+        ElMessage.success(`图片上传成功`)
       }
     } catch (error) {
-      ElMessage.error('上传失败')
+      console.error('上传失败:', error)
+      if (error.code === 'ECONNABORTED') {
+        ElMessage.error('上传超时，请检查网络连接')
+      } else {
+        ElMessage.error(error.response?.data?.message || '图片上传失败')
+      }
     }
   }
   event.target.value = ''
@@ -312,22 +382,76 @@ const handleVideoUpload = async (event) => {
   formData.append('file', file)
 
   try {
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      headers: {
-        Authorization: tokenStore.token,
-      },
-      body: formData,
+    ElMessage.info('视频上传中，请稍候...')
+
+    const uploadInstance = axios.create({
+      baseURL: '/api',
+      timeout: 300000
     })
-    const result = await response.json()
+
+    uploadInstance.interceptors.request.use(
+        (config) => {
+          const tokenStore = useTokenStore()
+          let token = tokenStore.token
+          if (!token) {
+            token = localStorage.getItem('global_token')
+            if (!token) {
+              const tabId = sessionStorage.getItem('tab_id')
+              if (tabId) {
+                token = sessionStorage.getItem(`token_${tabId}`)
+              }
+            }
+          }
+          if (token) {
+            config.headers.Authorization = token
+          }
+          return config
+        },
+        (err) => Promise.reject(err)
+    )
+
+    uploadInstance.interceptors.response.use(
+        (result) => {
+          if (result.data.code === 0) {
+            return result.data
+          }
+          ElMessage.error(result.data.message || '服务异常')
+          return Promise.reject(result.data)
+        },
+        (err) => {
+          if (err.code === 'ECONNABORTED') {
+            ElMessage.error('上传超时，请检查网络连接或尝试上传较小的视频')
+          } else if (!err.response) {
+            ElMessage.error('网络异常，请检查网络连接')
+          } else {
+            ElMessage.error(err.response?.data?.message || '上传失败')
+          }
+          return Promise.reject(err)
+        }
+    )
+
+    const result = await uploadInstance.post('/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (progressEvent) => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        console.log(`上传进度: ${percentCompleted}%`)
+      }
+    })
+
     if (result.code === 0) {
       videoUrl.value = result.data
       ElMessage.success('视频上传成功')
     }
   } catch (error) {
-    ElMessage.error('视频上传失败')
+    console.error('视频上传失败:', error)
+    if (error.code !== 'ECONNABORTED' && error.response) {
+      ElMessage.error(error.response?.data?.message || '视频上传失败')
+    }
+  } finally {
+    event.target.value = ''
   }
-  event.target.value = ''
 }
 
 // 移除视频
@@ -351,24 +475,31 @@ const handleCoverUpload = async (event) => {
     return
   }
 
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.warning('封面图片不能超过10MB')
+    return
+  }
+
   const formData = new FormData()
   formData.append('file', file)
 
   try {
-    const response = await fetch('/api/upload', {
-      method: 'POST',
+    const result = await request.post('/upload', formData, {
       headers: {
-        Authorization: tokenStore.token,
-      },
-      body: formData,
+        'Content-Type': 'multipart/form-data'
+      }
     })
-    const result = await response.json()
     if (result.code === 0) {
       videoCover.value = result.data
       ElMessage.success('封面上传成功')
     }
   } catch (error) {
-    ElMessage.error('封面上传失败')
+    console.error('封面上传失败:', error)
+    if (error.code === 'ECONNABORTED') {
+      ElMessage.error('上传超时，请检查网络连接')
+    } else {
+      ElMessage.error(error.response?.data?.message || '封面上传失败')
+    }
   }
   event.target.value = ''
 }
@@ -384,48 +515,72 @@ const saveAsDraft = async () => {
 
 // 发布笔记
 const publishNote = async () => {
-  await formRef.value?.validate()
-  await submitNote('已发布')
+  try {
+    await formRef.value?.validate()
+    await submitNote('已发布')
+  } catch (error) {
+    console.error('表单验证失败:', error)
+  }
 }
 
 // 提交笔记
 const submitNote = async (state) => {
-  const requestData = {
-    title: noteForm.title,
-    content: noteForm.content,
-    topicId: noteForm.topicId,
-    location: noteForm.location,
-    state: state,
-    mediaType: mediaType.value,
-  }
-
-  if (mediaType.value === 'image') {
-    if (images.value.length === 0) {
-      ElMessage.warning('请至少上传一张图片')
-      return
-    }
-    requestData.images = images.value
-    requestData.coverImg = images.value[0]
-  } else {
-    if (!videoUrl.value) {
-      ElMessage.warning('请上传视频')
-      return
-    }
-    requestData.videoUrl = videoUrl.value
-    requestData.videoCover = videoCover.value
-    requestData.coverImg = videoCover.value
-  }
+  submitting.value = true
 
   try {
+    const requestData = {
+      title: noteForm.title,
+      content: noteForm.content,
+      topicId: noteForm.topicId,
+      location: noteForm.location,
+      state: state,
+      noteCategory: mediaType.value,
+    }
+
+    if (mediaType.value === 'image') {
+      if (images.value.length === 0) {
+        ElMessage.warning('请至少上传一张图片')
+        submitting.value = false
+        return
+      }
+      requestData.images = images.value
+      requestData.coverImg = images.value[0]
+    } else {
+      if (!videoUrl.value) {
+        ElMessage.warning('请上传视频')
+        submitting.value = false
+        return
+      }
+      requestData.video = videoUrl.value
+      requestData.coverImg = videoCover.value || videoUrl.value
+    }
+
+    console.log('提交数据:', JSON.stringify(requestData, null, 2))
+
     const result = await noteAddService(requestData)
     ElMessage.success(state === '已发布' ? '发布成功！' : '已保存到草稿箱')
-    // 触发自定义事件，通知其他组件刷新话题列表
+
     window.dispatchEvent(new CustomEvent('notesChanged'))
     router.push('/home')
   } catch (error) {
-    ElMessage.error('操作失败')
+    console.error('提交失败:', error)
+    ElMessage.error(error.response?.data?.message || '操作失败')
+  } finally {
+    submitting.value = false
   }
 }
+
+// 编辑器创建回调
+const handleCreated = (editor) => {
+  editorRef.value = editor
+}
+
+// 组件销毁时销毁编辑器
+onBeforeUnmount(() => {
+  const editor = editorRef.value
+  if (editor == null) return
+  editor.destroy()
+})
 
 onMounted(() => {
   if (!tokenStore.token) {
@@ -664,7 +819,7 @@ onMounted(() => {
     margin-bottom: 16px;
     color: #c5a3ff;
   }
-  span {
+  .video-upload-text {
     display: block;
     font-size: 16px;
     color: #6a4a9c;
@@ -755,16 +910,21 @@ onMounted(() => {
   }
 
   .editor-wrapper {
-    :deep(.ql-editor) {
-      min-height: 200px;
+    border: 1px solid #f0e5ff;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #faf7ff;
+
+    .editor-toolbar {
+      border-bottom: 1px solid #f0e5ff;
     }
-    :deep(.ql-toolbar) {
-      border-radius: 12px 12px 0 0;
-      border-color: #ffe0e8;
-    }
-    :deep(.ql-container) {
-      border-radius: 0 0 12px 12px;
-      border-color: #ffe0e8;
+
+    .editor-content {
+      height: 300px;
+
+      :deep(.w-e-text-container) {
+        background: #faf7ff;
+      }
     }
   }
 
@@ -835,5 +995,4 @@ onMounted(() => {
     transform: translateY(-8px);
   }
 }
-//富文本框的格式美化
 </style>

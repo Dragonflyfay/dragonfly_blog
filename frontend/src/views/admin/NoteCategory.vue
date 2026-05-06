@@ -1,4 +1,3 @@
-NEW_FILE_CODE
 <script setup>
 import {
   topicListService,
@@ -16,6 +15,7 @@ const router = useRouter()
 const tokenStore = useTokenStore()
 
 const topics = ref([])
+const loading = ref(false)
 
 const getTopicGradient = (name) => {
   const gradients = {
@@ -27,11 +27,15 @@ const getTopicGradient = (name) => {
 }
 
 const topicList = async () => {
+  loading.value = true
   try {
     let result = await topicListService()
-    topics.value = result.data
+    topics.value = result.data || []
   } catch (error) {
     console.error('获取话题列表失败:', error)
+    ElMessage.error('获取话题列表失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -45,6 +49,7 @@ onMounted(() => {
 
 const dialogVisible = ref(false)
 const title = ref('')
+const submitLoading = ref(false)
 
 const topicModel = ref({
   topicName: '',
@@ -52,8 +57,13 @@ const topicModel = ref({
 })
 
 const rules = {
-  topicName: [{ required: true, message: '请输入话题名称', trigger: 'blur' }],
-  description: [{ required: false, message: '请输入话题描述', trigger: 'blur' }],
+  topicName: [
+    { required: true, message: '请输入话题名称', trigger: 'blur' },
+    { min: 1, max: 20, message: '话题名称长度在 1 到 20 个字符', trigger: 'blur' }
+  ],
+  description: [
+    { max: 100, message: '描述不能超过 100 个字符', trigger: 'blur' }
+  ],
 }
 
 const resetTopicModel = () => {
@@ -64,11 +74,19 @@ const resetTopicModel = () => {
 }
 
 const addTopic = async () => {
-  let result = await topicAddService(topicModel.value)
-  ElMessage.success(result.message ? result.message : '添加成功')
-  topicList()
-  dialogVisible.value = false
-  resetTopicModel()
+  submitLoading.value = true
+  try {
+    let result = await topicAddService(topicModel.value)
+    ElMessage.success(result.message ? result.message : '添加成功')
+    await topicList()
+    dialogVisible.value = false
+    resetTopicModel()
+  } catch (error) {
+    console.error('添加话题失败:', error)
+    ElMessage.error(error.response?.data?.message || '添加失败')
+  } finally {
+    submitLoading.value = false
+  }
 }
 
 const showDialog = (row) => {
@@ -80,30 +98,48 @@ const showDialog = (row) => {
 }
 
 const updateTopic = async () => {
-  let result = await topicUpdateService(topicModel.value)
-  ElMessage.success(result.message ? result.message : '修改成功')
-  topicList()
-  dialogVisible.value = false
-  resetTopicModel()
+  submitLoading.value = true
+  try {
+    let result = await topicUpdateService(topicModel.value)
+    ElMessage.success(result.message ? result.message : '修改成功')
+    await topicList()
+    dialogVisible.value = false
+    resetTopicModel()
+  } catch (error) {
+    console.error('更新话题失败:', error)
+    ElMessage.error(error.response?.data?.message || '更新失败')
+  } finally {
+    submitLoading.value = false
+  }
 }
 
 const deleteTopic = (row) => {
-  ElMessageBox.confirm('你确认要删除该话题吗', '温馨提示', {
+  const hasNotes = row.notesCount && row.notesCount > 0
+  const confirmMsg = hasNotes
+      ? `该话题下有 ${row.notesCount} 篇笔记，删除后不可恢复，确认删除吗？`
+      : '你确认要删除该话题吗？'
+
+  ElMessageBox.confirm(confirmMsg, '温馨提示', {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
-    type: 'warning',
+    type: hasNotes ? 'warning' : 'info',
   })
-    .then(async () => {
-      let result = await topicDeleteService(row.id)
-      ElMessage.success(result.message ? result.message : '删除成功')
-      topicList()
-    })
-    .catch(() => {
-      ElMessage({
-        type: 'info',
-        message: '你取消了删除',
+      .then(async () => {
+        try {
+          let result = await topicDeleteService(row.id)
+          ElMessage.success(result.message ? result.message : '删除成功')
+          await topicList()
+        } catch (error) {
+          console.error('删除话题失败:', error)
+          ElMessage.error(error.response?.data?.message || '删除失败')
+        }
       })
-    })
+      .catch(() => {
+        ElMessage({
+          type: 'info',
+          message: '已取消删除',
+        })
+      })
 }
 </script>
 
@@ -120,10 +156,10 @@ const deleteTopic = (row) => {
       </div>
       <div class="header-extra">
         <el-button
-          class="add-category-btn"
-          type="primary"
-          size="large"
-          @click="
+            class="add-category-btn"
+            type="primary"
+            size="large"
+            @click="
             () => {
               dialogVisible = true
               title = '添加话题'
@@ -137,7 +173,13 @@ const deleteTopic = (row) => {
     </div>
 
     <div class="category-table-wrapper">
-      <el-table :data="topics" style="width: 100%" class="custom-table">
+      <el-table
+          :data="topics"
+          style="width: 100%"
+          class="custom-table"
+          v-loading="loading"
+          element-loading-text="加载中..."
+      >
         <el-table-column label="序号" width="80" type="index">
           <template #default="{ $index }">
             <div class="index-badge">
@@ -146,19 +188,19 @@ const deleteTopic = (row) => {
           </template>
         </el-table-column>
 
-        <el-table-column label="话题名称" prop="topicName" align="left">
+        <el-table-column label="话题名称" prop="topicName" align="left" min-width="150">
           <template #default="{ row }">
             <div class="category-name-cell">
               <span
-                class="category-icon"
-                :style="{ backgroundImage: getTopicGradient(row.topicName) }"
+                  class="category-icon"
+                  :style="{ backgroundImage: getTopicGradient(row.topicName) }"
               ></span>
               <span class="category-name-text">{{ row.topicName }}</span>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="描述" prop="description" align="left">
+        <el-table-column label="描述" prop="description" align="left" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">
             <div class="category-alias">
               <span class="alias-label">{{ row.description || '暂无描述' }}</span>
@@ -166,9 +208,11 @@ const deleteTopic = (row) => {
           </template>
         </el-table-column>
 
-        <el-table-column label="笔记数量" prop="notesCount" align="center">
+        <el-table-column label="笔记数量" prop="notesCount" align="center" width="120">
           <template #default="{ row }">
-            <span class="count-badge">{{ row.notesCount || 0 }}</span>
+            <span class="count-badge" :class="{ 'has-notes': row.notesCount > 0 }">
+              {{ row.notesCount || 0 }}
+            </span>
           </template>
         </el-table-column>
 
@@ -177,18 +221,18 @@ const deleteTopic = (row) => {
             <div class="action-buttons">
               <el-tooltip content="编辑话题" placement="top">
                 <el-button
-                  :icon="Edit"
-                  circle
-                  class="action-btn edit-btn"
-                  @click="showDialog(row)"
+                    :icon="Edit"
+                    circle
+                    class="action-btn edit-btn"
+                    @click="showDialog(row)"
                 ></el-button>
               </el-tooltip>
               <el-tooltip content="删除话题" placement="top">
                 <el-button
-                  :icon="Delete"
-                  circle
-                  class="action-btn delete-btn"
-                  @click="deleteTopic(row)"
+                    :icon="Delete"
+                    circle
+                    class="action-btn delete-btn"
+                    @click="deleteTopic(row)"
                 ></el-button>
               </el-tooltip>
             </div>
@@ -213,29 +257,32 @@ const deleteTopic = (row) => {
 
     <el-dialog v-model="dialogVisible" :title="title" width="400px" center class="dialog">
       <el-form
-        :model="topicModel"
-        :rules="rules"
-        label-width="100px"
-        style="padding-right: 30px"
-        class="form"
+          ref="formRef"
+          :model="topicModel"
+          :rules="rules"
+          label-width="100px"
+          style="padding-right: 30px"
+          class="form"
       >
         <el-form-item label="话题名称" prop="topicName">
           <el-input
-            v-model="topicModel.topicName"
-            minlength="1"
-            maxlength="20"
-            class="custom-input"
-            placeholder="请输入话题名称"
+              v-model="topicModel.topicName"
+              minlength="1"
+              maxlength="20"
+              show-word-limit
+              class="custom-input"
+              placeholder="请输入话题名称"
           ></el-input>
         </el-form-item>
         <el-form-item label="话题描述" prop="description">
           <el-input
-            v-model="topicModel.description"
-            type="textarea"
-            :rows="3"
-            maxlength="100"
-            class="custom-input"
-            placeholder="请输入话题描述（可选）"
+              v-model="topicModel.description"
+              type="textarea"
+              :rows="3"
+              maxlength="100"
+              show-word-limit
+              class="custom-input"
+              placeholder="请输入话题描述（可选）"
           ></el-input>
         </el-form-item>
       </el-form>
@@ -243,9 +290,10 @@ const deleteTopic = (row) => {
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false" class="cancel-btn">取消</el-button>
           <el-button
-            type="primary"
-            @click="title == '添加话题' ? addTopic() : updateTopic()"
-            class="confirm-btn"
+              type="primary"
+              @click="title == '添加话题' ? addTopic() : updateTopic()"
+              class="confirm-btn"
+              :loading="submitLoading"
           >
             确认
           </el-button>
@@ -428,6 +476,13 @@ const deleteTopic = (row) => {
       color: #2c665a;
       font-size: 13px;
       font-weight: 600;
+      transition: all 0.3s ease;
+
+      &.has-notes {
+        background: linear-gradient(135deg, #f8b4d9, #ff9a9e);
+        color: #8a1c4c;
+        box-shadow: 0 2px 8px rgba(248, 180, 217, 0.3);
+      }
     }
 
     .action-buttons {
@@ -563,6 +618,12 @@ const deleteTopic = (row) => {
 
       :deep(textarea) {
         border-radius: 12px;
+      }
+
+      :deep(.el-input__count) {
+        background: transparent;
+        color: #b0a7c0;
+        font-size: 12px;
       }
     }
   }
