@@ -40,11 +40,28 @@ public class NoteServiceImpl implements NoteService {
         Integer userId = (Integer) map.get("id");
 
         note.setCreateUser(userId);
+        System.out.println("=== 笔记添加调试信息 ===");
+        System.out.println("标题: " + note.getTitle());
+        System.out.println("状态: " + note.getState());
+        System.out.println("话题ID: " + note.getTopicId());
+        System.out.println("媒体类型: " + note.getNoteCategory());
+        System.out.println("视频URL: " + note.getVideo());
+        System.out.println("封面图: " + note.getCoverImg());
 
         if ("已发布".equals(note.getState())) {
             note.setPublishTime(LocalDateTime.now());
         }
         syncCoverIntoImages(note);
+        initStatisticsFields(note);
+        noteMapper.add(note);
+        // 如果笔记是已发布状态，增加话题的笔记数量
+        if ("已发布".equals(note.getState()) && note.getTopicId() != null) {
+            topicMapper.incrementNotesCount(note.getTopicId());
+        }
+
+    }
+
+    private void initStatisticsFields(Note note) {
         if (note.getViewsCount() == null) {
             note.setViewsCount(0);
         }
@@ -57,13 +74,6 @@ public class NoteServiceImpl implements NoteService {
         if (note.getFavoritesCount() == null) {
             note.setFavoritesCount(0);
         }
-
-        noteMapper.add(note);
-        // 如果笔记是已发布状态，增加话题的笔记数量
-        if ("已发布".equals(note.getState()) && note.getTopicId() != null) {
-            topicMapper.incrementNotesCount(note.getTopicId());
-        }
-
     }
 
     /** 封面优先写入图片列表首位，便于前端「小红书」封面展示 */
@@ -112,6 +122,7 @@ public class NoteServiceImpl implements NoteService {
             note.setPublishTime(LocalDateTime.now());
         }
         syncCoverIntoImages(note);
+        preserveStatistics(oldNote,note);
         noteMapper.update(note);
 
         // 处理话题笔记数量变化
@@ -139,6 +150,21 @@ public class NoteServiceImpl implements NoteService {
                     topicMapper.incrementNotesCount(newTopicId);
                 }
             }
+        }
+    }
+    // 保存统计数据
+    private void preserveStatistics(Note oldNote, Note newNote) {
+        if (newNote.getViewsCount() == null) {
+            newNote.setViewsCount(oldNote.getViewsCount());
+        }
+        if (newNote.getLikesCount() == null) {
+            newNote.setLikesCount(oldNote.getLikesCount());
+        }
+        if (newNote.getCommentsCount() == null) {
+            newNote.setCommentsCount(oldNote.getCommentsCount());
+        }
+        if (newNote.getFavoritesCount() == null) {
+            newNote.setFavoritesCount(oldNote.getFavoritesCount());
         }
     }
 

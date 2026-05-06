@@ -54,6 +54,10 @@ public class TopicServiceImpl implements TopicService {
 
     @Override
     public void delete(Integer id) {
+        int publishedCount = topicMapper.countPublishedNotesByTopicId(id);
+        if (publishedCount > 0) {
+            throw new RuntimeException("该话题下还有" + publishedCount + "篇已发布的笔记，无法删除");
+        }
         topicMapper.delete(id);
     }
 }
