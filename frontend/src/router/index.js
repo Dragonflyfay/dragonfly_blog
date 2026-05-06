@@ -39,7 +39,9 @@ const routes = [
       { path: 'topic', component: NoteCategoryVue, meta: { title: '话题管理' } },
       { path: 'note', component: NoteManageVue, meta: { title: '笔记管理' } },
       { path: 'role', component: RoleManageVue, meta: { title: '角色管理' } },
-
+      { path: 'user/info', component: UserInfo, meta: { title: '基本资料' } },
+      { path: 'user/avatar', component: UserAvatarVue, meta: { title: '更换头像' } },
+      { path: 'user/resetPassword', component: UserResetPasswordVue, meta: { title: '重置密码' } },
     ],
   },
 
@@ -53,19 +55,12 @@ const routes = [
       { path: 'home', component: UserHomeVue, meta: { title: '发现' } },
       { path: 'publish', component: PublishVue, meta: { title: '发布' } },
       { path: 'notification', component: NotificationVue, meta: { title: '通知' } },
+      { path: 'user/info', component: UserInfo, meta: { title: '基本资料' } },
+      { path: 'user/avatar', component: UserAvatarVue, meta: { title: '更换头像' } },
+      { path: 'user/resetPassword', component: UserResetPasswordVue, meta: { title: '重置密码' } },
     ],
   },
-  // 个人中心路由 - Admin和User共用
-  {
-    path: '/user',
-    meta: { requiresAuth: true },
-    redirect: '/user/info',
-    children: [
-      { path: 'info', component: UserInfo, meta: { title: '基本资料' } },
-      { path: 'avatar', component: UserAvatarVue, meta: { title: '更换头像' } },
-      { path: 'resetPassword', component: UserResetPasswordVue, meta: { title: '重置密码' } },
-    ],
-  },
+
 
   // 403无权限页面
   { path: '/403', component: () => import('@/views/403.vue') },
@@ -80,10 +75,51 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const tokenStore = useTokenStore()
   const userInfoStore = useUserInfoStore()
-  const token = tokenStore.token
-  const resolvedRole = normalizeRole(
-    userInfoStore.info?.role ?? userInfoStore.role,
+
+  // 获取token（支持多种来源）
+  let token = tokenStore.token
+  if (!token) {
+    token = localStorage.getItem('global_token')
+    if (!token) {
+      const tabId = sessionStorage.getItem('tab_id')
+      if (tabId) {
+        token = sessionStorage.getItem(`token_${tabId}`)
+      }
+    }
+  }
+
+  // 获取用户角色
+  let resolvedRole = normalizeRole(
+      userInfoStore.info?.role ?? userInfoStore.role,
   )
+
+  // 如果store中没有，尝试从存储中恢复
+  if (!resolvedRole) {
+    // 先检查全局存储
+    const globalInfo = localStorage.getItem('global_userInfo')
+    if (globalInfo) {
+      try {
+        const info = JSON.parse(globalInfo)
+        resolvedRole = normalizeRole(info?.role)
+      } catch (e) {
+        console.error('解析全局用户信息失败:', e)
+      }
+    } else {
+      // 再检查标签页存储
+      const tabId = sessionStorage.getItem('tab_id')
+      if (tabId) {
+        const tabInfo = sessionStorage.getItem(`userInfo_${tabId}`)
+        if (tabInfo) {
+          try {
+            const info = JSON.parse(tabInfo)
+            resolvedRole = normalizeRole(info?.role)
+          } catch (e) {
+            console.error('解析标签页用户信息失败:', e)
+          }
+        }
+      }
+    }
+  }
 
   // 登录页直接放行
   if (to.path === '/login') {
@@ -102,7 +138,7 @@ router.beforeEach((to, from, next) => {
     return
   }
 
-  // 角色权限验证（大小写与 admin/user 规则见 utils/roles）
+  // 角色权限验证
   if (to.meta.role && !routeRoleAllows(to.meta.role, resolvedRole)) {
     next('/403')
     return

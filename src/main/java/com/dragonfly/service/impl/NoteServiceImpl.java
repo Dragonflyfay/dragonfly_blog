@@ -1,12 +1,14 @@
 package com.dragonfly.service.impl;
 
 import com.dragonfly.mapper.NoteMapper;
+import com.dragonfly.mapper.TopicMapper;
 import com.dragonfly.pojo.Note;
 import com.dragonfly.pojo.PageBean;
 import com.dragonfly.service.NoteService;
 import com.dragonfly.utils.ThreadLocalUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -25,7 +27,10 @@ import java.util.Map;
 public class NoteServiceImpl implements NoteService {
     @Autowired
     private NoteMapper noteMapper;
+    @Autowired
+    private TopicMapper topicMapper;
 
+    @Transactional
     @Override
     public void add(Note note) {
         note.setCreateTime(LocalDateTime.now());
@@ -33,6 +38,7 @@ public class NoteServiceImpl implements NoteService {
 
         Map<String, Object> map = ThreadLocalUtil.get();
         Integer userId = (Integer) map.get("id");
+
         note.setCreateUser(userId);
 
         if ("已发布".equals(note.getState())) {
@@ -53,6 +59,10 @@ public class NoteServiceImpl implements NoteService {
         }
 
         noteMapper.add(note);
+        // 如果笔记是已发布状态，增加话题的笔记数量
+        if ("已发布".equals(note.getState()) && note.getTopicId() != null) {
+            topicMapper.incrementNotesCount(note.getTopicId());
+        }
 
     }
 
@@ -86,11 +96,50 @@ public class NoteServiceImpl implements NoteService {
     @Override
     public void update(Note note) {
         note.setUpdateTime(LocalDateTime.now());
-        if ("已发布".equals(note.getState()) && note.getPublishTime() == null) {
+
+        // 获取更新前的笔记信息，用于判断状态变化
+        Note oldNote = noteMapper.findById(note.getId());
+        if (oldNote == null) {
+            throw new RuntimeException("要更新的笔记不存在");
+        }
+
+        String oldState = oldNote.getState();
+        String newState = note.getState();
+        Integer oldTopicId = oldNote.getTopicId();
+        Integer newTopicId = note.getTopicId();
+
+        if ("已发布".equals(newState) && note.getPublishTime() == null) {
             note.setPublishTime(LocalDateTime.now());
         }
         syncCoverIntoImages(note);
         noteMapper.update(note);
+
+        // 处理话题笔记数量变化
+        // 情况1: 从非发布状态变为发布状态
+        if (!"已发布".equals(oldState) && "已发布".equals(newState)) {
+            if (newTopicId != null) {
+                topicMapper.incrementNotesCount(newTopicId);
+            }
+        }
+        // 情况2: 从发布状态变为非发布状态
+        else if ("已发布".equals(oldState) && !"已发布".equals(newState)) {
+            if (oldTopicId != null) {
+                topicMapper.decrementNotesCount(oldTopicId);
+            }
+        }
+        // 情况3: 话题变更，且都是发布状态
+        else if ("已发布".equals(oldState) && "已发布".equals(newState)) {
+            if (!oldTopicId.equals(newTopicId)) {
+                // 减少旧话题的计数
+                if (oldTopicId != null) {
+                    topicMapper.decrementNotesCount(oldTopicId);
+                }
+                // 增加新话题的计数
+                if (newTopicId != null) {
+                    topicMapper.incrementNotesCount(newTopicId);
+                }
+            }
+        }
     }
 
     @Override
@@ -105,6 +154,11 @@ public class NoteServiceImpl implements NoteService {
         }
         if (!note.getCreateUser().equals(userId)) {
             throw new RuntimeException("没有权限，只能删除自己创建的笔记");
+        }
+
+        // 如果删除的是已发布的笔记，减少话题的笔记数量
+        if ("已发布".equals(note.getState()) && note.getTopicId() != null) {
+            topicMapper.decrementNotesCount(note.getTopicId());
         }
 
         noteMapper.delete(id, userId);
