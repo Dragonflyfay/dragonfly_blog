@@ -66,5 +66,10 @@ public class UserServiceImpl implements UserService {
 
     }
 
+    @Override
+    public java.util.List<User> list() {
+        return userMapper.list();
+    }
+
 
 }

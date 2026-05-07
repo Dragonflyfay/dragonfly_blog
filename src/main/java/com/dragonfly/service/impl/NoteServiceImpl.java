@@ -172,29 +172,29 @@ public class NoteServiceImpl implements NoteService {
     public void delete(Integer id) {
         Map<String, Object> map = ThreadLocalUtil.get();
         Integer userId = (Integer) map.get("id");
+        String role = (String) map.get("role");
 
         // 验证笔记是否存在及权限
+        // 只有笔记创建者或管理员可以删除
         Note note = noteMapper.findById(id);
-        if (note == null) {
-            throw new RuntimeException("要删除的笔记不存在");
-        }
-        if (!note.getCreateUser().equals(userId)) {
+        boolean isOwner = note.getCreateUser().equals(userId);
+        boolean isAdmin = "ADMIN".equals(role);
+
+        if (!isOwner && !isAdmin) {
             throw new RuntimeException("没有权限，只能删除自己创建的笔记");
         }
+
 
         // 如果删除的是已发布的笔记，减少话题的笔记数量
         if ("已发布".equals(note.getState()) && note.getTopicId() != null) {
             topicMapper.decrementNotesCount(note.getTopicId());
         }
 
-        noteMapper.delete(id, userId);
+        noteMapper.delete(id);
     }
 
     @Override
-    public PageBean<Note> pageList(Integer pageNum, Integer pageSize, Integer topicId, String state) {
-        Map<String, Object> map = ThreadLocalUtil.get();
-        Integer userId = (Integer) map.get("id");
-
+    public PageBean<Note> pageList(Integer pageNum, Integer pageSize, Integer topicId, String state, Integer userId) {
         Integer offset = (pageNum - 1) * pageSize;
 
         List<Note> notes = noteMapper.listByPage(userId, topicId, state, offset, pageSize);

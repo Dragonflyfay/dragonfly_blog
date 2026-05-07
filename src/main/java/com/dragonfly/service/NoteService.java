@@ -29,6 +29,6 @@ public interface NoteService {
     // 删除笔记
     void delete(Integer id);
 
-    // 分页查询笔记（可选 topicId、state）
-    PageBean<Note> pageList(Integer pageNum, Integer pageSize, Integer topicId, String state);
+    // 分页查询笔记（可选 topicId、state、userId）
+    PageBean<Note> pageList(Integer pageNum, Integer pageSize, Integer topicId, String state, Integer userId);
 }

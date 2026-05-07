@@ -153,5 +153,11 @@ public class UserController {
         return Result.success();
 
     }
+
+    @GetMapping("/list")
+    public Result<java.util.List<User>> list() {
+        java.util.List<User> users = userService.list();
+        return Result.success(users);
+    }
 }
 

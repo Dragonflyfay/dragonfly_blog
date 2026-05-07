@@ -55,14 +55,15 @@ public class NoteController {
         return Result.success();
     }
 
-    // 分页查询笔记（可选话题、状态）
+    // 分页查询笔记（可选话题、状态、用户）
     @GetMapping("/page")
     public Result<PageBean<Note>> pageList(
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize,
             @RequestParam(required = false) Integer topicId,
-            @RequestParam(required = false) String state) {
-        PageBean<Note> pageBean = noteService.pageList(pageNum, pageSize, topicId, state);
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) Integer userId) {
+        PageBean<Note> pageBean = noteService.pageList(pageNum, pageSize, topicId, state, userId);
         return Result.success(pageBean);
     }
 }

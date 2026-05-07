@@ -50,3 +50,8 @@ export const noteUpdateService = (noteData) => {
 export const noteDeleteService = (id) => {
   return request.delete('/note', { params: { id } })
 }
+
+// 用户列表查询
+export const userListService = () => {
+  return request.get('/user/list')
+}

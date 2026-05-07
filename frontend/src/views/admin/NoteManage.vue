@@ -1,23 +1,20 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { Delete, Edit, LocationFilled, PictureFilled, Plus, View } from '@element-plus/icons-vue'
+import { Delete, Edit, LocationFilled, PictureFilled, View } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { QuillEditor } from '@vueup/vue-quill'
-import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
 import {
-  noteAddService,
   noteDeleteService,
-  noteDetailService,
   notePageListService,
-  noteUpdateService,
   topicListService,
+  userListService,
 } from '@/api/note.js'
-import { useTokenStore } from '@/stores/token.js'
 
 const topics = ref([])
 const topicId = ref('')
 const state = ref('')
+const userId = ref('')
+const users = ref([])
 
 const notes = ref([])
 const pageNum = ref(1)
@@ -29,26 +26,6 @@ const PLACEHOLDER_IMG =
   encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="533" viewBox="0 0 400 533"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffeef8"/><stop offset="100%" stop-color="#e8f4ff"/></linearGradient></defs><rect width="400" height="533" fill="url(#g)"/><text x="200" y="270" text-anchor="middle" fill="#b8b0c8" font-family="system-ui" font-size="14">暂无封面</text></svg>`,
   )
-
-const tokenStore = useTokenStore()
-
-const visibleDrawer = ref(false)
-const isEdit = ref(false)
-const editingId = ref(null)
-
-const defaultNote = () => ({
-  title: '',
-  topicId: '',
-  coverImg: '',
-  content: '',
-  location: '',
-  state: '',
-  images: [],
-})
-
-const noteModel = ref(defaultNote())
-
-const drawerKey = computed(() => (editingId.value != null ? `edit-${editingId.value}` : 'create'))
 
 const cardCover = (row) => {
   if (row.coverImg) return row.coverImg
@@ -75,9 +52,19 @@ const topicNameOf = (note) => {
   return t ? t.topicName : '未分类'
 }
 
+const userNameOf = (note) => {
+  const u = users.value.find((x) => x.id === note.createUser)
+  return u ? u.nickname : '未知用户'
+}
+
 const getTopicList = async () => {
   const result = await topicListService()
   topics.value = result.data || []
+}
+
+const getUserList = async () => {
+  const result = await userListService()
+  users.value = result.data || []
 }
 
 const noteList = async () => {
@@ -87,12 +74,14 @@ const noteList = async () => {
   }
   if (topicId.value !== '' && topicId.value != null) params.topicId = topicId.value
   if (state.value) params.state = state.value
+  if (userId.value !== '' && userId.value != null) params.userId = userId.value
 
   const result = await notePageListService(params)
   total.value = result.data.total
   notes.value = result.data.items || []
   for (const note of notes.value) {
     note.topicName = topicNameOf(note)
+    note.userName = userNameOf(note)
   }
 }
 
@@ -110,59 +99,9 @@ const onCurrentChange = (num) => {
 const resetFilters = () => {
   topicId.value = ''
   state.value = ''
+  userId.value = ''
   pageNum.value = 1
   noteList()
-}
-
-const uploadSuccess = (result) => {
-  noteModel.value.coverImg = result.data
-}
-
-const openCreateDrawer = () => {
-  isEdit.value = false
-  editingId.value = null
-  noteModel.value = defaultNote()
-  visibleDrawer.value = true
-}
-
-const openEditDrawer = async (row) => {
-  try {
-    const result = await noteDetailService(row.id)
-    isEdit.value = true
-    editingId.value = row.id
-    const data = result.data || {}
-    noteModel.value = {
-      title: data.title ?? '',
-      topicId: data.topicId ?? '',
-      coverImg: data.coverImg ?? '',
-      content: data.content ?? '',
-      location: data.location ?? '',
-      state: data.state ?? '',
-      images: Array.isArray(data.images) ? [...data.images] : [],
-      id: data.id,
-      publishTime: data.publishTime,
-    }
-    visibleDrawer.value = true
-  } catch {
-    ElMessage.error('加载笔记失败')
-  }
-}
-
-const submitNote = async (clickState) => {
-  noteModel.value.state = clickState
-  try {
-    if (isEdit.value) {
-      await noteUpdateService(noteModel.value)
-      ElMessage.success('保存成功')
-    } else {
-      await noteAddService(noteModel.value)
-      ElMessage.success('添加成功')
-    }
-    visibleDrawer.value = false
-    noteList()
-  } catch {
-    ElMessage.error(isEdit.value ? '保存失败' : '添加失败')
-  }
 }
 
 const removeNote = (row) => {
@@ -180,6 +119,7 @@ const removeNote = (row) => {
 }
 
 getTopicList()
+getUserList()
 noteList()
 </script>
 
@@ -193,12 +133,7 @@ noteList()
           <span class="decoration-dot"></span>
         </div>
         <h1 class="page-title">笔记管理</h1>
-        <p class="page-subtitle">瀑布流浏览 · 封面标题 · 互动数据，风格类似「小红书」笔记流</p>
-      </div>
-      <div class="header-extra">
-        <el-button class="add-btn" type="primary" size="large" @click="openCreateDrawer">
-          <span class="btn-text">+ 发笔记</span>
-        </el-button>
+        <p class="page-subtitle">瀑布流浏览 · 封面标题 · 互动数据</p>
       </div>
     </div>
 
@@ -208,6 +143,19 @@ noteList()
         <span>筛选</span>
       </div>
       <el-form inline class="search-form">
+        <el-form-item label="用户">
+          <el-select
+            v-model="userId"
+            placeholder="全部用户"
+            clearable
+            class="custom-select"
+            style="width: 200px"
+            @clear="userId = ''"
+          >
+            <el-option v-for="u in users" :key="u.id" :label="u.nickname" :value="u.id" />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="话题">
           <el-select
             v-model="topicId"
@@ -222,14 +170,29 @@ noteList()
         </el-form-item>
 
         <el-form-item label="状态">
-          <el-select v-model="state" placeholder="全部状态" clearable class="custom-select" style="width: 160px">
+          <el-select
+            v-model="state"
+            placeholder="全部状态"
+            clearable
+            class="custom-select"
+            style="width: 160px"
+          >
             <el-option label="已发布" value="已发布" />
             <el-option label="草稿" value="草稿" />
           </el-select>
         </el-form-item>
 
         <el-form-item>
-          <el-button class="search-btn" @click="() => { pageNum = 1; noteList() }">搜索</el-button>
+          <el-button
+            class="search-btn"
+            @click="
+              () => {
+                pageNum = 1
+                noteList()
+              }
+            "
+            >搜索</el-button
+          >
           <el-button class="reset-btn" @click="resetFilters">重置</el-button>
         </el-form-item>
       </el-form>
@@ -259,15 +222,22 @@ noteList()
                 <el-icon><LocationFilled /></el-icon>
                 {{ row.location }}
               </span>
+              <span class="xhs-author">👤 {{ row.userName }}</span>
             </div>
             <div class="xhs-stats">
-              <span><el-icon><View /></el-icon> {{ row.viewsCount ?? 0 }}</span>
+              <span
+                ><el-icon><View /></el-icon> {{ row.viewsCount ?? 0 }}</span
+              >
               <span>❤️ {{ row.likesCount ?? 0 }}</span>
               <span>⭐ {{ row.favoritesCount ?? 0 }}</span>
             </div>
             <div class="xhs-actions">
-              <el-button :icon="Edit" circle class="action-btn edit-btn" @click="openEditDrawer(row)" />
-              <el-button :icon="Delete" circle class="action-btn delete-btn" @click="removeNote(row)" />
+              <el-button
+                :icon="Delete"
+                circle
+                class="action-btn delete-btn"
+                @click="removeNote(row)"
+              />
             </div>
           </div>
         </article>
@@ -298,57 +268,6 @@ noteList()
       <span>共 {{ total }} 篇笔记</span>
       <span class="footer-emoji">✨</span>
     </div>
-
-    <el-drawer v-model="visibleDrawer" :title="isEdit ? '编辑笔记' : '发笔记'" direction="rtl" size="50%" class="custom-drawer">
-      <div class="drawer-content">
-        <el-form :key="drawerKey" :model="noteModel" label-width="100px" class="drawer-form">
-          <el-form-item label="标题">
-            <el-input v-model="noteModel.title" placeholder="简短标题，会显示在卡片上" class="custom-input" />
-          </el-form-item>
-
-          <el-form-item label="话题">
-            <el-select v-model="noteModel.topicId" placeholder="选择话题" class="custom-select">
-              <el-option v-for="t in topics" :key="t.id" :label="t.topicName" :value="t.id" />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item label="位置">
-            <el-input v-model="noteModel.location" placeholder="可选，显示为地点标签" class="custom-input" />
-          </el-form-item>
-
-          <el-form-item label="封面图">
-            <el-upload
-              class="avatar-uploader"
-              :auto-upload="true"
-              :show-file-list="false"
-              action="/api/upload"
-              name="file"
-              :headers="{ Authorization: tokenStore.token }"
-              :on-success="uploadSuccess"
-            >
-              <img v-if="noteModel.coverImg" :src="noteModel.coverImg" class="cover-preview" />
-              <div v-else class="upload-placeholder">
-                <el-icon class="upload-icon"><Plus /></el-icon>
-                <span>上传封面（竖图更接近小红书）</span>
-              </div>
-            </el-upload>
-          </el-form-item>
-
-          <el-form-item label="正文">
-            <div class="editor-wrapper">
-              <quill-editor theme="snow" v-model:content="noteModel.content" contentType="html" />
-            </div>
-          </el-form-item>
-
-          <el-form-item>
-            <div class="form-actions">
-              <el-button class="publish-btn" type="primary" @click="submitNote('已发布')">发布</el-button>
-              <el-button class="draft-btn" @click="submitNote('草稿')">存草稿</el-button>
-            </div>
-          </el-form-item>
-        </el-form>
-      </div>
-    </el-drawer>
   </div>
 </template>
 
@@ -414,26 +333,6 @@ noteList()
       color: #a09abf;
       margin: 0;
       letter-spacing: 0.5px;
-    }
-  }
-
-  .add-btn {
-    background: linear-gradient(135deg, #ff2442 0%, #ff6b8a 100%);
-    border: none;
-    border-radius: 48px;
-    padding: 12px 32px;
-    font-weight: 500;
-    color: white;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(255, 36, 66, 0.25);
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(255, 36, 66, 0.35);
-    }
-
-    .btn-text {
-      font-size: 14px;
     }
   }
 }
@@ -621,6 +520,15 @@ noteList()
   }
 }
 
+.xhs-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  color: #6a4a9c;
+  font-weight: 500;
+}
+
 .xhs-stats {
   display: flex;
   gap: 14px;
@@ -651,12 +559,6 @@ noteList()
     &:hover {
       transform: translateY(-2px) scale(1.05);
     }
-  }
-
-  .edit-btn {
-    background: linear-gradient(135deg, #a8e6cf 0%, #c2f5e9 100%);
-    border-color: #a8e6cf;
-    color: #2c665a;
   }
 
   .delete-btn {
@@ -716,150 +618,6 @@ noteList()
   .footer-emoji {
     font-size: 14px;
     animation: pulse 2s ease-in-out infinite;
-  }
-}
-
-.custom-drawer {
-  :deep(.el-drawer__header) {
-    background: linear-gradient(135deg, #ff6b8a 0%, #ff2442 100%);
-    color: white;
-    margin-bottom: 0;
-    padding: 20px 24px;
-
-    .el-drawer__title {
-      font-weight: 600;
-    }
-
-    .el-drawer__close-btn {
-      color: white;
-    }
-  }
-
-  :deep(.el-drawer__body) {
-    padding: 24px;
-    background: linear-gradient(145deg, #ffffff 0%, #fffafb 100%);
-  }
-}
-
-.drawer-content {
-  .drawer-form {
-    .custom-input {
-      :deep(.el-input__wrapper) {
-        border-radius: 48px;
-        padding: 8px 20px;
-        background-color: #fff8fa;
-        border: 1px solid #ffe0e8;
-        transition: all 0.3s ease;
-        box-shadow: none;
-
-        &:hover {
-          border-color: #ffb8c8;
-          background-color: #fff;
-        }
-
-        &.is-focus {
-          border-color: #ff2442;
-          background-color: #fff;
-          box-shadow: 0 0 0 4px rgba(255, 36, 66, 0.1);
-        }
-      }
-    }
-
-    .custom-select {
-      width: 100%;
-    }
-
-    .avatar-uploader {
-      .cover-preview {
-        width: 200px;
-        height: 267px;
-        object-fit: cover;
-        border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(255, 36, 66, 0.15);
-      }
-
-      .upload-placeholder {
-        width: 200px;
-        height: 267px;
-        background: linear-gradient(135deg, #fff8fa 0%, #ffeef2 100%);
-        border: 2px dashed #ffb8c8;
-        border-radius: 16px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-
-        &:hover {
-          border-color: #ff2442;
-          background: linear-gradient(135deg, #fff 0%, #fff5f7 100%);
-        }
-
-        .upload-icon {
-          font-size: 24px;
-          color: #ff6b8a;
-        }
-
-        span {
-          font-size: 12px;
-          color: #999;
-          text-align: center;
-          padding: 0 8px;
-        }
-      }
-    }
-
-    .editor-wrapper {
-      width: 100%;
-
-      :deep(.ql-editor) {
-        min-height: 200px;
-        border-radius: 12px;
-      }
-
-      :deep(.ql-toolbar) {
-        border-radius: 12px 12px 0 0;
-        border-color: #ffe0e8;
-      }
-
-      :deep(.ql-container) {
-        border-radius: 0 0 12px 12px;
-        border-color: #ffe0e8;
-      }
-    }
-
-    .form-actions {
-      display: flex;
-      gap: 16px;
-
-      .publish-btn {
-        background: linear-gradient(135deg, #ff2442 0%, #ff6b8a 100%);
-        border: none;
-        border-radius: 48px;
-        padding: 10px 32px;
-        transition: all 0.3s ease;
-
-        &:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(255, 36, 66, 0.35);
-        }
-      }
-
-      .draft-btn {
-        background: linear-gradient(135deg, #a8e6cf 0%, #c2f5e9 100%);
-        border: none;
-        border-radius: 48px;
-        padding: 10px 32px;
-        transition: all 0.3s ease;
-
-        &:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(168, 230, 207, 0.4);
-        }
-      }
-    }
   }
 }
 
