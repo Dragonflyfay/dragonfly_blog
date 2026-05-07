@@ -1,193 +1,3 @@
-<template>
-  <div class="publish-container">
-    <div class="publish-card">
-      <!-- 头部 -->
-      <div class="publish-header">
-        <div class="header-decoration">
-          <span class="deco-dot"></span>
-          <span class="deco-dot"></span>
-          <span class="deco-dot"></span>
-        </div>
-        <h1 class="publish-title">📝 发布新笔记</h1>
-        <p class="publish-subtitle">分享你的精彩瞬间，让更多人看见 ✨</p>
-      </div>
-
-      <!-- 主要内容区 -->
-      <div class="publish-content">
-        <!-- 媒体类型选择 -->
-        <div class="media-type-selector">
-          <div
-              class="media-type-item"
-              :class="{ active: mediaType === 'image' }"
-              @click="switchMediaType('image')"
-          >
-            <div class="type-icon">🖼️</div>
-            <span>图文笔记</span>
-          </div>
-          <div
-              class="media-type-item"
-              :class="{ active: mediaType === 'video' }"
-              @click="switchMediaType('video')"
-          >
-            <div class="type-icon">🎬</div>
-            <span>视频笔记</span>
-          </div>
-        </div>
-
-        <!-- 图文笔记上传区域 -->
-        <div v-if="mediaType === 'image'" class="image-upload-section">
-          <div class="section-title">
-            <span class="title-icon">📸</span>
-            <span>精选图片</span>
-            <span class="title-count">{{ images.length }}/9</span>
-          </div>
-
-          <div class="image-grid">
-            <div
-                v-for="(img, index) in images"
-                :key="index"
-                class="image-item"
-                :style="{ backgroundImage: `url(${img})` }"
-            >
-              <div class="image-overlay">
-                <el-button circle size="small" class="delete-img-btn" @click="removeImage(index)">
-                  <el-icon><Delete /></el-icon>
-                </el-button>
-              </div>
-            </div>
-
-            <div v-if="images.length < 9" class="upload-trigger" @click="triggerImageUpload">
-              <div class="upload-icon">+</div>
-              <span>上传图片</span>
-              <input
-                  ref="imageInput"
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                  multiple
-                  style="display: none"
-                  @change="handleImageUpload"
-              />
-            </div>
-          </div>
-          <p class="upload-hint">最多可上传9张图片，支持jpg/png/gif/webp格式，单张不超过10MB</p>
-        </div>
-
-        <!-- 视频笔记上传区域 -->
-        <div v-if="mediaType === 'video'" class="video-upload-section">
-          <div class="section-title">
-            <span class="title-icon">🎥</span>
-            <span>上传视频</span>
-          </div>
-
-          <div v-if="!videoUrl" class="video-upload-trigger" @click="triggerVideoUpload">
-            <div class="video-upload-icon">
-              <el-icon :size="48"><VideoCamera /></el-icon>
-            </div>
-            <span class="video-upload-text">点击上传视频</span>
-            <span class="video-hint">支持 mp4/mov/avi/flv/3gp 格式，大小不超过 500MB</span>
-            <input
-                ref="videoInput"
-                type="file"
-                accept="video/mp4,video/quicktime,video/x-msvideo,video/x-flv,video/3gpp"
-                style="display: none"
-                @change="handleVideoUpload"
-            />
-          </div>
-
-          <div v-else class="video-preview">
-            <video ref="videoPreview" :src="videoUrl" controls class="preview-video"></video>
-            <div class="video-actions">
-              <el-button type="danger" size="small" @click="removeVideo">
-                <el-icon><Delete /></el-icon> 重新上传
-              </el-button>
-              <div class="video-cover-section">
-                <span>视频封面：</span>
-                <div class="cover-upload" @click="triggerCoverUpload">
-                  <img v-if="videoCover" :src="videoCover" class="cover-preview" />
-                  <div v-else class="cover-placeholder">
-                    <el-icon><Plus /></el-icon>
-                    <span>上传封面</span>
-                  </div>
-                </div>
-                <input
-                    ref="coverInput"
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                    style="display: none"
-                    @change="handleCoverUpload"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 笔记信息表单 -->
-        <el-form :model="noteForm" :rules="rules" ref="formRef" class="publish-form">
-          <el-form-item prop="title">
-            <el-input
-                v-model="noteForm.title"
-                placeholder="标题：一句话概括你的笔记内容..."
-                maxlength="50"
-                show-word-limit
-                class="title-input"
-            />
-          </el-form-item>
-
-          <el-form-item prop="content">
-            <div class="editor-wrapper">
-              <Toolbar
-                  class="editor-toolbar"
-                  :editor="editorRef"
-                  :defaultConfig="toolbarConfig"
-                  mode="simple"
-              />
-              <Editor
-                  class="editor-content"
-                  v-model="noteForm.content"
-                  :defaultConfig="editorConfig"
-                  mode="simple"
-                  @onCreated="handleCreated"
-              />
-            </div>
-          </el-form-item>
-
-          <div class="form-row">
-            <el-form-item prop="topicId" class="half-item">
-              <el-select v-model="noteForm.topicId" placeholder="选择话题" class="topic-select">
-                <el-option v-for="t in topics" :key="t.id" :label="t.topicName" :value="t.id" />
-              </el-select>
-            </el-form-item>
-
-            <el-form-item class="half-item">
-              <el-input v-model="noteForm.location" placeholder="添加地点">
-                <template #prefix>
-                  <el-icon><LocationFilled /></el-icon>
-                </template>
-              </el-input>
-            </el-form-item>
-          </div>
-        </el-form>
-
-        <!-- 操作按钮 -->
-        <div class="action-buttons">
-          <el-button class="draft-btn" size="large" @click="saveAsDraft" :loading="submitting">
-            <el-icon><Document /></el-icon> 存草稿
-          </el-button>
-          <el-button
-              class="publish-btn"
-              type="primary"
-              size="large"
-              @click="publishNote"
-              :loading="submitting"
-          >
-            <el-icon><Promotion /></el-icon> 发布笔记
-          </el-button>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup>
 import { ref, reactive, onMounted, shallowRef, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -198,6 +8,7 @@ import {
   Plus,
   Document,
   Promotion,
+  Check,
 } from '@element-plus/icons-vue'
 import '@wangeditor/editor/dist/css/style.css'
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
@@ -217,6 +28,7 @@ const mediaType = ref('image') // image 或 video
 // 图片相关
 const images = ref([])
 const imageInput = ref()
+const selectedCoverIndex = ref(0)
 
 // 视频相关
 const videoUrl = ref('')
@@ -224,6 +36,8 @@ const videoCover = ref('')
 const videoInput = ref()
 const coverInput = ref()
 const videoPreview = ref()
+// 新增：用于从视频中提取封面
+const canvasRef = ref(null)
 
 // 话题列表
 const topics = ref([])
@@ -249,9 +63,9 @@ const editorConfig = {
         if (res.code === 0) {
           insertFn(res.data, '', res.data)
         }
-      }
-    }
-  }
+      },
+    },
+  },
 }
 
 // 表单验证规则
@@ -269,8 +83,8 @@ const rules = {
           callback()
         }
       },
-      trigger: 'blur'
-    }
+      trigger: 'blur',
+    },
   ],
   topicId: [{ required: true, message: '请选择话题', trigger: 'change' }],
 }
@@ -317,6 +131,8 @@ const handleImageUpload = async (event) => {
     return
   }
 
+  // 过滤有效的图片文件
+  const validFiles = []
   for (const file of files) {
     if (!file.type.startsWith('image/')) {
       ElMessage.warning('请上传图片文件')
@@ -328,34 +144,75 @@ const handleImageUpload = async (event) => {
       continue
     }
 
+    validFiles.push(file)
+  }
+
+  if (validFiles.length === 0) {
+    event.target.value = ''
+    return
+  }
+
+  // 显示上传进度信息
+  ElMessage.info(`正在上传 ${validFiles.length} 张图片...`)
+
+  const uploadPromises = validFiles.map((file) => {
     const formData = new FormData()
     formData.append('file', file)
 
-    try {
-      const result = await request.post('/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      })
+    return request.post('/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+  })
+
+  try {
+    const results = await Promise.all(uploadPromises.map((p) => p.catch((e) => e)))
+
+    let successCount = 0
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]
+
+      if (result instanceof Error) {
+        console.error('上传失败:', result)
+        continue
+      }
+
       if (result.code === 0) {
         images.value.push(result.data)
-        ElMessage.success(`图片上传成功`)
-      }
-    } catch (error) {
-      console.error('上传失败:', error)
-      if (error.code === 'ECONNABORTED') {
-        ElMessage.error('上传超时，请检查网络连接')
+        successCount++
       } else {
-        ElMessage.error(error.response?.data?.message || '图片上传失败')
+        console.error(`图片 ${validFiles[i].name} 上传失败:`, result.message)
       }
     }
+
+    if (successCount > 0) {
+      ElMessage.success(`成功上传了 ${successCount} 张图片`)
+    } else {
+      ElMessage.warning('所有图片上传都失败了')
+    }
+  } catch (error) {
+    console.error('批量上传失败:', error)
+    ElMessage.error('批量上传失败')
   }
+
   event.target.value = ''
 }
 
 // 删除图片
 const removeImage = (index) => {
   images.value.splice(index, 1)
+  // 如果删除的是封面，重置封面索引
+  if (index === selectedCoverIndex.value) {
+    selectedCoverIndex.value = 0
+  } else if (index < selectedCoverIndex.value) {
+    selectedCoverIndex.value--
+  }
+}
+
+// 选择封面
+const selectCover = (index) => {
+  selectedCoverIndex.value = index
 }
 
 // 触发视频上传
@@ -386,58 +243,58 @@ const handleVideoUpload = async (event) => {
 
     const uploadInstance = axios.create({
       baseURL: '/api',
-      timeout: 300000
+      timeout: 300000,
     })
 
     uploadInstance.interceptors.request.use(
-        (config) => {
-          const tokenStore = useTokenStore()
-          let token = tokenStore.token
+      (config) => {
+        const tokenStore = useTokenStore()
+        let token = tokenStore.token
+        if (!token) {
+          token = localStorage.getItem('global_token')
           if (!token) {
-            token = localStorage.getItem('global_token')
-            if (!token) {
-              const tabId = sessionStorage.getItem('tab_id')
-              if (tabId) {
-                token = sessionStorage.getItem(`token_${tabId}`)
-              }
+            const tabId = sessionStorage.getItem('tab_id')
+            if (tabId) {
+              token = sessionStorage.getItem(`token_${tabId}`)
             }
           }
-          if (token) {
-            config.headers.Authorization = token
-          }
-          return config
-        },
-        (err) => Promise.reject(err)
+        }
+        if (token) {
+          config.headers.Authorization = token
+        }
+        return config
+      },
+      (err) => Promise.reject(err),
     )
 
     uploadInstance.interceptors.response.use(
-        (result) => {
-          if (result.data.code === 0) {
-            return result.data
-          }
-          ElMessage.error(result.data.message || '服务异常')
-          return Promise.reject(result.data)
-        },
-        (err) => {
-          if (err.code === 'ECONNABORTED') {
-            ElMessage.error('上传超时，请检查网络连接或尝试上传较小的视频')
-          } else if (!err.response) {
-            ElMessage.error('网络异常，请检查网络连接')
-          } else {
-            ElMessage.error(err.response?.data?.message || '上传失败')
-          }
-          return Promise.reject(err)
+      (result) => {
+        if (result.data.code === 0) {
+          return result.data
         }
+        ElMessage.error(result.data.message || '服务异常')
+        return Promise.reject(result.data)
+      },
+      (err) => {
+        if (err.code === 'ECONNABORTED') {
+          ElMessage.error('上传超时，请检查网络连接或尝试上传较小的视频')
+        } else if (!err.response) {
+          ElMessage.error('网络异常，请检查网络连接')
+        } else {
+          ElMessage.error(err.response?.data?.message || '上传失败')
+        }
+        return Promise.reject(err)
+      },
     )
 
     const result = await uploadInstance.post('/upload', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data'
+        'Content-Type': 'multipart/form-data',
       },
       onUploadProgress: (progressEvent) => {
         const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
         console.log(`上传进度: ${percentCompleted}%`)
-      }
+      },
     })
 
     if (result.code === 0) {
@@ -465,7 +322,7 @@ const triggerCoverUpload = () => {
   coverInput.value?.click()
 }
 
-// 处理封面上传
+// 处理视频封面上传
 const handleCoverUpload = async (event) => {
   const file = event.target.files[0]
   if (!file) return
@@ -486,8 +343,8 @@ const handleCoverUpload = async (event) => {
   try {
     const result = await request.post('/upload', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+        'Content-Type': 'multipart/form-data',
+      },
     })
     if (result.code === 0) {
       videoCover.value = result.data
@@ -544,7 +401,8 @@ const submitNote = async (state) => {
         return
       }
       requestData.images = images.value
-      requestData.coverImg = images.value[0]
+      // 使用用户选择的封面
+      requestData.coverImg = images.value[selectedCoverIndex.value] || images.value[0]
     } else {
       if (!videoUrl.value) {
         ElMessage.warning('请上传视频')
@@ -590,6 +448,208 @@ onMounted(() => {
   getTopicList()
 })
 </script>
+
+<template>
+  <div class="publish-container">
+    <div class="publish-card">
+      <!-- 头部 -->
+      <div class="publish-header">
+        <div class="header-decoration">
+          <span class="deco-dot"></span>
+          <span class="deco-dot"></span>
+          <span class="deco-dot"></span>
+        </div>
+        <h1 class="publish-title">📝 发布新笔记</h1>
+        <p class="publish-subtitle">分享你的精彩瞬间，让更多人看见 ✨</p>
+      </div>
+
+      <!-- 主要内容区 -->
+      <div class="publish-content">
+        <!-- 媒体类型选择 -->
+        <div class="media-type-selector">
+          <div
+            class="media-type-item"
+            :class="{ active: mediaType === 'image' }"
+            @click="switchMediaType('image')"
+          >
+            <div class="type-icon">🖼️</div>
+            <span>图文笔记</span>
+          </div>
+          <div
+            class="media-type-item"
+            :class="{ active: mediaType === 'video' }"
+            @click="switchMediaType('video')"
+          >
+            <div class="type-icon">🎬</div>
+            <span>视频笔记</span>
+          </div>
+        </div>
+
+        <!-- 图文笔记上传区域 -->
+        <div v-if="mediaType === 'image'" class="image-upload-section">
+          <div class="section-title">
+            <span class="title-icon">📸</span>
+            <span>精选图片</span>
+            <span class="title-count">{{ images.length }}/9</span>
+          </div>
+
+          <div class="image-grid">
+            <div
+              v-for="(img, index) in images"
+              :key="index"
+              class="image-item"
+              :class="{ 'cover-selected': selectedCoverIndex === index }"
+              :style="{ backgroundImage: `url(${img})` }"
+              @click="selectCover(index)"
+            >
+              <div class="image-overlay">
+                <el-button
+                  circle
+                  size="small"
+                  class="delete-img-btn"
+                  @click.stop="removeImage(index)"
+                >
+                  <el-icon><Delete /></el-icon>
+                </el-button>
+                <div v-if="selectedCoverIndex === index" class="cover-badge">
+                  <el-icon><Check /></el-icon> 封面
+                </div>
+              </div>
+            </div>
+
+            <div v-if="images.length < 9" class="upload-trigger" @click="triggerImageUpload">
+              <div class="upload-icon">+</div>
+              <span>上传图片</span>
+              <input
+                ref="imageInput"
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                multiple
+                style="display: none"
+                @change="handleImageUpload"
+              />
+            </div>
+          </div>
+          <p class="upload-hint">
+            最多可上传9张图片，支持jpg/png/gif/webp格式，单张不超过10MB • 点击任意图片设为封面
+          </p>
+        </div>
+
+        <!-- 视频笔记上传区域 -->
+        <div v-if="mediaType === 'video'" class="video-upload-section">
+          <div class="section-title">
+            <span class="title-icon">🎥</span>
+            <span>上传视频</span>
+          </div>
+
+          <div v-if="!videoUrl" class="video-upload-trigger" @click="triggerVideoUpload">
+            <div class="video-upload-icon">
+              <el-icon :size="48"><VideoCamera /></el-icon>
+            </div>
+            <span class="video-upload-text">点击上传视频</span>
+            <span class="video-hint">支持 mp4/mov/avi/flv/3gp 格式，大小不超过 500MB</span>
+            <input
+              ref="videoInput"
+              type="file"
+              accept="video/mp4,video/quicktime,video/x-msvideo,video/x-flv,video/3gpp"
+              style="display: none"
+              @change="handleVideoUpload"
+            />
+          </div>
+
+          <div v-else class="video-preview">
+            <video ref="videoPreview" :src="videoUrl" controls class="preview-video"></video>
+            <div class="video-actions">
+              <el-button type="danger" size="small" @click="removeVideo">
+                <el-icon><Delete /></el-icon> 重新上传
+              </el-button>
+              <div class="video-cover-section">
+                <span>视频封面：</span>
+                <div class="cover-upload" @click="triggerCoverUpload">
+                  <img v-if="videoCover" :src="videoCover" class="cover-preview" />
+                  <div v-else class="cover-placeholder">
+                    <el-icon><Plus /></el-icon>
+                    <span>上传封面</span>
+                  </div>
+                </div>
+                <input
+                  ref="coverInput"
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  style="display: none"
+                  @change="handleCoverUpload"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 笔记信息表单 -->
+        <el-form :model="noteForm" :rules="rules" ref="formRef" class="publish-form">
+          <el-form-item prop="title">
+            <el-input
+              v-model="noteForm.title"
+              placeholder="标题：一句话概括你的笔记内容..."
+              maxlength="50"
+              show-word-limit
+              class="title-input"
+            />
+          </el-form-item>
+
+          <el-form-item prop="content">
+            <div class="editor-wrapper">
+              <Toolbar
+                class="editor-toolbar"
+                :editor="editorRef"
+                :defaultConfig="toolbarConfig"
+                mode="simple"
+              />
+              <Editor
+                class="editor-content"
+                v-model="noteForm.content"
+                :defaultConfig="editorConfig"
+                mode="simple"
+                @onCreated="handleCreated"
+              />
+            </div>
+          </el-form-item>
+
+          <div class="form-row">
+            <el-form-item prop="topicId" class="half-item">
+              <el-select v-model="noteForm.topicId" placeholder="选择话题" class="topic-select">
+                <el-option v-for="t in topics" :key="t.id" :label="t.topicName" :value="t.id" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item class="half-item">
+              <el-input v-model="noteForm.location" placeholder="添加地点">
+                <template #prefix>
+                  <el-icon><LocationFilled /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+          </div>
+        </el-form>
+
+        <!-- 操作按钮 -->
+        <div class="action-buttons">
+          <el-button class="draft-btn" size="large" @click="saveAsDraft" :loading="submitting">
+            <el-icon><Document /></el-icon> 存草稿
+          </el-button>
+          <el-button
+            class="publish-btn"
+            type="primary"
+            size="large"
+            @click="publishNote"
+            :loading="submitting"
+          >
+            <el-icon><Promotion /></el-icon> 发布笔记
+          </el-button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .publish-container {
@@ -742,6 +802,14 @@ onMounted(() => {
     border-radius: 16px;
     position: relative;
     overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 3px solid transparent;
+
+    &.cover-selected {
+      border-color: #c5a3ff;
+      box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.3);
+    }
 
     .image-overlay {
       position: absolute;
@@ -761,6 +829,22 @@ onMounted(() => {
           background: #ff4757;
           color: white;
         }
+      }
+
+      .cover-badge {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        box-shadow: 0 2px 8px rgba(197, 163, 255, 0.4);
       }
     }
 

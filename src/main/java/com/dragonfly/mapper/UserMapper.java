@@ -34,4 +34,8 @@ public interface UserMapper {
 
     @Update("update user set password=#{md5String},update_time=now() where id=#{id}")
     void updatePwd(String md5String, Integer id);
+
+    // 查询所有用户
+    @Select("SELECT * FROM user")
+    java.util.List<User> list();
 }

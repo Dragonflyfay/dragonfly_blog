@@ -144,6 +144,13 @@ router.beforeEach((to, from, next) => {
     return
   }
 
+  // 管理员访问 /user/* 路径时，重定向到 /admin/user/*
+  if (canEnterAdmin(resolvedRole) && to.path.startsWith('/user/')) {
+    const adminPath = to.path.replace(/^\/user\//, '/admin/user/')
+    next(adminPath)
+    return
+  }
+
   next()
 })
 

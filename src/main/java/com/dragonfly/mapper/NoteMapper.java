@@ -32,12 +32,13 @@ public interface NoteMapper {
 
 
     // 删除笔记
-    @Delete("DELETE FROM note WHERE id = #{id} AND create_user = #{userId}")
-    void delete(Integer id, Integer userId);
+    @Delete("DELETE FROM note WHERE id = #{id} ")
+    void delete(Integer id);
 
-    // 分页查询笔记（可选话题、状态筛选，按更新时间倒序）
+    // 分页查询笔记（可选话题、状态、用户筛选，按更新时间倒序）
     @Select("<script>" +
-            "SELECT * FROM note WHERE create_user = #{userId} " +
+            "SELECT * FROM note WHERE 1=1 " +
+            "<if test='userId != null'> AND create_user = #{userId} </if>" +
             "<if test='topicId != null'> AND topic_id = #{topicId} </if>" +
             "<if test='state != null and state != \"\"'> AND state = #{state} </if>" +
             "ORDER BY COALESCE(update_time, create_time) DESC " +
@@ -51,7 +52,8 @@ public interface NoteMapper {
 
     // 统计笔记数量（与分页筛选条件一致）
     @Select("<script>" +
-            "SELECT COUNT(*) FROM note WHERE create_user = #{userId} " +
+            "SELECT COUNT(*) FROM note WHERE 1=1 " +
+            "<if test='userId != null'> AND create_user = #{userId} </if>" +
             "<if test='topicId != null'> AND topic_id = #{topicId} </if>" +
             "<if test='state != null and state != \"\"'> AND state = #{state} </if>" +
             "</script>")
