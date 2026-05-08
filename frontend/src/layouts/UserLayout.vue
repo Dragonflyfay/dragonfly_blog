@@ -69,6 +69,7 @@ getUserInfo()
   <el-container class="layout-container" :class="{ 'dark-mode': isDark }">
     <!-- 左侧菜单 -->
     <el-aside width="260px">
+      <!-- logo区域 -->
       <div class="el-aside__logo">
         <div class="logo-wrapper">
           <img src="@/assets/logo.png" alt="logo" class="logo-img" />
@@ -98,8 +99,12 @@ getUserInfo()
         </el-menu-item>
         <el-sub-menu index="/profile">
           <template #title>
-            <el-icon><User /></el-icon>
-            <span>个人中心</span>
+            <el-avatar
+              :src="userInfoStore.info.userPic ? userInfoStore.info.userPic : avatar"
+              :size="40"
+              class="profile-avatar"
+            ></el-avatar>
+            <span class="profile-text">我</span>
           </template>
           <el-menu-item index="/user/info">
             <el-icon><User /></el-icon>
@@ -293,10 +298,21 @@ getUserInfo()
         margin: 8px 12px;
         border-radius: 12px;
         transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 12px;
 
         &:hover {
           background: rgba(197, 163, 255, 0.15);
         }
+
+        // .profile-avatar {
+        //   margin-right: 8px;
+        // }
+
+        // .profile-text {
+        //   margin-left: 4px;
+        // }
       }
     }
 
