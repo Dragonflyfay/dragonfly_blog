@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { Delete, Edit, LocationFilled, PictureFilled, View } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -20,6 +20,7 @@ const notes = ref([])
 const pageNum = ref(1)
 const total = ref(0)
 const pageSize = ref(12)
+const loading = ref(false)
 
 const PLACEHOLDER_IMG =
   'data:image/svg+xml,' +
@@ -47,41 +48,78 @@ const contentPreview = (html, maxLen = 72) => {
   return text.length > maxLen ? `${text.slice(0, maxLen)}…` : text
 }
 
+// 创建映射表优化查找性能
+const topicMap = computed(() => {
+  const map = {}
+  topics.value.forEach((t) => {
+    map[t.id] = t.topicName
+  })
+  return map
+})
+
+const userMap = computed(() => {
+  const map = {}
+  users.value.forEach((u) => {
+    map[u.id] = u.nickname
+  })
+  return map
+})
+
 const topicNameOf = (note) => {
-  const t = topics.value.find((x) => x.id === note.topicId)
-  return t ? t.topicName : '未分类'
+  return topicMap.value[note.topicId] || '未分类'
 }
 
 const userNameOf = (note) => {
-  const u = users.value.find((x) => x.id === note.createUser)
-  return u ? u.nickname : '未知用户'
+  return userMap.value[note.createUser] || '未知用户'
 }
 
 const getTopicList = async () => {
-  const result = await topicListService()
-  topics.value = result.data || []
+  try {
+    const result = await topicListService()
+    topics.value = result.data || []
+  } catch (error) {
+    console.error('获取话题列表失败:', error)
+    ElMessage.error('获取话题列表失败')
+    topics.value = []
+  }
 }
 
 const getUserList = async () => {
-  const result = await userListService()
-  users.value = result.data || []
+  try {
+    const result = await userListService()
+    users.value = result.data || []
+  } catch (error) {
+    console.error('获取用户列表失败:', error)
+    ElMessage.error('获取用户列表失败')
+    users.value = []
+  }
 }
 
 const noteList = async () => {
-  const params = {
-    pageNum: pageNum.value,
-    pageSize: pageSize.value,
-  }
-  if (topicId.value !== '' && topicId.value != null) params.topicId = topicId.value
-  if (state.value) params.state = state.value
-  if (userId.value !== '' && userId.value != null) params.userId = userId.value
+  loading.value = true
+  try {
+    const params = {
+      pageNum: pageNum.value,
+      pageSize: pageSize.value,
+    }
+    if (topicId.value !== '' && topicId.value != null) params.topicId = topicId.value
+    if (state.value) params.state = state.value
+    if (userId.value !== '' && userId.value != null) params.userId = userId.value
 
-  const result = await notePageListService(params)
-  total.value = result.data.total
-  notes.value = result.data.items || []
-  for (const note of notes.value) {
-    note.topicName = topicNameOf(note)
-    note.userName = userNameOf(note)
+    const result = await notePageListService(params)
+    total.value = result.data.total
+    notes.value = (result.data.items || []).map((note) => ({
+      ...note,
+      topicName: topicNameOf(note),
+      userName: userNameOf(note),
+    }))
+  } catch (error) {
+    console.error('获取笔记列表失败:', error)
+    ElMessage.error('获取笔记列表失败')
+    notes.value = []
+    total.value = 0
+  } finally {
+    loading.value = false
   }
 }
 
@@ -111,16 +149,28 @@ const removeNote = (row) => {
     cancelButtonText: '取消',
   })
     .then(async () => {
-      await noteDeleteService(row.id)
-      ElMessage.success('已删除')
-      noteList()
+      try {
+        await noteDeleteService(row.id)
+        ElMessage.success('已删除')
+        // 如果当前页只有一条数据且不是第一页，回到上一页
+        if (notes.value.length === 1 && pageNum.value > 1) {
+          pageNum.value--
+        }
+        noteList()
+      } catch (error) {
+        console.error('删除笔记失败:', error)
+        ElMessage.error(error.response?.data?.message || '删除失败')
+      }
     })
     .catch(() => {})
 }
 
-getTopicList()
-getUserList()
-noteList()
+// 在组件挂载时初始化数据
+onMounted(() => {
+  getTopicList()
+  getUserList()
+  noteList()
+})
 </script>
 
 <template>
@@ -198,7 +248,7 @@ noteList()
       </el-form>
     </div>
 
-    <div class="feed-card">
+    <div class="feed-card" v-loading="loading">
       <div v-if="notes.length" class="xhs-feed">
         <article v-for="row in notes" :key="row.id" class="xhs-card">
           <div class="xhs-card-media">

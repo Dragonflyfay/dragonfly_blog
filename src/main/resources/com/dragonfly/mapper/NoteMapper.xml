@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dragonfly.mapper.NoteMapper">
+
+    <!-- 用户首页分页查询 -->
+    <select id="listUserPage" resultType="com.dragonfly.pojo.Note">
+        SELECT 
+            id, title, content, note_category,
+            images, video, cover_img,
+            topic_id, location, state,
+            views_count, likes_count, comments_count, favorites_count,
+            create_user, publish_time, create_time, update_time
+        FROM note
+        WHERE state = '已发布'
+        <if test="topicId != null and topicId != 0">
+            AND topic_id = #{topicId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (title LIKE CONCAT('%', #{keyword}, '%') OR content LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY COALESCE(publish_time, create_time) DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <!-- 用户首页统计数量 -->
+    <select id="countUserPage" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM note
+        WHERE state = '已发布'
+        <if test="topicId != null and topicId != 0">
+            AND topic_id = #{topicId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (title LIKE CONCAT('%', #{keyword}, '%') OR content LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </select>
+
+    <!-- 根据ID查询笔记详情（使用resultMap处理images字段） -->
+    <resultMap id="NoteResultMap" type="com.dragonfly.pojo.Note">
+        <id property="id" column="id"/>
+        <result property="title" column="title"/>
+        <result property="content" column="content"/>
+        <result property="noteCategory" column="note_category"/>
+        <result property="images" column="images" typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result property="video" column="video"/>
+        <result property="coverImg" column="cover_img"/>
+        <result property="topicId" column="topic_id"/>
+        <result property="location" column="location"/>
+        <result property="state" column="state"/>
+        <result property="viewsCount" column="views_count"/>
+        <result property="likesCount" column="likes_count"/>
+        <result property="commentsCount" column="comments_count"/>
+        <result property="favoritesCount" column="favorites_count"/>
+        <result property="createUser" column="create_user"/>
+        <result property="publishTime" column="publish_time"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <select id="findById" resultMap="NoteResultMap">
+        SELECT * FROM note WHERE id = #{id}
+    </select>
+
+</mapper>
