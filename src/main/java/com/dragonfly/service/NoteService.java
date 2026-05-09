@@ -31,4 +31,7 @@ public interface NoteService {
 
     // 分页查询笔记（可选 topicId、state、userId）
     PageBean<Note> pageList(Integer pageNum, Integer pageSize, Integer topicId, String state, Integer userId);
+
+    //用户首页分页查询（可选 topicId,state,userId）
+    PageBean<Note> userPageList(Integer pageNum, Integer pageSize, Integer topicId, String state, Integer userId);
 }

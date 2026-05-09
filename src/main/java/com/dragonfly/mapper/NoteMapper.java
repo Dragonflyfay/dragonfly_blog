@@ -21,8 +21,7 @@ public interface NoteMapper {
     @Select("SELECT * FROM note WHERE create_user = #{userId}")
     List<Note> list(Integer userId);
 
-    // 根据id查询笔记
-    @Select("SELECT * FROM note WHERE id = #{id}")
+    // 根据id查询笔记（在XML中定义，使用resultMap处理images字段）
     Note findById(Integer id);
 
     @Update("UPDATE note SET title = #{title}, content = #{content}, images = #{images, typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}, video = #{video}, cover_img = #{coverImg}, note_category = #{noteCategory}, topic_id = #{topicId}, " +
@@ -60,4 +59,28 @@ public interface NoteMapper {
     int countByFilters(@Param("userId") Integer userId,
                        @Param("topicId") Integer topicId,
                        @Param("state") String state);
+
+    // 用户首页分页查询
+    List<Note> listUserPage(@Param("userId") Integer userId,@Param("topicId") Integer topicId, @Param("keyword") String keyword,  @Param("offset") Integer offset, @Param("pageSize") Integer pageSize);
+    int countUserPage(@Param("topicId") Integer topicId, @Param("keyword") String keyword, @Param("userId") Integer userId);
+
+    // 增加笔记点赞数
+    @Update("UPDATE note SET likes_count = likes_count + 1 WHERE id = #{id}")
+    void incrementLikesCount(Integer id);
+
+    // 减少笔记点赞数
+    @Update("UPDATE note SET likes_count = likes_count - 1 WHERE id = #{id} AND likes_count > 0")
+    void decrementLikesCount(Integer id);
+
+    // 增加笔记浏览数
+    @Update("UPDATE note SET views_count = views_count + 1 WHERE id = #{id}")
+    void incrementViewsCount(Integer id);
+
+    // 增加笔记收藏数
+    @Update("UPDATE note SET favorites_count = favorites_count + 1 WHERE id = #{id}")
+    void incrementFavoritesCount(Integer id);
+
+    // 减少笔记收藏数
+    @Update("UPDATE note SET favorites_count = favorites_count - 1 WHERE id = #{id} AND favorites_count > 0")
+    void decrementFavoritesCount(Integer id);
 }

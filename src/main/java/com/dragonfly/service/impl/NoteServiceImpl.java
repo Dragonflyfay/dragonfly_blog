@@ -207,4 +207,19 @@ public class NoteServiceImpl implements NoteService {
 
         return pageBean;
     }
+
+    @Override
+    public PageBean<Note> userPageList(Integer pageNum, Integer pageSize, Integer topicId,String keyword, Integer userId) {
+        Integer offset = (pageNum - 1) * pageSize;
+
+        List<Note> notes = noteMapper.listUserPage(userId,topicId, keyword, offset, pageSize);
+
+        int total = noteMapper.countUserPage( topicId, keyword,userId);
+
+        PageBean<Note> pageBean = new PageBean<>();
+        pageBean.setTotal((long) total);
+        pageBean.setItems(notes);
+
+        return pageBean;
+    }
 }
