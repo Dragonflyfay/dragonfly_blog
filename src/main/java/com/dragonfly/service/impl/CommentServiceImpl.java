@@ -100,7 +100,7 @@ public class CommentServiceImpl implements CommentService {
             throw new RuntimeException("无权限删除");
         }
         commentMapper.delete(id);
-        
+
         if(note!=null&&note.getCommentsCount()>0){
             note.setCommentsCount(note.getCommentsCount()-1);
             note.setUpdateTime(LocalDateTime.now());
