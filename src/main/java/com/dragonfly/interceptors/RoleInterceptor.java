@@ -11,11 +11,13 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.Map;
 
-@Component
+@Component// 将这个类注册为拦截器
+// 实现HandlerInterceptor接口
 public class RoleInterceptor implements HandlerInterceptor {
-
+// 重写preHandle方法，拦截请求
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        // 判断当前请求是否为方法请求
         if (handler instanceof HandlerMethod) {
             HandlerMethod hm = (HandlerMethod) handler;
             RequireRole requireRole = hm.getMethodAnnotation(RequireRole.class);
@@ -25,7 +27,21 @@ public class RoleInterceptor implements HandlerInterceptor {
                 String role = (String) userInfo.get("role");
                 String requiredRole = requireRole.value();
 
-                if (role == null || !requiredRole.equalsIgnoreCase(role)) {
+                if (role == null) {
+                    response.setStatus(403);
+                    return false;
+                }
+
+                String normalizedRole = role.toLowerCase();
+                String normalizedRequiredRole = requiredRole.toLowerCase();
+
+                boolean roleMatched = normalizedRole.equals(normalizedRequiredRole);
+
+                if (requireRole.allowSuperAdmin() && "super_admin".equals(normalizedRole)) {
+                    roleMatched = true;
+                }
+
+                if (!roleMatched) {
                     response.setStatus(403);
                     return false;
                 }

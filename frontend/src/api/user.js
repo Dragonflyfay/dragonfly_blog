@@ -40,3 +40,12 @@ export const userUpdateAvatarService = (avatarUrl) => {
 export const userUpdatePwdService = (pwdData) => {
   return request.patch('/user/updatePwd', pwdData)
 }
+// 获取用户列表
+export const userListService = () => {
+  return request.get('/user/list')
+}
+
+// 更新用户角色
+export const userUpdateRoleService = (data) => {
+  return request.put('/user/updateRole', data)
+}

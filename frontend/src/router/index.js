@@ -13,7 +13,8 @@ import AdminLayoutVue from '@/layouts/AdminLayout.vue'
 import AdminHomeVue from '@/views/admin/AdminHome.vue' // 新建：后台首页仪表盘
 import NoteCategoryVue from '@/views/admin/NoteCategory.vue' // 移入admin目录
 import NoteManageVue from '@/views/admin/NoteManage.vue' // 移入admin目录
-import RoleManageVue from '@/views/admin/RoleManage.vue' // 新建：角色管理
+import UserRoleManageVue from '@/views/admin/UserRoleManage.vue' // 普通角色管理
+import AdminRoleManageVue from '@/views/admin/AdminRoleManage.vue' //管理员角色管理
 // User个人中心（Admin和User共用）
 import UserAvatarVue from '@/views/user/UserAvatar.vue'
 import UserInfo from '@/views/user/UserInfo.vue'
@@ -38,7 +39,8 @@ const routes = [
       { path: 'home', component: AdminHomeVue, meta: { title: '后台首页' } },
       { path: 'topic', component: NoteCategoryVue, meta: { title: '话题管理' } },
       { path: 'note', component: NoteManageVue, meta: { title: '笔记管理' } },
-      { path: 'role', component: RoleManageVue, meta: { title: '角色管理' } },
+      { path: 'userRole', component: UserRoleManageVue, meta: { title: '普通角色管理' } },
+      { path: 'adminRole', component: AdminRoleManageVue, meta: { title: '管理员角色管理' } },
       { path: 'user/info', component: UserInfo, meta: { title: '基本资料' } },
       { path: 'user/avatar', component: UserAvatarVue, meta: { title: '更换头像' } },
       { path: 'user/resetPassword', component: UserResetPasswordVue, meta: { title: '重置密码' } },
@@ -60,7 +62,6 @@ const routes = [
       { path: 'user/resetPassword', component: UserResetPasswordVue, meta: { title: '重置密码' } },
     ],
   },
-
 
   // 403无权限页面
   { path: '/403', component: () => import('@/views/403.vue') },
@@ -89,9 +90,7 @@ router.beforeEach((to, from, next) => {
   }
 
   // 获取用户角色
-  let resolvedRole = normalizeRole(
-      userInfoStore.info?.role ?? userInfoStore.role,
-  )
+  let resolvedRole = normalizeRole(userInfoStore.info?.role ?? userInfoStore.role)
 
   // 如果store中没有，尝试从存储中恢复
   if (!resolvedRole) {
