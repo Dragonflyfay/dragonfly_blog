@@ -159,5 +159,27 @@ public class UserController {
         java.util.List<User> users = userService.list();
         return Result.success(users);
     }
+
+    @PutMapping("/updateRole")
+    public Result updateRole(@RequestBody Map<String,Object> params){
+        Integer userId = (Integer)params.get("userId");
+        String role = (String)params.get("role");
+
+        if(userId==null||role==null){
+            return Result.error("缺少必要的参数");
+        }
+        String normalizedRole = role.toLowerCase();
+        if(!normalizedRole.equals("admin") && !normalizedRole.equals("user") && !normalizedRole.equals("super_admin")){
+            return Result.error("角色参数不合法");
+        }
+
+        userService.updateRole(userId, normalizedRole);
+        return Result.success();
+
+
+
+
+
+    }
 }
 

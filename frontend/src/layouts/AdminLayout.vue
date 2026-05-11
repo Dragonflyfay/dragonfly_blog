@@ -10,9 +10,9 @@ import {
   CaretBottom,
   Sunny,
   Moon,
-  DataLine,      // 新增：数据看板图标
-  UserFilled as UserIcon,  // 新增：用户管理图标
-  ChatDotRound
+  DataLine, // 新增：数据看板图标
+  UserFilled as UserIcon, // 新增：用户管理图标
+  ChatDotRound,
 } from '@element-plus/icons-vue'
 import avatar from '@/assets/default.png'
 import { ref } from 'vue'
@@ -88,12 +88,12 @@ getUserInfo()
         <div class="logo-slogan">记录生活 · 分享美好</div>
       </div>
       <el-menu
-          :default-active="route.path"
-          active-text-color="#c5a3ff"
-          background-color="transparent"
-          text-color="rgba(255,255,255,0.75)"
-          router
-          class="custom-menu"
+        :default-active="route.path"
+        active-text-color="#c5a3ff"
+        background-color="transparent"
+        text-color="rgba(255,255,255,0.75)"
+        router
+        class="custom-menu"
       >
         <el-menu-item index="/admin/home">
           <el-icon><DataLine /></el-icon>
@@ -108,10 +108,20 @@ getUserInfo()
           <el-icon><ChatDotRound /></el-icon>
           <span>话题管理</span>
         </el-menu-item>
-        <el-menu-item index="/admin/role">
-          <el-icon><UserIcon /></el-icon>
-          <span>系统角色管理</span>
-        </el-menu-item>
+        <el-sub-menu index="/role">
+          <template #title>
+            <el-icon><UserFilled /></el-icon>
+            <span>用户管理</span>
+          </template>
+          <el-menu-item index="/admin/adminRole">
+            <el-icon><User /></el-icon>
+            <span>管理员管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/userRole">
+            <el-icon><User /></el-icon>
+            <span>用户管理</span>
+          </el-menu-item>
+        </el-sub-menu>
         <el-sub-menu index="profile">
           <template #title>
             <el-icon><UserFilled /></el-icon>

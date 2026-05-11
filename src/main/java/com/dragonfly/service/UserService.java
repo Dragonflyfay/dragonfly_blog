@@ -26,6 +26,9 @@ public interface UserService {
     //更新密码
     void updatePwd(String newPwd);
 
+    //更新用户角色
+    void updateRole(Integer userId,String role);
+
     //查询用户列表
     java.util.List<User> list();
 }

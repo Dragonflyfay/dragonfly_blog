@@ -67,6 +67,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public void updateRole(Integer userId, String role) {
+        userMapper.updateRole(userId,role);
+    }
+
+    @Override
     public java.util.List<User> list() {
         return userMapper.list();
     }
