@@ -11,6 +11,22 @@ const searchNickname = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+// 图片预览相关
+const showImageViewer = ref(false)
+const previewImageUrl = ref('')
+// 打开图片预览
+const openImageViewer = (imageUrl) => {
+  if (imageUrl) {
+    previewImageUrl.value = imageUrl
+    showImageViewer.value = true
+  }
+}
+
+// 关闭图片预览
+const closeImageViewer = () => {
+  showImageViewer.value = false
+  previewImageUrl.value = ''
+}
 
 // 获取用户列表
 const getUserList = async () => {
@@ -174,7 +190,11 @@ onMounted(() => {
         <el-table-column prop="email" label="邮箱" min-width="180" />
         <el-table-column label="头像" width="80">
           <template #default="scope">
-            <el-avatar :size="40" :src="scope.row.userPic" />
+            <el-avatar
+                :size="40"
+                :src="scope.row.userPic"
+                @click="openImageViewer(scope.row.userPic)"              style="cursor: pointer;"
+            />
           </template>
         </el-table-column>
         <el-table-column prop="role" label="当前角色" width="120">
@@ -246,6 +266,11 @@ onMounted(() => {
           :total="total"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
+        />
+        <el-image-viewer
+            v-if="showImageViewer"
+            :url-list="[previewImageUrl]"
+            @close="closeImageViewer"
         />
       </div>
     </div>
