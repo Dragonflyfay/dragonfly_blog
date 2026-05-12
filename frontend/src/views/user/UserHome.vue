@@ -1,4 +1,4 @@
-NEW_FILE_CODE
+
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
@@ -311,7 +311,51 @@ const viewDetail = async (note) => {
 // 视频错误处理
 const handleVideoError = (e) => {
   console.error('视频加载失败:', e)
-  ElMessage.error('视频加载失败，请检查网络连接或视频链接')
+  const video = e.target
+
+  // 安全的错误诊断信息
+  const errorDetails = {
+    errorCode: video.error?.code || 'unknown',
+    errorMessage: video.error?.message || '无错误信息',
+    networkState: video.networkState,
+    readyState: video.readyState,
+    src: video.src
+  }
+
+  console.error('视频错误详情:', errorDetails)
+
+  // 根据错误类型提供具体建议
+  let errorMsg = '视频加载失败'
+
+  if (video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
+    errorMsg = '视频资源无法访问\n可能原因：\n1. OSS Bucket未设置为公共读\n2. CORS配置不正确\n3. 视频文件不存在或链接失效'
+  } else if (video.networkState === HTMLMediaElement.NETWORK_EMPTY) {
+    errorMsg = '视频源未设置'
+  } else if (video.networkState === HTMLMediaElement.NETWORK_LOADING) {
+    errorMsg = '视频加载中，请检查网络连接'
+  } else if (video.networkState === HTMLMediaElement.NETWORK_IDLE) {
+    errorMsg = '视频加载已停止，可能是网络问题'
+  }
+
+  // 如果是CORS错误，给出明确提示
+  if (video.error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+    errorMsg = '视频格式不支持或CORS跨域限制\n请在阿里云OSS控制台配置CORS规则'
+  }
+
+  ElMessage.error({
+    message: errorMsg,
+    duration: 5000,
+    showClose: true
+  })
+}
+
+// 弹窗视频元数据加载完成
+const handleDialogVideoLoaded = (e) => {
+  const video = e.target
+  // 确保视频第一帧被渲染
+  if (video.readyState >= 2) {
+    video.currentTime = 0
+  }
 }
 
 // 初始化弹窗视频播放器
@@ -385,19 +429,28 @@ const initVideoPlayer = (noteId) => {
 // 视频元数据加载完成
 const onVideoLoaded = (noteId, event) => {
   const video = event.target
+  if (!videoPlayers[noteId]) {
+    initVideoPlayer(noteId)
+  }
   videoPlayers[noteId].duration = video.duration
 }
 
 // 视频时间更新
 const onVideoTimeUpdate = (noteId, event) => {
   const video = event.target
+  if (!videoPlayers[noteId]) {
+    initVideoPlayer(noteId)
+  }
   const player = videoPlayers[noteId]
   player.currentTime = video.currentTime
-  player.progress = (video.currentTime / video.duration) * 100
+  player.progress = video.duration ? (video.currentTime / video.duration) * 100 : 0
 }
 
 // 视频播放结束
 const onVideoEnded = (noteId) => {
+  if (!videoPlayers[noteId]) {
+    initVideoPlayer(noteId)
+  }
   videoPlayers[noteId].isPlaying = false
   videoPlayers[noteId].progress = 0
 }
@@ -654,6 +707,7 @@ onMounted(() => {
   window.addEventListener('resize', updateColumnCount)
 })
 
+
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', updateColumnCount)
@@ -726,13 +780,16 @@ onUnmounted(() => {
               <div v-if="note.noteCategory === 'video'" class="video-container">
                 <video
                     :src="note.video"
+                    :poster="note.coverImg || ''"
                     preload="metadata"
+                    crossorigin="anonymous"
+                    playsinline
                     muted
-                    loop
-                    @loadedmetadata="initVideoPlayer(note.id)"
-                    @timeupdate="onVideoTimeUpdate(note.id, $event)"
-                    @ended="onVideoEnded(note.id)"
-                    class="video-player"
+                    class="card-video"
+                    @error="handleVideoError"
+                    @loadedmetadata="(e) => onVideoLoaded(note.id, e)"
+                    @timeupdate="(e) => onVideoTimeUpdate(note.id, e)"
+                    @ended="() => onVideoEnded(note.id)"
                 ></video>
 
                 <!-- 视频控制层 -->
@@ -759,6 +816,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
+
               <!-- 图片类型 -->
               <img
                   v-else
@@ -769,6 +827,7 @@ onUnmounted(() => {
                   class="card-image"
               />
             </div>
+
 
             <!-- 卡片内容 -->
             <div class="card-body">
@@ -845,6 +904,7 @@ onUnmounted(() => {
                 crossorigin="anonymous"
                 class="detail-video"
                 @error="handleVideoError"
+                @loadedmetadata="handleDialogVideoLoaded"
             ></video>
           </div>
 
@@ -992,7 +1052,7 @@ onUnmounted(() => {
         </div>
       </div>
     </el-dialog>
-  </div>
+</div>
 </template>
 
 <style lang="scss" scoped>

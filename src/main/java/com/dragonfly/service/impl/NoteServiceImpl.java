@@ -178,7 +178,11 @@ public class NoteServiceImpl implements NoteService {
         // 只有笔记创建者或管理员可以删除
         Note note = noteMapper.findById(id);
         boolean isOwner = note.getCreateUser().equals(userId);
-        boolean isAdmin = "ADMIN".equals(role);
+
+        // 检查是否为管理员或超级管理员（大小写不敏感）
+        boolean isAdmin = role != null &&
+                (role.toLowerCase().equals("admin") ||
+                        role.toLowerCase().equals("super_admin"));
 
         if (!isOwner && !isAdmin) {
             throw new RuntimeException("没有权限，只能删除自己创建的笔记");
@@ -192,6 +196,7 @@ public class NoteServiceImpl implements NoteService {
 
         noteMapper.delete(id);
     }
+
 
     @Override
     public PageBean<Note> pageList(Integer pageNum, Integer pageSize, Integer topicId, String state, Integer userId) {

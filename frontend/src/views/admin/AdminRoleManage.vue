@@ -5,6 +5,7 @@ import { Search, Refresh, Plus, Delete, Edit } from '@element-plus/icons-vue'
 import { userListService, userUpdateRoleService } from '@/api/user.js'
 import { normalizeRole } from '@/utils/roles.js'
 
+import useUserInfoStore from '@/stores/userInfo.js'
 const users = ref([])
 const loading = ref(false)
 const searchNickname = ref('')
@@ -12,7 +13,13 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const selectedUsers = ref([])
+// 图片预览相关
+const showImageViewer = ref(false)
+const previewImageUrl = ref('')
 
+// 获取当前登录用户信息
+const userInfoStore = useUserInfoStore()
+const currentUserRole = normalizeRole(userInfoStore.role)
 // 获取管理员用户列表
 const getUserList = async () => {
   loading.value = true
@@ -96,18 +103,16 @@ const updateUserRole = async (user, newRole) => {
 }
 
 // 降级为普通用户
-const demoteToUser = (user) => {
-  const normalizedRole = normalizeRole(user.role)
-  const roleName = normalizedRole === 'super_admin' ? '超级管理员' : '管理员'
-  ElMessageBox.confirm(`确定要将${roleName} "${user.nickname}" 降级为普通用户吗？`, '确认降级', {
+const demoteToAdmin = (user) => {
+  ElMessageBox.confirm(`确定要将超级管理员 "${user.nickname}" 降级为普通管理员吗？`, '确认降级', {
     type: 'warning',
     confirmButtonText: '确定',
     cancelButtonText: '取消',
   })
-    .then(() => {
-      updateUserRole(user, 'user')
-    })
-    .catch(() => {})
+      .then(() => {
+        updateUserRole(user, 'admin')
+      })
+      .catch(() => {})
 }
 
 // 批量降级
@@ -133,6 +138,18 @@ const batchDemote = () => {
       selectedUsers.value = []
     })
     .catch(() => {})
+}
+// 打开图片预览
+const openImageViewer = (imageUrl) => {
+  if (imageUrl) {
+    previewImageUrl.value = imageUrl
+    showImageViewer.value = true
+  }
+}
+// 关闭图片预览
+const closeImageViewer = () => {
+  showImageViewer.value = false
+  previewImageUrl.value = ''
 }
 
 // 在组件挂载时初始化数据
@@ -185,13 +202,35 @@ onMounted(() => {
         </el-table-column>
         <el-table-column label="头像" width="100">
           <template #default="scope">
-            <el-avatar :size="50" :src="scope.row.userPic" />
+            <el-avatar
+                :size="50"
+                :src="scope.row.userPic"
+                @click="openImageViewer(scope.row.userPic)"              style="cursor: pointer;"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="scope">
-            <el-button type="info" size="small" :icon="Edit" @click="demoteToUser(scope.row)">
-              降级
+            <!-- 超级管理员可以看到：将其他超级管理员降级为普通管理员 -->
+            <el-button
+                v-if="currentUserRole === 'super_admin' && normalizeRole(scope.row.role) === 'super_admin' && scope.row.id !== userInfoStore.info.id"
+                type="warning"
+                size="small"
+                :icon="Edit"
+                @click="demoteToAdmin(scope.row)"
+            >
+              降级为管理员
+            </el-button>
+
+            <!-- 所有管理员都可以将其他管理员降级为普通用户 -->
+            <el-button
+                v-if="normalizeRole(scope.row.role) !== 'user' && scope.row.id !== userInfoStore.info.id"
+                type="info"
+                size="small"
+                :icon="Edit"
+                @click="demoteToUser(scope.row)"
+            >
+              降级为用户
             </el-button>
           </template>
         </el-table-column>
@@ -210,6 +249,12 @@ onMounted(() => {
         />
       </div>
     </div>
+    <!-- 图片预览组件 -->
+    <el-image-viewer
+        v-if="showImageViewer"
+        :url-list="[previewImageUrl]"
+        @close="closeImageViewer"
+    />
   </div>
 </template>
 
