@@ -38,6 +38,9 @@ const coverInput = ref()
 const videoPreview = ref()
 // 新增：用于从视频中提取封面
 const canvasRef = ref(null)
+// 视频上传进度
+const videoUploadProgress = ref(0)
+const isUploadingVideo = ref(false)
 
 // 话题列表
 const topics = ref([])
@@ -238,9 +241,11 @@ const handleVideoUpload = async (event) => {
   const formData = new FormData()
   formData.append('file', file)
 
-  try {
-    ElMessage.info('视频上传中，请稍候...')
+  // 重置进度
+  videoUploadProgress.value = 0
+  isUploadingVideo.value = true
 
+  try {
     const uploadInstance = axios.create({
       baseURL: '/api',
       timeout: 300000,
@@ -293,6 +298,7 @@ const handleVideoUpload = async (event) => {
       },
       onUploadProgress: (progressEvent) => {
         const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        videoUploadProgress.value = percentCompleted
         console.log(`上传进度: ${percentCompleted}%`)
       },
     })
@@ -307,6 +313,8 @@ const handleVideoUpload = async (event) => {
       ElMessage.error(error.response?.data?.message || '视频上传失败')
     }
   } finally {
+    isUploadingVideo.value = false
+    videoUploadProgress.value = 0
     event.target.value = ''
   }
 }
@@ -315,6 +323,8 @@ const handleVideoUpload = async (event) => {
 const removeVideo = () => {
   videoUrl.value = ''
   videoCover.value = ''
+  videoUploadProgress.value = 0
+  isUploadingVideo.value = false
 }
 
 // 触发封面上传
@@ -542,19 +552,39 @@ onMounted(() => {
             <span>上传视频</span>
           </div>
 
-          <div v-if="!videoUrl" class="video-upload-trigger" @click="triggerVideoUpload">
-            <div class="video-upload-icon">
-              <el-icon :size="48"><VideoCamera /></el-icon>
+          <div v-if="!videoUrl" class="video-upload-wrapper">
+            <div 
+              class="video-upload-trigger" 
+              :class="{ disabled: isUploadingVideo }"
+              @click="!isUploadingVideo && triggerVideoUpload()"
+            >
+              <div class="video-upload-icon">
+                <el-icon :size="48"><VideoCamera /></el-icon>
+              </div>
+              <span class="video-upload-text">点击上传视频</span>
+              <span class="video-hint">支持 mp4/mov/avi/flv/3gp 格式，大小不超过 500MB</span>
+              <input
+                ref="videoInput"
+                type="file"
+                accept="video/mp4,video/quicktime,video/x-msvideo,video/x-flv,video/3gpp"
+                style="display: none"
+                @change="handleVideoUpload"
+              />
             </div>
-            <span class="video-upload-text">点击上传视频</span>
-            <span class="video-hint">支持 mp4/mov/avi/flv/3gp 格式，大小不超过 500MB</span>
-            <input
-              ref="videoInput"
-              type="file"
-              accept="video/mp4,video/quicktime,video/x-msvideo,video/x-flv,video/3gpp"
-              style="display: none"
-              @change="handleVideoUpload"
-            />
+
+            <!-- 上传进度条 -->
+            <div v-if="isUploadingVideo" class="upload-progress-container">
+              <div class="progress-info">
+                <span class="progress-text">视频上传中...</span>
+                <span class="progress-percent">{{ videoUploadProgress }}%</span>
+              </div>
+              <el-progress 
+                :percentage="videoUploadProgress" 
+                :stroke-width="12"
+                :show-text="false"
+                color="linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%)"
+              />
+            </div>
           </div>
 
           <div v-else class="video-preview">
@@ -890,6 +920,47 @@ onMounted(() => {
   text-align: center;
 }
 
+.video-upload-wrapper {
+  position: relative;
+}
+
+.upload-progress-container {
+  margin-top: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, #faf7ff 0%, #f0e5ff 100%);
+  border-radius: 16px;
+  border: 2px solid rgba(197, 163, 255, 0.2);
+
+  .progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+
+    .progress-text {
+      font-size: 14px;
+      color: #6a4a9c;
+      font-weight: 500;
+    }
+
+    .progress-percent {
+      font-size: 14px;
+      color: #c5a3ff;
+      font-weight: 600;
+    }
+  }
+
+  :deep(.el-progress-bar__outer) {
+    background: rgba(197, 163, 255, 0.15);
+    border-radius: 6px;
+  }
+
+  :deep(.el-progress-bar__inner) {
+    border-radius: 6px;
+    transition: width 0.3s ease;
+  }
+}
+
 .video-upload-trigger {
   background: linear-gradient(135deg, #faf7ff 0%, #f0e5ff 100%);
   border: 2px dashed #c5a3ff;
@@ -898,6 +969,12 @@ onMounted(() => {
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
+
+  &.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
 
   .video-upload-icon {
     margin-bottom: 16px;
@@ -914,7 +991,7 @@ onMounted(() => {
     color: #b0a7c0;
   }
 
-  &:hover {
+  &:hover:not(.disabled) {
     background: linear-gradient(135deg, #fff 0%, #f8f3ff 100%);
     transform: translateY(-2px);
   }

@@ -69,9 +69,15 @@ import { userInfoService } from '@/api/user.js'
 import useUserInfoStore from '@/stores/userInfo.js'
 const userInfoStore = useUserInfoStore()
 const getUserInfo = async () => {
-  let reuslt = await userInfoService()
-  // 保持原有的存储方式
-  userInfoStore.setInfo(reuslt.data, tokenStore.rememberMe)
+  try {
+    let result = await userInfoService()
+    // 保持原有的存储方式
+    userInfoStore.setInfo(result.data, tokenStore.rememberMe)
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    // 如果是401错误，响应拦截器已经处理了跳转逻辑
+    // 这里只需要避免页面崩溃即可
+  }
 }
 getUserInfo()
 </script>
