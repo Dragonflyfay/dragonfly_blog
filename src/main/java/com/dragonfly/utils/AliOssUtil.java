@@ -6,9 +6,10 @@ import com.aliyun.oss.common.auth.EnvironmentVariableCredentialsProvider;
 import com.aliyun.oss.common.comm.SignVersion;
 import com.aliyun.oss.model.PutObjectRequest;
 import com.aliyun.oss.model.PutObjectResult;
+import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
-
+@Component
 public class AliOssUtil {
     private static final String ENDPOINT = "oss-cn-beijing.aliyuncs.com";
     private static final EnvironmentVariableCredentialsProvider credentialsProvider;
