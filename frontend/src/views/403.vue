@@ -72,5 +72,3 @@ const reLogin = () => {
   border: none;
 }
 </style>
-
-

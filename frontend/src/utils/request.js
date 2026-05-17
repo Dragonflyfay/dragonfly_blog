@@ -32,33 +32,33 @@ import { useTokenStore } from '@/stores/token.js'
 //添加请求拦截器
 //use里可以调用两个回调函数
 instance.interceptors.request.use(
-    (config) => {
-        //请求前的回调
-        //添加token
-        const tokenStore = useTokenStore()
+  (config) => {
+    //请求前的回调
+    //添加token
+    const tokenStore = useTokenStore()
 
-        // 优先使用store中的token，其次从存储中获取
-        let token = tokenStore.token
-        if (!token) {
-            // 尝试从全局存储或当前标签页存储获取
-            token = localStorage.getItem('global_token')
-            if (!token) {
-                const tabId = sessionStorage.getItem('tab_id')
-                if (tabId) {
-                    token = sessionStorage.getItem(`token_${tabId}`)
-                }
-            }
+    // 优先使用store中的token，其次从存储中获取
+    let token = tokenStore.token
+    if (!token) {
+      // 尝试从全局存储或当前标签页存储获取
+      token = localStorage.getItem('global_token')
+      if (!token) {
+        const tabId = sessionStorage.getItem('tab_id')
+        if (tabId) {
+          token = sessionStorage.getItem(`token_${tabId}`)
         }
+      }
+    }
 
-        if (token) {
-            config.headers.Authorization = token
-        }
-        return config
-    },
-    (err) => {
-        //请求错误的回调
-        Promise.reject(err)
-    },
+    if (token) {
+      config.headers.Authorization = token
+    }
+    return config
+  },
+  (err) => {
+    //请求错误的回调
+    Promise.reject(err)
+  },
 )
 
 import router from '@/router'
@@ -80,11 +80,11 @@ instance.interceptors.response.use(
 
     if (status === 401) {
       ElMessage.error('请先登录')
-        //清除token和用户信息
-        const tokenStore = useTokenStore()
-        const userInfoStore=useUserInfoStore()
-        tokenStore.removeToken()
-        userInfoStore.removeInfo()
+      //清除token和用户信息
+      const tokenStore = useTokenStore()
+      const userInfoStore = useUserInfoStore()
+      tokenStore.removeToken()
+      userInfoStore.removeInfo()
       router.push('/login')
     } else if (status === 502 || status === 503 || status === 504) {
       ElMessage.error(

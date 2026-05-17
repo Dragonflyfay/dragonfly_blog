@@ -59,11 +59,9 @@ const topicModel = ref({
 const rules = {
   topicName: [
     { required: true, message: '请输入话题名称', trigger: 'blur' },
-    { min: 1, max: 20, message: '话题名称长度在 1 到 20 个字符', trigger: 'blur' }
+    { min: 1, max: 20, message: '话题名称长度在 1 到 20 个字符', trigger: 'blur' },
   ],
-  description: [
-    { max: 100, message: '描述不能超过 100 个字符', trigger: 'blur' }
-  ],
+  description: [{ max: 100, message: '描述不能超过 100 个字符', trigger: 'blur' }],
 }
 
 const resetTopicModel = () => {
@@ -116,30 +114,30 @@ const updateTopic = async () => {
 const deleteTopic = (row) => {
   const hasNotes = row.notesCount && row.notesCount > 0
   const confirmMsg = hasNotes
-      ? `该话题下有 ${row.notesCount} 篇笔记，删除后不可恢复，确认删除吗？`
-      : '你确认要删除该话题吗？'
+    ? `该话题下有 ${row.notesCount} 篇笔记，删除后不可恢复，确认删除吗？`
+    : '你确认要删除该话题吗？'
 
   ElMessageBox.confirm(confirmMsg, '温馨提示', {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
     type: hasNotes ? 'warning' : 'info',
   })
-      .then(async () => {
-        try {
-          let result = await topicDeleteService(row.id)
-          ElMessage.success(result.message ? result.message : '删除成功')
-          await topicList()
-        } catch (error) {
-          console.error('删除话题失败:', error)
-          ElMessage.error(error.response?.data?.message || '删除失败')
-        }
+    .then(async () => {
+      try {
+        let result = await topicDeleteService(row.id)
+        ElMessage.success(result.message ? result.message : '删除成功')
+        await topicList()
+      } catch (error) {
+        console.error('删除话题失败:', error)
+        ElMessage.error(error.response?.data?.message || '删除失败')
+      }
+    })
+    .catch(() => {
+      ElMessage({
+        type: 'info',
+        message: '已取消删除',
       })
-      .catch(() => {
-        ElMessage({
-          type: 'info',
-          message: '已取消删除',
-        })
-      })
+    })
 }
 </script>
 
@@ -156,10 +154,10 @@ const deleteTopic = (row) => {
       </div>
       <div class="header-extra">
         <el-button
-            class="add-category-btn"
-            type="primary"
-            size="large"
-            @click="
+          class="add-category-btn"
+          type="primary"
+          size="large"
+          @click="
             () => {
               dialogVisible = true
               title = '添加话题'
@@ -174,11 +172,11 @@ const deleteTopic = (row) => {
 
     <div class="category-table-wrapper">
       <el-table
-          :data="topics"
-          style="width: 100%"
-          class="custom-table"
-          v-loading="loading"
-          element-loading-text="加载中..."
+        :data="topics"
+        style="width: 100%"
+        class="custom-table"
+        v-loading="loading"
+        element-loading-text="加载中..."
       >
         <el-table-column label="序号" width="80" type="index">
           <template #default="{ $index }">
@@ -192,15 +190,21 @@ const deleteTopic = (row) => {
           <template #default="{ row }">
             <div class="category-name-cell">
               <span
-                  class="category-icon"
-                  :style="{ backgroundImage: getTopicGradient(row.topicName) }"
+                class="category-icon"
+                :style="{ backgroundImage: getTopicGradient(row.topicName) }"
               ></span>
               <span class="category-name-text">{{ row.topicName }}</span>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="描述" prop="description" align="left" min-width="200" show-overflow-tooltip>
+        <el-table-column
+          label="描述"
+          prop="description"
+          align="left"
+          min-width="200"
+          show-overflow-tooltip
+        >
           <template #default="{ row }">
             <div class="category-alias">
               <span class="alias-label">{{ row.description || '暂无描述' }}</span>
@@ -221,18 +225,18 @@ const deleteTopic = (row) => {
             <div class="action-buttons">
               <el-tooltip content="编辑话题" placement="top">
                 <el-button
-                    :icon="Edit"
-                    circle
-                    class="action-btn edit-btn"
-                    @click="showDialog(row)"
+                  :icon="Edit"
+                  circle
+                  class="action-btn edit-btn"
+                  @click="showDialog(row)"
                 ></el-button>
               </el-tooltip>
               <el-tooltip content="删除话题" placement="top">
                 <el-button
-                    :icon="Delete"
-                    circle
-                    class="action-btn delete-btn"
-                    @click="deleteTopic(row)"
+                  :icon="Delete"
+                  circle
+                  class="action-btn delete-btn"
+                  @click="deleteTopic(row)"
                 ></el-button>
               </el-tooltip>
             </div>
@@ -257,32 +261,32 @@ const deleteTopic = (row) => {
 
     <el-dialog v-model="dialogVisible" :title="title" width="400px" center class="dialog">
       <el-form
-          ref="formRef"
-          :model="topicModel"
-          :rules="rules"
-          label-width="100px"
-          style="padding-right: 30px"
-          class="form"
+        ref="formRef"
+        :model="topicModel"
+        :rules="rules"
+        label-width="100px"
+        style="padding-right: 30px"
+        class="form"
       >
         <el-form-item label="话题名称" prop="topicName">
           <el-input
-              v-model="topicModel.topicName"
-              minlength="1"
-              maxlength="20"
-              show-word-limit
-              class="custom-input"
-              placeholder="请输入话题名称"
+            v-model="topicModel.topicName"
+            minlength="1"
+            maxlength="20"
+            show-word-limit
+            class="custom-input"
+            placeholder="请输入话题名称"
           ></el-input>
         </el-form-item>
         <el-form-item label="话题描述" prop="description">
           <el-input
-              v-model="topicModel.description"
-              type="textarea"
-              :rows="3"
-              maxlength="100"
-              show-word-limit
-              class="custom-input"
-              placeholder="请输入话题描述（可选）"
+            v-model="topicModel.description"
+            type="textarea"
+            :rows="3"
+            maxlength="100"
+            show-word-limit
+            class="custom-input"
+            placeholder="请输入话题描述（可选）"
           ></el-input>
         </el-form-item>
       </el-form>
@@ -290,10 +294,10 @@ const deleteTopic = (row) => {
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false" class="cancel-btn">取消</el-button>
           <el-button
-              type="primary"
-              @click="title == '添加话题' ? addTopic() : updateTopic()"
-              class="confirm-btn"
-              :loading="submitLoading"
+            type="primary"
+            @click="title == '添加话题' ? addTopic() : updateTopic()"
+            class="confirm-btn"
+            :loading="submitLoading"
           >
             确认
           </el-button>
