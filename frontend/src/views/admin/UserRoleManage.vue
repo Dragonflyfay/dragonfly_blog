@@ -191,9 +191,10 @@ onMounted(() => {
         <el-table-column label="头像" width="80">
           <template #default="scope">
             <el-avatar
-                :size="40"
-                :src="scope.row.userPic"
-                @click="openImageViewer(scope.row.userPic)"              style="cursor: pointer;"
+              :size="40"
+              :src="scope.row.userPic"
+              @click="openImageViewer(scope.row.userPic)"
+              style="cursor: pointer"
             />
           </template>
         </el-table-column>
@@ -268,9 +269,9 @@ onMounted(() => {
           @current-change="handleCurrentChange"
         />
         <el-image-viewer
-            v-if="showImageViewer"
-            :url-list="[previewImageUrl]"
-            @close="closeImageViewer"
+          v-if="showImageViewer"
+          :url-list="[previewImageUrl]"
+          @close="closeImageViewer"
         />
       </div>
     </div>

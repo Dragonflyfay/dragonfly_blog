@@ -1,4 +1,3 @@
-
 import request from '@/utils/request.js'
 
 // 话题列表查询
@@ -32,8 +31,8 @@ export const notePageListService = (params) => {
 }
 
 //用户首页分页查询（支持话题，关键词筛选）
-export const userNotePageListService=(params)=>{
-  return request.get('/note/user/page',{params})
+export const userNotePageListService = (params) => {
+  return request.get('/note/user/page', { params })
 }
 // 获取笔记详情（包含完整信息）
 export const noteDetailFullService = (id) => {
@@ -143,4 +142,3 @@ export const unfavoriteNoteService = (noteId) => {
 export const checkFavoriteNoteService = (noteId) => {
   return request.get(`/favorite/note/${noteId}/check`)
 }
-

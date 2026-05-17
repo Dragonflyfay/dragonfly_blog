@@ -18,4 +18,3 @@ export function routeRoleAllows(routeRole, userRole) {
   if (routeRole === 'user') return u === 'user' || canEnterAdmin(u)
   return u === normalizeRole(routeRole)
 }
-

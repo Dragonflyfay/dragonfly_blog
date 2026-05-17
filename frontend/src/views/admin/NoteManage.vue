@@ -1,6 +1,15 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
-import { Delete, Edit, LocationFilled, PictureFilled, View, ArrowLeft, ArrowRight, VideoPlay } from '@element-plus/icons-vue'
+import {
+  Delete,
+  Edit,
+  LocationFilled,
+  PictureFilled,
+  View,
+  ArrowLeft,
+  ArrowRight,
+  VideoPlay,
+} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import {
@@ -76,7 +85,9 @@ const closePreview = () => {
 // 上一张图片
 const prevImage = () => {
   if (!previewNote.value?.images || previewNote.value.images.length <= 1) return
-  currentImageIndex.value = (currentImageIndex.value - 1 + previewNote.value.images.length) % previewNote.value.images.length
+  currentImageIndex.value =
+    (currentImageIndex.value - 1 + previewNote.value.images.length) %
+    previewNote.value.images.length
 }
 
 // 下一张图片
@@ -94,8 +105,6 @@ const getMediaType = (note) => {
   if (note.images && note.images.length > 0) return 'image'
   return 'unknown'
 }
-
-
 
 // 创建映射表优化查找性能
 const topicMap = computed(() => {
@@ -235,7 +244,6 @@ onMounted(() => {
   getUserList()
   noteList()
 })
-
 </script>
 
 <template>
@@ -398,17 +406,17 @@ onMounted(() => {
         <div v-if="getMediaType(previewNote) === 'video'" class="note-video-section">
           <div class="video-container">
             <video
-                ref="videoPlayerRef"
-                :src="previewNote.video"
-                :poster="previewNote.coverImg || ''"
-                controls
-                autoplay
-                preload="metadata"
-                crossorigin="anonymous"
-                playsinline
-                class="preview-video-player"
-                @error="handleVideoError"
-                @loadedmetadata="handleVideoLoaded"
+              ref="videoPlayerRef"
+              :src="previewNote.video"
+              :poster="previewNote.coverImg || ''"
+              controls
+              autoplay
+              preload="metadata"
+              crossorigin="anonymous"
+              playsinline
+              class="preview-video-player"
+              @error="handleVideoError"
+              @loadedmetadata="handleVideoLoaded"
             >
               您的浏览器不支持视频播放
             </video>
@@ -424,7 +432,7 @@ onMounted(() => {
               class="preview-image"
               @error="onImgError"
             />
-            
+
             <!-- 图片导航按钮 -->
             <div v-if="previewNote.images && previewNote.images.length > 1" class="image-nav">
               <button class="nav-btn prev-btn" @click="prevImage">
@@ -483,7 +491,10 @@ onMounted(() => {
                 new Date(previewNote.createTime).toLocaleString('zh-CN')
               }}</span>
             </div>
-            <div class="meta-item" v-if="getMediaType(previewNote) === 'image' && previewNote.images">
+            <div
+              class="meta-item"
+              v-if="getMediaType(previewNote) === 'image' && previewNote.images"
+            >
               <span class="meta-label">图片数：</span>
               <span class="meta-value">{{ previewNote.images.length }} 张</span>
             </div>

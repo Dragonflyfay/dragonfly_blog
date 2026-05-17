@@ -553,8 +553,8 @@ onMounted(() => {
           </div>
 
           <div v-if="!videoUrl" class="video-upload-wrapper">
-            <div 
-              class="video-upload-trigger" 
+            <div
+              class="video-upload-trigger"
               :class="{ disabled: isUploadingVideo }"
               @click="!isUploadingVideo && triggerVideoUpload()"
             >
@@ -578,8 +578,8 @@ onMounted(() => {
                 <span class="progress-text">视频上传中...</span>
                 <span class="progress-percent">{{ videoUploadProgress }}%</span>
               </div>
-              <el-progress 
-                :percentage="videoUploadProgress" 
+              <el-progress
+                :percentage="videoUploadProgress"
                 :stroke-width="12"
                 :show-text="false"
                 color="linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%)"

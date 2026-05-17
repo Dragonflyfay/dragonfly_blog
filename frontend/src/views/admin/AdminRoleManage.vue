@@ -109,10 +109,10 @@ const demoteToAdmin = (user) => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
   })
-      .then(() => {
-        updateUserRole(user, 'admin')
-      })
-      .catch(() => {})
+    .then(() => {
+      updateUserRole(user, 'admin')
+    })
+    .catch(() => {})
 }
 
 // 批量降级
@@ -203,9 +203,10 @@ onMounted(() => {
         <el-table-column label="头像" width="100">
           <template #default="scope">
             <el-avatar
-                :size="50"
-                :src="scope.row.userPic"
-                @click="openImageViewer(scope.row.userPic)"              style="cursor: pointer;"
+              :size="50"
+              :src="scope.row.userPic"
+              @click="openImageViewer(scope.row.userPic)"
+              style="cursor: pointer"
             />
           </template>
         </el-table-column>
@@ -213,22 +214,28 @@ onMounted(() => {
           <template #default="scope">
             <!-- 超级管理员可以看到：将其他超级管理员降级为普通管理员 -->
             <el-button
-                v-if="currentUserRole === 'super_admin' && normalizeRole(scope.row.role) === 'super_admin' && scope.row.id !== userInfoStore.info.id"
-                type="warning"
-                size="small"
-                :icon="Edit"
-                @click="demoteToAdmin(scope.row)"
+              v-if="
+                currentUserRole === 'super_admin' &&
+                normalizeRole(scope.row.role) === 'super_admin' &&
+                scope.row.id !== userInfoStore.info.id
+              "
+              type="warning"
+              size="small"
+              :icon="Edit"
+              @click="demoteToAdmin(scope.row)"
             >
               降级为管理员
             </el-button>
 
             <!-- 所有管理员都可以将其他管理员降级为普通用户 -->
             <el-button
-                v-if="normalizeRole(scope.row.role) !== 'user' && scope.row.id !== userInfoStore.info.id"
-                type="info"
-                size="small"
-                :icon="Edit"
-                @click="demoteToUser(scope.row)"
+              v-if="
+                normalizeRole(scope.row.role) !== 'user' && scope.row.id !== userInfoStore.info.id
+              "
+              type="info"
+              size="small"
+              :icon="Edit"
+              @click="demoteToUser(scope.row)"
             >
               降级为用户
             </el-button>
@@ -251,9 +258,9 @@ onMounted(() => {
     </div>
     <!-- 图片预览组件 -->
     <el-image-viewer
-        v-if="showImageViewer"
-        :url-list="[previewImageUrl]"
-        @close="closeImageViewer"
+      v-if="showImageViewer"
+      :url-list="[previewImageUrl]"
+      @close="closeImageViewer"
     />
   </div>
 </template>

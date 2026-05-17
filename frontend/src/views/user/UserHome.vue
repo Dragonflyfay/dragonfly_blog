@@ -130,7 +130,7 @@ const getUserInfo = (userId) => {
 // 批量设置用户信息到缓存
 const setUsersToCache = (users) => {
   if (!users || !Array.isArray(users)) return
-  users.forEach(user => {
+  users.forEach((user) => {
     if (user && user.id) {
       userInfoCache.set(user.id, user)
     }
@@ -153,7 +153,7 @@ const restoreUserCache = () => {
     const cached = sessionStorage.getItem('user_info_cache')
     if (cached) {
       const cacheObj = JSON.parse(cached)
-      Object.keys(cacheObj).forEach(key => {
+      Object.keys(cacheObj).forEach((key) => {
         userInfoCache.set(parseInt(key), cacheObj[key])
       })
     }
@@ -166,11 +166,11 @@ const restoreUserCache = () => {
 const loadAllUsers = async () => {
   // 如果缓存已有数据，不需要重新加载
   if (userInfoCache.size > 0) return
-  
+
   // 尝试从 sessionStorage 恢复
   restoreUserCache()
   if (userInfoCache.size > 0) return
-  
+
   try {
     const res = await userListService()
     if (res.data && Array.isArray(res.data)) {
@@ -236,7 +236,7 @@ const loadNotes = async () => {
           note.userName = note.userName || '匿名用户'
           note.userPic = note.userPic || ''
         }
-        
+
         // 确保统计数据有默认值
         note.likesCount = note.likesCount || 0
         note.viewsCount = note.viewsCount || 0
@@ -355,6 +355,22 @@ const viewDetail = async (note) => {
     // 获取完整的笔记详情
     const res = await noteDetailService(note.id)
     currentNote.value = res.data
+
+    // 补充用户信息（从缓存中获取）
+    if (currentNote.value.createUser) {
+      const userInfo = getUserInfo(currentNote.value.createUser)
+      if (userInfo) {
+        currentNote.value.userName = userInfo.nickname || userInfo.username || '匿名用户'
+        currentNote.value.userPic = userInfo.userPic || ''
+      } else {
+        currentNote.value.userName = currentNote.value.userName || '匿名用户'
+        currentNote.value.userPic = currentNote.value.userPic || ''
+      }
+    } else {
+      currentNote.value.userName = currentNote.value.userName || '匿名用户'
+      currentNote.value.userPic = currentNote.value.userPic || ''
+    }
+
     showDetailDialog.value = true
 
     // 重置图片索引
@@ -1042,8 +1058,20 @@ onUnmounted(() => {
 
         <div class="detail-right">
           <h2 class="detail-title">{{ currentNote.title }}</h2>
+          <div class="detail-author-section">
+            <img
+              v-if="currentNote.userPic"
+              :src="currentNote.userPic"
+              class="author-avatar-detail"
+              alt="author avatar"
+              @error="(e) => (e.target.style.display = 'none')"
+            />
+            <div v-else class="author-avatar-placeholder">
+              {{ (currentNote.userName || '匿名用户').charAt(0).toUpperCase() }}
+            </div>
+            <span class="author-name-detail">{{ currentNote.userName || '匿名用户' }}</span>
+          </div>
           <div class="detail-meta">
-            <span class="meta-item">👤 作者</span>
             <span class="meta-item">📍 {{ currentNote.location || '未知地点' }}</span>
             <span class="meta-item"
               >🕒 {{ currentNote.publishTime || currentNote.createTime }}</span
@@ -1711,6 +1739,41 @@ onUnmounted(() => {
   color: #333;
   margin: 0 0 16px;
   line-height: 1.4;
+}
+
+.detail-author-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.author-avatar-detail {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #f0f0f0;
+}
+
+.author-avatar-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffeef8, #e8f4ff);
+  color: #ff2442;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.author-name-detail {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
 }
 
 .detail-meta {
