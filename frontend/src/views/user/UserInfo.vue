@@ -27,7 +27,12 @@ const updateUserInfo = async () => {
   //调用接口
   let result = await userInfoService(userInfo)
   ElMessage.success(result.message ? result.message : '修改成功')
+  
+  // 更新 Pinia store
   userInfoStore.setInfo(userInfo)
+  
+  // 触发全局事件，通知其他组件更新
+  window.dispatchEvent(new CustomEvent('userInfoUpdated', { detail: userInfo }))
 }
 </script>
 
