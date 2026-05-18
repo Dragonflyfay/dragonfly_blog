@@ -164,9 +164,6 @@ const restoreUserCache = () => {
 
 // 加载所有用户信息到缓存（仅在缓存为空时加载）
 const loadAllUsers = async () => {
-  // 如果缓存已有数据，不需要重新加载
-  if (userInfoCache.size > 0) return
-
   // 尝试从 sessionStorage 恢复
   restoreUserCache()
   if (userInfoCache.size > 0) return
@@ -180,6 +177,29 @@ const loadAllUsers = async () => {
     console.error('加载用户列表失败:', error)
   }
 }
+// 动态获取单个用户信息（当缓存中没有时）
+const fetchUserInfo = async (userId) => {
+  if (!userId) return null
+
+  // 如果缓存中已有，直接返回
+  if (userInfoCache.has(userId)) {
+    return userInfoCache.get(userId)
+  }
+
+  try {
+    // 这里可以调用获取单个用户信息的接口
+    // 如果没有单独接口，可以重新加载用户列表
+    const res = await userListService()
+    if (res.data && Array.isArray(res.data)) {
+      setUsersToCache(res.data)
+      return userInfoCache.get(userId) || null
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+  }
+  return null
+}
+
 // 加载笔记数据
 const loadNotes = async () => {
   if (loading.value || !hasMore.value) return
@@ -222,15 +242,17 @@ const loadNotes = async () => {
 
       // 为每个笔记填充真实的用户信息和确保统计数据有效
       notes.value.forEach((note) => {
-        // 填充用户信息
+        // 填充用户信息 - 优先使用缓存中的最新信息
         if (note.createUser) {
           const userInfo = getUserInfo(note.createUser)
           if (userInfo) {
+            // 使用缓存中的最新用户信息
             note.userName = userInfo.nickname || userInfo.username || '匿名用户'
             note.userPic = userInfo.userPic || ''
           } else {
-            note.userName = note.userName || '匿名用户'
-            note.userPic = note.userPic || ''
+            // 如果缓存中没有，使用后端返回的字段或默认值
+            note.userName = note.createUserName || note.userName || '匿名用户'
+            note.userPic = note.createUserAvatar || note.userPic || ''
           }
         } else {
           note.userName = note.userName || '匿名用户'
@@ -243,6 +265,24 @@ const loadNotes = async () => {
         note.commentsCount = note.commentsCount || 0
         note.favoritesCount = note.favoritesCount || 0
       })
+      
+      // 检查是否有未缓存的用户，异步获取并更新
+      const missingUserIds = [...new Set(
+        notes.value
+          .filter(note => note.createUser && !userInfoCache.has(note.createUser))
+          .map(note => note.createUser)
+      )]
+      
+      if (missingUserIds.length > 0) {
+        // 异步获取缺失的用户信息，不阻塞当前渲染
+        setTimeout(async () => {
+          for (const userId of missingUserIds) {
+            await fetchUserInfo(userId)
+          }
+          // 重新触发响应式更新，刷新用户信息显示
+          notes.value = [...notes.value]
+        }, 100)
+      }
     }
   } catch (error) {
     console.error('加载笔记失败:', error)
@@ -328,25 +368,18 @@ const formatNumber = (num) => {
 const formatTimeAgo = (time) => {
   if (!time) return ''
 
-  const now = new Date()
-  const past = new Date(time)
-  const diffMs = now - past
-  const diffSecs = Math.floor(diffMs / 1000)
-  const diffMins = Math.floor(diffSecs / 60)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
+  // 将时间字符串转换为Date对象
+  const date = new Date(time)
 
-  if (diffSecs < 60) {
-    return '刚刚'
-  } else if (diffMins < 60) {
-    return `${diffMins}分钟前`
-  } else if (diffHours < 24) {
-    return `${diffHours}小时前`
-  } else if (diffDays < 30) {
-    return `${diffDays}天前`
-  } else {
-    return time.split(' ')[0] // 返回日期部分
-  }
+  // 格式化为 YYYY-MM-DD HH:mm:ss 格式
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
 // 查看详情
@@ -792,7 +825,7 @@ const updateColumnCount = () => {
 
 /** 封面区域宽高比 class（模拟小红书不规则竖版） */
 const getMediaAspectClass = (note) => {
-  if (note.noteCategory === 'video') return 'media-ar-3-4'
+  if (note.noteCategory === 'video') return 'media-ar-video'
   const v = (note.id || 0) % 5
   return ['media-ar-1-1', 'media-ar-4-5', 'media-ar-3-4', 'media-ar-5-7', 'media-ar-4-5'][v]
 }
@@ -801,7 +834,7 @@ const getMediaAspectClass = (note) => {
 const estimateNoteHeight = (note) => {
   let media = 1.12
   if (note.noteCategory === 'video') {
-    media = 1.32
+    media = 1.5
   } else {
     const ratios = [1.0, 1.12, 1.28, 0.95, 1.18]
     media = ratios[(note.id || 0) % 5]
@@ -827,6 +860,35 @@ const waterfallColumns = computed(() => {
   return cols
 })
 
+// 监听用户信息更新事件，实时更新页面显示
+const handleUserInfoUpdate = (event) => {
+  const updatedUser = event.detail
+  if (updatedUser && updatedUser.id) {
+    // 更新缓存中的用户信息
+    if (userInfoCache.has(updatedUser.id)) {
+      const cachedUser = userInfoCache.get(updatedUser.id)
+      userInfoCache.set(updatedUser.id, { ...cachedUser, ...updatedUser })
+    } else {
+      // 如果缓存中没有，添加新用户信息
+      userInfoCache.set(updatedUser.id, updatedUser)
+    }
+    
+    // 更新当前页面中所有该用户的笔记显示
+    notes.value.forEach(note => {
+      if (note.createUser === updatedUser.id) {
+        note.userName = updatedUser.nickname || updatedUser.username || '匿名用户'
+        note.userPic = updatedUser.userPic || ''
+      }
+    })
+    
+    // 如果当前正在查看笔记详情，也更新详情中的用户信息
+    if (currentNote.value && currentNote.value.createUser === updatedUser.id) {
+      currentNote.value.userName = updatedUser.nickname || updatedUser.username || '匿名用户'
+      currentNote.value.userPic = updatedUser.userPic || ''
+    }
+  }
+}
+
 // 生命周期
 onMounted(async () => {
   // 先加载用户信息和话题列表
@@ -836,11 +898,16 @@ onMounted(async () => {
   updateColumnCount()
   window.addEventListener('scroll', handleScroll)
   window.addEventListener('resize', updateColumnCount)
+  
+  // 监听用户信息更新事件
+  window.addEventListener('userInfoUpdated', handleUserInfoUpdate)
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', updateColumnCount)
+  // 移除用户信息更新事件监听
+  window.removeEventListener('userInfoUpdated', handleUserInfoUpdate)
 })
 </script>
 
@@ -890,6 +957,7 @@ onUnmounted(() => {
 
     <!-- 瀑布流内容区 -->
     <div class="waterfall-container" v-loading="loading && pageNum === 1">
+      <!-- 无笔记，空状态 -->
       <div v-if="notes.length === 0 && !loading" class="empty-state">
         <el-icon class="empty-icon"><PictureFilled /></el-icon>
         <p class="empty-text">暂无内容</p>
@@ -905,7 +973,9 @@ onUnmounted(() => {
             @click="viewDetail(note)"
           >
             <article class="note-card xhs-note-card">
+              <!-- 媒体区域 -->
               <div class="card-media" :class="getMediaAspectClass(note)">
+                <!-- 视频内容 -->
                 <div v-if="note.noteCategory === 'video'" class="video-container">
                   <video
                     :src="note.video"
@@ -921,12 +991,14 @@ onUnmounted(() => {
                     @ended="() => onVideoEnded(note.id)"
                   ></video>
 
+                  <!-- 视频播放遮罩 -->
                   <div class="video-overlay" @click.stop="toggleVideoPlay(note.id, $event)">
                     <el-icon v-if="!videoPlayers[note.id]?.isPlaying" class="play-icon">
                       <VideoPlay />
                     </el-icon>
                   </div>
 
+                  <!-- 视频进度条 -->
                   <div class="video-progress" @click.stop="onVideoSeek(note.id, $event)">
                     <div class="progress-bar">
                       <div
@@ -936,12 +1008,14 @@ onUnmounted(() => {
                     </div>
                   </div>
 
+                  <!-- 视频标识 -->
                   <div class="video-badge">
                     <el-icon><VideoPlay /></el-icon>
                     <span>视频</span>
                   </div>
                 </div>
 
+                <!-- 图片内容 -->
                 <img
                   v-else
                   :src="getCoverImage(note)"
@@ -950,13 +1024,23 @@ onUnmounted(() => {
                   @error="onImgError"
                   class="card-image"
                 />
+
+                <!-- 悬停遮罩层（小红书风格） -->
+                <div class="card-hover-overlay">
+                  <div class="hover-actions">
+                    <button class="action-btn view-btn" @click.stop="viewDetail(note)">
+                      <el-icon><View /></el-icon>
+                      <span>查看</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
+              <!-- 卡片内容区 -->
               <div class="xhs-card-body">
                 <h3 class="xhs-title">{{ note.title }}</h3>
                 <div class="xhs-meta-row">
                   <div class="xhs-author">
-                    <!--                    <span v-if="!note.userPic" class="xhs-avatar" aria-hidden="true">👤</span>-->
                     <img
                       v-if="note.userPic"
                       :src="note.userPic"
@@ -1004,7 +1088,7 @@ onUnmounted(() => {
     <el-dialog
       v-model="showDetailDialog"
       :show-close="true"
-      width="80%"
+      width="90%"
       class="detail-dialog"
       @close="closeDialog"
     >
@@ -1338,22 +1422,35 @@ onUnmounted(() => {
 
 .waterfall-item {
   cursor: pointer;
-  transition: transform 0.22s ease;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: fadeInUp 0.5s ease-out;
 
   &:hover {
-    transform: translateY(-3px);
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
 .xhs-note-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  transition: box-shadow 0.22s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
   }
 }
 
@@ -1378,6 +1475,72 @@ onUnmounted(() => {
   &.media-ar-5-7 {
     aspect-ratio: 5 / 7;
   }
+
+  &.media-ar-video {
+    aspect-ratio: 9 / 12;
+  }
+
+  // 悬停遮罩层（小红书风格）
+  .card-hover-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+
+    .hover-actions {
+      display: flex;
+      gap: 12px;
+      transform: scale(0.8);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+      .action-btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        color: #333;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+        .el-icon {
+          font-size: 16px;
+        }
+
+        &:hover {
+          background: #fff;
+          transform: scale(1.05);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
+      }
+    }
+  }
+
+  &:hover .card-hover-overlay {
+    opacity: 1;
+
+    .hover-actions {
+      transform: scale(1);
+    }
+  }
 }
 
 .card-video {
@@ -1386,6 +1549,12 @@ onUnmounted(() => {
   object-fit: cover;
   display: block;
   vertical-align: top;
+  background: #000;
+  transition: transform 0.3s ease;
+
+  .video-container:hover & {
+    transform: scale(1.02);
+  }
 }
 
 .card-image {
@@ -1393,6 +1562,11 @@ onUnmounted(() => {
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform 0.3s ease;
+
+  .card-media:hover & {
+    transform: scale(1.05);
+  }
 }
 
 // 视频容器
@@ -1425,9 +1599,15 @@ onUnmounted(() => {
     }
 
     .play-icon {
-      font-size: 48px;
+      font-size: 56px;
       color: white;
-      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+      transform: scale(0.9);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    &:hover .play-icon {
+      transform: scale(1);
     }
   }
 
@@ -1437,7 +1617,13 @@ onUnmounted(() => {
     left: 0;
     right: 0;
     padding: 8px 12px;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.5), transparent);
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+
+    .card-media:hover & {
+      opacity: 1;
+    }
 
     .progress-bar {
       height: 4px;
@@ -1463,7 +1649,7 @@ onUnmounted(() => {
     position: absolute;
     top: 12px;
     right: 12px;
-    padding: 4px 10px;
+    padding: 6px 12px;
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(8px);
     border-radius: 12px;
@@ -1472,11 +1658,27 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     gap: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+
+    .el-icon {
+      font-size: 14px;
+    }
+
+    .card-media:hover & {
+      transform: scale(1.05);
+      background: rgba(0, 0, 0, 0.7);
+    }
   }
 }
 
 .xhs-card-body {
-  padding: 10px 10px 12px;
+  padding: 12px 12px 14px;
+  transition: background-color 0.2s ease;
+
+  .xhs-note-card:hover & {
+    background-color: #fafafa;
+  }
 }
 
 .xhs-title {
@@ -1484,12 +1686,17 @@ onUnmounted(() => {
   font-weight: 500;
   color: #333;
   margin: 0 0 10px;
-  line-height: 1.45;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: calc(1.45em * 2);
+  min-height: calc(1.5em * 2);
+  transition: color 0.2s ease;
+
+  .xhs-note-card:hover & {
+    color: #ff2442;
+  }
 }
 
 .xhs-meta-row {
@@ -1504,6 +1711,11 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  transition: opacity 0.2s ease;
+
+  .xhs-note-card:hover & {
+    opacity: 0.8;
+  }
 }
 
 .xhs-avatar {
@@ -1523,6 +1735,11 @@ onUnmounted(() => {
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
+
+  .xhs-author:hover & {
+    transform: scale(1.1);
+  }
 }
 
 .xhs-name {
@@ -1531,13 +1748,18 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color 0.2s ease;
+
+  .xhs-note-card:hover & {
+    color: #333;
+  }
 }
 
 .xhs-like {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 4px 8px;
+  padding: 6px 10px;
   margin: 0;
   border: none;
   border-radius: 999px;
@@ -1546,22 +1768,34 @@ onUnmounted(() => {
   color: #999;
   cursor: pointer;
   flex-shrink: 0;
-  transition:
-    color 0.2s ease,
-    background 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
   .el-icon {
     font-size: 14px;
+    transition: transform 0.2s ease;
   }
 
   &:hover {
     color: #ff2442;
-    background: rgba(255, 36, 66, 0.06);
+    background: rgba(255, 36, 66, 0.08);
+    transform: scale(1.05);
+
+    .el-icon {
+      transform: scale(1.1);
+    }
+  }
+
+  &:active {
+    transform: scale(0.95);
   }
 
   &.liked {
     color: #ff2442;
-    background: rgba(255, 36, 66, 0.08);
+    background: rgba(255, 36, 66, 0.1);
+
+    .el-icon {
+      animation: heartBeat 0.5s ease;
+    }
   }
 }
 
@@ -1643,37 +1877,49 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow-y: auto;
+  
+  min-height: 60vh;
 }
 
 .detail-video-wrapper {
   width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
 
   .detail-video {
     width: 100%;
-    max-height: 80vh;
+    height: 100%;
+    max-height: 85vh;
     object-fit: contain;
+    background: #000;
   }
 }
 
 .detail-images {
+  position: relative;
+  width: 100%;
+  height: 100vh;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  padding: 0;
 
   .image-gallery {
     position: relative;
     width: 100%;
+    height: 100%;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
   }
 
   .detail-image {
-    width: 100%;
-    max-height: 70vh;
+    max-width: 100%;
+    max-height: 100%;
     object-fit: contain;
     border-radius: 8px;
   }
@@ -1686,15 +1932,16 @@ onUnmounted(() => {
     transform: translateY(-50%);
     display: flex;
     justify-content: space-between;
-    padding: 0 16px;
+    padding: 0 20px;
     pointer-events: none;
+    z-index: 10;
 
     .nav-btn {
-      width: 40px;
-      height: 40px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
-      background: rgba(0, 0, 0, 0.5);
-      border: none;
+      background: rgba(0, 0, 0, 0.6);
+      border: 2px solid rgba(255, 255, 255, 0.3);
       color: white;
       cursor: pointer;
       display: flex;
@@ -1702,28 +1949,34 @@ onUnmounted(() => {
       justify-content: center;
       transition: all 0.3s ease;
       pointer-events: auto;
+      backdrop-filter: blur(4px);
 
       &:hover {
-        background: rgba(0, 0, 0, 0.7);
-        transform: scale(1.1);
+        background: rgba(0, 0, 0, 0.8);
+        border-color: rgba(255, 255, 255, 0.5);
+        transform: scale(1.15);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
       }
 
       .el-icon {
-        font-size: 20px;
+        font-size: 24px;
       }
     }
   }
 
   .image-indicator {
     position: absolute;
-    bottom: 16px;
+    bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.7);
     color: white;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 12px;
+    padding: 6px 16px;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 500;
+    backdrop-filter: blur(4px);
+    z-index: 10;
   }
 }
 
@@ -2035,6 +2288,14 @@ onUnmounted(() => {
   .detail-content {
     grid-template-columns: 1fr;
   }
+  
+  .detail-left {
+    min-height: 50vh;
+  }
+  
+  .detail-video-wrapper .detail-video {
+    max-height: 60vh;
+  }
 }
 
 @media (max-width: 768px) {
@@ -2059,6 +2320,18 @@ onUnmounted(() => {
     bottom: 60px;
     width: 40px;
     height: 40px;
+  }
+  
+  .detail-dialog {
+    width: 95% !important;
+  }
+  
+  .detail-left {
+    min-height: 40vh;
+  }
+  
+  .detail-video-wrapper .detail-video {
+    max-height: 50vh;
   }
 }
 </style>

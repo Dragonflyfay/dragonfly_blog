@@ -37,6 +37,9 @@ const updateAvatar = async () => {
   }
   //修改pinia中的用户信息
   userInfoStore.info.userPic = imgUrl.value
+  
+  // 触发全局事件，通知其他组件更新
+  window.dispatchEvent(new CustomEvent('userInfoUpdated', { detail: userInfoStore.info }))
 }
 </script>
 

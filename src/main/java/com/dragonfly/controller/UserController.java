@@ -37,8 +37,8 @@ public class UserController {
     private StringRedisTemplate stringRedisTemplate;
 
     @PostMapping("/register")
-    //用Spring Validation注解对参数进行校验，要求用户名和密码必须是5-16位的非空字符串
-    public Result register(@Pattern(regexp = "^\\S{5,16}$") String username, @Pattern(regexp = "^\\S{5,16}$") String password) {
+    //用Spring Validation注解对参数进行校验，要求用户名和密码必须是1-15位的非空字符串
+    public Result register(@Pattern(regexp = "^\\S{1,15}$") String username, @Pattern(regexp = "^\\S{5,16}$") String password) {
         //查询用户
         User u = userService.findByUserName(username);
         //判断
@@ -56,7 +56,7 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public Result<String> login(@Pattern(regexp = "^\\S{5,16}$") String username, @Pattern(regexp = "^\\S{5,16}$") String password) {
+    public Result<String> login(@Pattern(regexp = "^\\S{1,15}$") String username, @Pattern(regexp = "^\\S{5,16}$") String password) {
         //根据用户名查询用户
         User loginUser = userService.findByUserName(username);
 
