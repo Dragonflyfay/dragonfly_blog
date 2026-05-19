@@ -242,6 +242,9 @@ const loadNotes = async () => {
 
       // 为每个笔记填充真实的用户信息和确保统计数据有效
       notes.value.forEach((note) => {
+        // 初始化图片加载状态
+        note.imageLoaded = false
+        
         // 填充用户信息 - 优先使用缓存中的最新信息
         if (note.createUser) {
           const userInfo = getUserInfo(note.createUser)
@@ -265,14 +268,14 @@ const loadNotes = async () => {
         note.commentsCount = note.commentsCount || 0
         note.favoritesCount = note.favoritesCount || 0
       })
-      
+
       // 检查是否有未缓存的用户，异步获取并更新
       const missingUserIds = [...new Set(
         notes.value
           .filter(note => note.createUser && !userInfoCache.has(note.createUser))
           .map(note => note.createUser)
       )]
-      
+
       if (missingUserIds.length > 0) {
         // 异步获取缺失的用户信息，不阻塞当前渲染
         setTimeout(async () => {
@@ -296,7 +299,20 @@ const loadNotes = async () => {
 // 图片加载错误处理
 const onImgError = (e) => {
   const el = e.target
-  if (el) el.src = PLACEHOLDER_IMG
+  if (el && el.src !== PLACEHOLDER_IMG) {
+    el.src = PLACEHOLDER_IMG
+  }
+}
+
+// 图片加载完成处理
+const onCardImageLoad = (e) => {
+  const img = e.target
+  if (img) {
+    // 确保图片正确显示，添加淡入效果
+    requestAnimationFrame(() => {
+      img.style.opacity = '1'
+    })
+  }
 }
 
 // 获取封面图
@@ -323,6 +339,7 @@ const generateVideoThumbnail = (videoUrl) => {
 // 图片轮播相关
 const currentImageIndex = ref(0)
 const showImageGallery = ref(false)
+const imageLoaded = ref(true)
 
 // 打开图片画廊
 const openImageGallery = (note, index = 0) => {
@@ -337,9 +354,15 @@ const closeImageGallery = () => {
   currentImageIndex.value = 0
 }
 
+// 图片加载完成
+const onImageLoad = () => {
+  imageLoaded.value = true
+}
+
 // 上一张图片
 const prevImage = () => {
   if (currentNote.value && currentNote.value.images) {
+    imageLoaded.value = false
     currentImageIndex.value =
       (currentImageIndex.value - 1 + currentNote.value.images.length) %
       currentNote.value.images.length
@@ -349,6 +372,7 @@ const prevImage = () => {
 // 下一张图片
 const nextImage = () => {
   if (currentNote.value && currentNote.value.images) {
+    imageLoaded.value = false
     currentImageIndex.value = (currentImageIndex.value + 1) % currentNote.value.images.length
   }
 }
@@ -406,8 +430,9 @@ const viewDetail = async (note) => {
 
     showDetailDialog.value = true
 
-    // 重置图片索引
+    // 重置图片索引和加载状态
     currentImageIndex.value = 0
+    imageLoaded.value = false
 
     // 记录浏览
     await recordView(note.id)
@@ -844,7 +869,7 @@ const estimateNoteHeight = (note) => {
   return media + titleBonus + 0.26
 }
 
-/** 小红书式瀑布流：按估算高度依次放入当前最短的列 */
+/** 瀑布流：按估算高度依次放入当前最短的列 */
 const waterfallColumns = computed(() => {
   const n = Math.max(1, columnCount.value)
   const cols = Array.from({ length: n }, () => [])
@@ -872,7 +897,7 @@ const handleUserInfoUpdate = (event) => {
       // 如果缓存中没有，添加新用户信息
       userInfoCache.set(updatedUser.id, updatedUser)
     }
-    
+
     // 更新当前页面中所有该用户的笔记显示
     notes.value.forEach(note => {
       if (note.createUser === updatedUser.id) {
@@ -880,7 +905,7 @@ const handleUserInfoUpdate = (event) => {
         note.userPic = updatedUser.userPic || ''
       }
     })
-    
+
     // 如果当前正在查看笔记详情，也更新详情中的用户信息
     if (currentNote.value && currentNote.value.createUser === updatedUser.id) {
       currentNote.value.userName = updatedUser.nickname || updatedUser.username || '匿名用户'
@@ -898,7 +923,7 @@ onMounted(async () => {
   updateColumnCount()
   window.addEventListener('scroll', handleScroll)
   window.addEventListener('resize', updateColumnCount)
-  
+
   // 监听用户信息更新事件
   window.addEventListener('userInfoUpdated', handleUserInfoUpdate)
 })
@@ -1016,14 +1041,19 @@ onUnmounted(() => {
                 </div>
 
                 <!-- 图片内容 -->
-                <img
-                  v-else
-                  :src="getCoverImage(note)"
-                  :alt="note.title"
-                  loading="lazy"
-                  @error="onImgError"
-                  class="card-image"
-                />
+                <template v-else>
+                  <!-- 图片加载中骨架屏 -->
+                  <div class="image-skeleton" v-if="!note.imageLoaded"></div>
+                  <img
+                    :src="getCoverImage(note)"
+                    :alt="note.title"
+                    loading="lazy"
+                    @error="onImgError"
+                    @load="(e) => { onCardImageLoad(e); note.imageLoaded = true }"
+                    class="card-image"
+                    :class="{ 'image-loaded': note.imageLoaded }"
+                  />
+                </template>
 
                 <!-- 悬停遮罩层（小红书风格） -->
                 <div class="card-hover-overlay">
@@ -1116,7 +1146,9 @@ onUnmounted(() => {
                 :src="currentNote.images[currentImageIndex] || currentNote.coverImg"
                 :alt="`图片${currentImageIndex + 1}`"
                 @error="onImgError"
+                @load="onImageLoad"
                 class="detail-image"
+                :class="{ 'image-loading': !imageLoaded }"
               />
 
               <!-- 图片导航按钮 -->
@@ -1266,7 +1298,7 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 .user-home-container {
   min-height: 100vh;
-  background: #f7f7f7;
+  background: linear-gradient(145deg, #f5f0ff 0%, #e8ddf8 50%, #fce4ec 100%);
 }
 
 // 顶部导航栏
@@ -1274,10 +1306,10 @@ onUnmounted(() => {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(10px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  padding: 12px 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  padding: 16px 0;
 
   .navbar-content {
     max-width: 1400px;
@@ -1291,12 +1323,13 @@ onUnmounted(() => {
 
   .logo-section {
     .logo-text {
-      font-size: 24px;
-      font-weight: bold;
-      background: linear-gradient(135deg, #ff2442, #ff6b8a);
+      font-size: 26px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9, #a8e6cf);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
+      letter-spacing: 1px;
     }
   }
 
@@ -1306,33 +1339,62 @@ onUnmounted(() => {
 
     .search-input {
       :deep(.el-input__wrapper) {
-        border-radius: 20px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        border-radius: 48px;
+        padding: 8px 20px;
+        background-color: #faf7ff;
+        border: 1px solid #f0e5ff;
+        transition: all 0.3s ease;
+        box-shadow: none;
+
+        &:hover {
+          border-color: #d9b8ff;
+          background-color: #fff;
+        }
+
+        &.is-focus {
+          border-color: #c5a3ff;
+          background-color: #fff;
+          box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.12);
+        }
+      }
+
+      :deep(.el-input__prefix) {
+        color: #c5a3ff;
       }
     }
   }
 
   .publish-btn {
-    background: linear-gradient(135deg, #ff2442, #ff6b8a);
+    background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
     border: none;
+    border-radius: 48px;
+    padding: 12px 28px;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    font-weight: 500;
+    color: white;
     transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(197, 163, 255, 0.2);
 
     &:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(255, 36, 66, 0.3);
+      box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
+    }
+
+    .el-icon {
+      font-size: 16px;
     }
   }
 }
 
 // 话题标签栏
 .topic-bar {
-  background: white;
-  padding: 16px 0;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.96);
+  padding: 18px 0;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(10px);
 
   .topic-scroll-wrapper {
     max-width: 1400px;
@@ -1347,31 +1409,36 @@ onUnmounted(() => {
     }
 
     &::-webkit-scrollbar-thumb {
-      background: #ddd;
+      background: linear-gradient(90deg, #e0c3ff, #c5a3ff);
       border-radius: 2px;
     }
   }
 
   .topic-tag {
-    padding: 8px 20px;
-    border-radius: 20px;
-    background: #f5f5f5;
-    color: #666;
+    padding: 10px 24px;
+    border-radius: 48px;
+    background: rgba(197, 163, 255, 0.1);
+    color: #8a6fa8;
     cursor: pointer;
     transition: all 0.3s ease;
     white-space: nowrap;
     font-size: 14px;
+    font-weight: 500;
+    border: 1px solid transparent;
 
     &:hover {
-      background: #ffeef1;
-      color: #ff2442;
+      background: rgba(197, 163, 255, 0.18);
+      color: #c5a3ff;
+      border-color: rgba(197, 163, 255, 0.3);
+      transform: translateY(-2px);
     }
 
     &.active {
-      background: linear-gradient(135deg, #ff2442, #ff6b8a);
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
       color: white;
-      font-weight: 500;
-      box-shadow: 0 4px 12px rgba(255, 36, 66, 0.25);
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+      border-color: transparent;
     }
   }
 }
@@ -1390,19 +1457,21 @@ onUnmounted(() => {
 
   .empty-icon {
     font-size: 64px;
-    color: #ddd;
+    color: #c5a3ff;
     margin-bottom: 16px;
+    animation: float 3s ease-in-out infinite;
   }
 
   .empty-text {
     font-size: 18px;
-    color: #999;
+    color: #6a4a9c;
     margin: 0 0 8px;
+    font-weight: 500;
   }
 
   .empty-hint {
     font-size: 14px;
-    color: #bbb;
+    color: #b0a7c0;
   }
 }
 
@@ -1442,15 +1511,17 @@ onUnmounted(() => {
 }
 
 .xhs-note-card {
-  background: #fff;
-  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 24px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(197, 163, 255, 0.1);
 
   &:hover {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(197, 163, 255, 0.15);
+    transform: translateY(-4px);
+    border-color: rgba(197, 163, 255, 0.2);
   }
 }
 
@@ -1459,25 +1530,40 @@ onUnmounted(() => {
   width: 100%;
   overflow: hidden;
   background: #f0f0f0;
-
-  &.media-ar-1-1 {
-    aspect-ratio: 1 / 1;
+  
+  // 统一所有卡片的宽高比，确保瀑布流整齐
+  aspect-ratio: 3 / 4;
+  
+  .card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    
+    &.image-loaded {
+      opacity: 1;
+    }
   }
 
-  &.media-ar-4-5 {
-    aspect-ratio: 4 / 5;
+  // 图片骨架屏
+  .image-skeleton {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+    z-index: 1;
   }
 
-  &.media-ar-3-4 {
-    aspect-ratio: 3 / 4;
-  }
 
-  &.media-ar-5-7 {
-    aspect-ratio: 5 / 7;
-  }
 
   &.media-ar-video {
-    aspect-ratio: 9 / 12;
+    aspect-ratio: 9 / 16;
   }
 
   // 悬停遮罩层（小红书风格）
@@ -1487,8 +1573,8 @@ onUnmounted(() => {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(2px);
+    background: linear-gradient(135deg, rgba(197, 163, 255, 0.4), rgba(248, 180, 217, 0.4));
+    backdrop-filter: blur(3px);
     opacity: 0;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
@@ -1505,9 +1591,9 @@ onUnmounted(() => {
       .action-btn {
         padding: 10px 20px;
         border: none;
-        border-radius: 20px;
+        border-radius: 48px;
         background: rgba(255, 255, 255, 0.95);
-        color: #333;
+        color: #c5a3ff;
         font-size: 14px;
         font-weight: 500;
         cursor: pointer;
@@ -1515,7 +1601,7 @@ onUnmounted(() => {
         align-items: center;
         gap: 6px;
         transition: all 0.2s ease;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.2);
 
         .el-icon {
           font-size: 16px;
@@ -1524,7 +1610,8 @@ onUnmounted(() => {
         &:hover {
           background: #fff;
           transform: scale(1.05);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+          box-shadow: 0 6px 16px rgba(197, 163, 255, 0.3);
+          color: #f8b4d9;
         }
 
         &:active {
@@ -1562,7 +1649,8 @@ onUnmounted(() => {
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.3s ease;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 
   .card-media:hover & {
     transform: scale(1.05);
@@ -1590,7 +1678,7 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.2);
+    background: linear-gradient(135deg, rgba(197, 163, 255, 0.3), rgba(248, 180, 217, 0.3));
     opacity: 0;
     transition: opacity 0.3s ease;
 
@@ -1601,7 +1689,7 @@ onUnmounted(() => {
     .play-icon {
       font-size: 56px;
       color: white;
-      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+      filter: drop-shadow(0 4px 12px rgba(197, 163, 255, 0.4));
       transform: scale(0.9);
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -1638,7 +1726,7 @@ onUnmounted(() => {
 
       .progress-fill {
         height: 100%;
-        background: linear-gradient(90deg, #ff2442, #ff6b8a);
+        background: linear-gradient(90deg, #c5a3ff, #f8b4d9);
         border-radius: 2px;
         transition: width 0.1s linear;
       }
@@ -1650,15 +1738,15 @@ onUnmounted(() => {
     top: 12px;
     right: 12px;
     padding: 6px 12px;
-    background: rgba(0, 0, 0, 0.6);
+    background: linear-gradient(135deg, rgba(197, 163, 255, 0.8), rgba(248, 180, 217, 0.8));
     backdrop-filter: blur(8px);
-    border-radius: 12px;
+    border-radius: 48px;
     color: white;
     font-size: 12px;
     display: flex;
     align-items: center;
     gap: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
     transition: all 0.3s ease;
 
     .el-icon {
@@ -1667,7 +1755,7 @@ onUnmounted(() => {
 
     .card-media:hover & {
       transform: scale(1.05);
-      background: rgba(0, 0, 0, 0.7);
+      background: linear-gradient(135deg, rgba(197, 163, 255, 0.95), rgba(248, 180, 217, 0.95));
     }
   }
 }
@@ -1684,7 +1772,7 @@ onUnmounted(() => {
 .xhs-title {
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: #4a4a6a;
   margin: 0 0 10px;
   line-height: 1.5;
   display: -webkit-box;
@@ -1695,7 +1783,7 @@ onUnmounted(() => {
   transition: color 0.2s ease;
 
   .xhs-note-card:hover & {
-    color: #ff2442;
+    color: #c5a3ff;
   }
 }
 
@@ -1722,12 +1810,13 @@ onUnmounted(() => {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ffeef8, #e8f4ff);
+  background: linear-gradient(135deg, #e0c3ff, #c5a3ff);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
   flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(197, 163, 255, 0.2);
 }
 .author-avatar-img {
   width: 22px;
@@ -1744,14 +1833,14 @@ onUnmounted(() => {
 
 .xhs-name {
   font-size: 12px;
-  color: #666;
+  color: #8a7a9a;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   transition: color 0.2s ease;
 
   .xhs-note-card:hover & {
-    color: #333;
+    color: #6a5a7a;
   }
 }
 
@@ -1759,10 +1848,10 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   margin: 0;
   border: none;
-  border-radius: 999px;
+  border-radius: 48px;
   background: transparent;
   font-size: 12px;
   color: #999;
@@ -1776,8 +1865,8 @@ onUnmounted(() => {
   }
 
   &:hover {
-    color: #ff2442;
-    background: rgba(255, 36, 66, 0.08);
+    color: #c5a3ff;
+    background: rgba(197, 163, 255, 0.1);
     transform: scale(1.05);
 
     .el-icon {
@@ -1790,8 +1879,8 @@ onUnmounted(() => {
   }
 
   &.liked {
-    color: #ff2442;
-    background: rgba(255, 36, 66, 0.1);
+    color: #c5a3ff;
+    background: rgba(197, 163, 255, 0.15);
 
     .el-icon {
       animation: heartBeat 0.5s ease;
@@ -1804,7 +1893,7 @@ onUnmounted(() => {
 .no-more {
   text-align: center;
   padding: 24px;
-  color: #999;
+  color: #b0a7c0;
   font-size: 14px;
   display: flex;
   align-items: center;
@@ -1817,9 +1906,9 @@ onUnmounted(() => {
   position: fixed;
   right: 32px;
   bottom: 80px;
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, #ff2442, #ff6b8a);
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
   border-radius: 50%;
   display: flex;
   flex-direction: column;
@@ -1827,22 +1916,23 @@ onUnmounted(() => {
   justify-content: center;
   color: white;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(255, 36, 66, 0.3);
+  box-shadow: 0 6px 16px rgba(197, 163, 255, 0.3);
   transition: all 0.3s ease;
   z-index: 99;
 
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 6px 16px rgba(255, 36, 66, 0.4);
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 8px 24px rgba(197, 163, 255, 0.4);
   }
 
   .el-icon {
-    font-size: 20px;
+    font-size: 22px;
   }
 
   span {
     font-size: 10px;
     margin-top: 2px;
+    font-weight: 500;
   }
 }
 
@@ -1859,8 +1949,34 @@ onUnmounted(() => {
 
 // 详情弹窗
 .detail-dialog {
+  border-radius: 30px;
+  overflow: hidden;
+
+  :deep(.el-dialog__header) {
+    background: linear-gradient(135deg, #f8b4d9 0%, #c5a3ff 100%);
+    padding: 20px;
+    margin: 0;
+
+    .el-dialog__title {
+      color: white;
+      font-weight: 600;
+    }
+
+    .el-dialog__headerbtn {
+      .el-dialog__close {
+        color: white;
+        font-size: 20px;
+
+        &:hover {
+          color: rgba(255, 255, 255, 0.8);
+        }
+      }
+    }
+  }
+
   :deep(.el-dialog__body) {
     padding: 0;
+    background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
   }
 }
 
@@ -1870,15 +1986,18 @@ onUnmounted(() => {
   gap: 0;
   max-height: 80vh;
   overflow: hidden;
+  border-radius: 30px;
 }
 
 .detail-left {
-  background: #000;
+  background: linear-gradient(135deg, #f0e5ff, #fce4ec);
   display: flex;
   align-items: center;
   justify-content: center;
-  
   min-height: 60vh;
+  max-height: 90vh;
+  border-radius: 30px 0 0 30px;
+  overflow: hidden;
 }
 
 .detail-video-wrapper {
@@ -1887,26 +2006,28 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
+  background: transparent;
 
   .detail-video {
     width: 100%;
     height: 100%;
     max-height: 85vh;
     object-fit: contain;
-    background: #000;
+    background: transparent;
+    border-radius: 20px;
   }
 }
 
 .detail-images {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: 100%;
+  min-height: 60vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
-  padding: 0;
+  background: transparent;
+  padding: 20px;
 
   .image-gallery {
     position: relative;
@@ -1919,9 +2040,17 @@ onUnmounted(() => {
 
   .detail-image {
     max-width: 100%;
-    max-height: 100%;
+    max-height: 85vh;
+    width: auto;
+    height: auto;
     object-fit: contain;
-    border-radius: 8px;
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    transition: opacity 0.3s ease;
+
+    &.image-loading {
+      opacity: 0;
+    }
   }
 
   .image-nav {
@@ -1940,8 +2069,8 @@ onUnmounted(() => {
       width: 48px;
       height: 48px;
       border-radius: 50%;
-      background: rgba(0, 0, 0, 0.6);
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+      border: 2px solid rgba(255, 255, 255, 0.8);
       color: white;
       cursor: pointer;
       display: flex;
@@ -1950,12 +2079,13 @@ onUnmounted(() => {
       transition: all 0.3s ease;
       pointer-events: auto;
       backdrop-filter: blur(4px);
+      box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
 
       &:hover {
-        background: rgba(0, 0, 0, 0.8);
-        border-color: rgba(255, 255, 255, 0.5);
+        background: linear-gradient(135deg, #f8b4d9, #c5a3ff);
+        border-color: white;
         transform: scale(1.15);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 6px 16px rgba(197, 163, 255, 0.4);
       }
 
       .el-icon {
@@ -1969,27 +2099,31 @@ onUnmounted(() => {
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.7);
+    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
     color: white;
     padding: 6px 16px;
-    border-radius: 16px;
+    border-radius: 48px;
     font-size: 13px;
     font-weight: 500;
     backdrop-filter: blur(4px);
     z-index: 10;
+    box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
   }
 }
 
 .detail-right {
   padding: 32px;
   overflow-y: auto;
-  background: white;
+  background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
 }
 
 .detail-title {
   font-size: 24px;
   font-weight: bold;
-  color: #333;
+  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   margin: 0 0 16px;
   line-height: 1.4;
 }
@@ -2013,20 +2147,24 @@ onUnmounted(() => {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ffeef8, #e8f4ff);
-  color: #ff2442;
+  background: linear-gradient(135deg, #e0c3ff, #c5a3ff);
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
   font-size: 18px;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(197, 163, 255, 0.3);
 }
 
 .author-name-detail {
   font-size: 16px;
   font-weight: 500;
-  color: #333;
+  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .detail-meta {
@@ -2037,7 +2175,7 @@ onUnmounted(() => {
 
   .meta-item {
     font-size: 14px;
-    color: #666;
+    color: #8a7a9a;
   }
 }
 
@@ -2048,24 +2186,32 @@ onUnmounted(() => {
   flex-wrap: wrap;
 
   .stat-badge {
-    padding: 6px 12px;
-    background: #f5f5f5;
-    border-radius: 16px;
+    padding: 6px 14px;
+    background: rgba(197, 163, 255, 0.1);
+    border-radius: 48px;
     font-size: 13px;
-    color: #666;
+    color: #8a7a9a;
     display: flex;
     align-items: center;
     gap: 4px;
     cursor: pointer;
     transition: all 0.3s ease;
+    border: 1px solid rgba(197, 163, 255, 0.15);
 
     .el-icon {
       font-size: 14px;
     }
 
+    &:hover {
+      background: rgba(197, 163, 255, 0.18);
+      border-color: rgba(197, 163, 255, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(197, 163, 255, 0.15);
+    }
+
     &.like-badge {
       &.liked {
-        background: linear-gradient(135deg, #ff2442, #ff6b8a);
+        background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
         color: white;
 
         .el-icon {
@@ -2075,14 +2221,14 @@ onUnmounted(() => {
 
       &:hover {
         transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(255, 36, 66, 0.2);
+        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
       }
     }
 
     &.favorite-badge {
       &.favorited {
-        background: linear-gradient(135deg, #ffa726, #ffb74d);
-        color: white;
+        background: linear-gradient(135deg, #a8e6cf, #7ee0b5);
+        color: #2c665a;
 
         .el-icon {
           animation: heartBeat 0.5s ease;
@@ -2091,7 +2237,7 @@ onUnmounted(() => {
 
       &:hover {
         transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(255, 167, 38, 0.2);
+        box-shadow: 0 4px 12px rgba(168, 230, 207, 0.3);
       }
     }
   }
@@ -2115,6 +2261,25 @@ onUnmounted(() => {
   }
 }
 
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
 .like-animation {
   animation: heartBeat 0.5s ease;
 }
@@ -2122,11 +2287,11 @@ onUnmounted(() => {
 .detail-body {
   font-size: 15px;
   line-height: 1.8;
-  color: #333;
+  color: #4a4a6a;
 
   :deep(img) {
     max-width: 100%;
-    border-radius: 8px;
+    border-radius: 12px;
     margin: 12px 0;
   }
 }
@@ -2135,27 +2300,54 @@ onUnmounted(() => {
 .comment-section {
   margin-top: 32px;
   padding-top: 24px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid rgba(197, 163, 255, 0.15);
 }
 
 .comment-title {
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   margin: 0 0 20px;
 }
 
 .comment-input-wrapper {
   margin-bottom: 24px;
 
+  :deep(.el-textarea__inner) {
+    border-radius: 16px;
+    padding: 12px 16px;
+    background-color: #faf7ff;
+    border: 1px solid #f0e5ff;
+    transition: all 0.3s ease;
+    box-shadow: none;
+
+    &:hover {
+      border-color: #d9b8ff;
+      background-color: #fff;
+    }
+
+    &:focus {
+      border-color: #c5a3ff;
+      background-color: #fff;
+      box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.12);
+    }
+  }
+
   .submit-comment-btn {
     margin-top: 12px;
-    background: linear-gradient(135deg, #ff2442, #ff6b8a);
+    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
     border: none;
+    border-radius: 48px;
+    padding: 10px 24px;
+    font-weight: 500;
+    transition: all 0.3s ease;
 
     &:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(255, 36, 66, 0.3);
+      box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
     }
   }
 }
@@ -2169,7 +2361,7 @@ onUnmounted(() => {
   display: flex;
   gap: 12px;
   padding: 16px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid rgba(197, 163, 255, 0.1);
 
   &:last-child {
     border-bottom: none;
@@ -2180,12 +2372,13 @@ onUnmounted(() => {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ffeef8, #e8f4ff);
+  background: linear-gradient(135deg, #e0c3ff, #c5a3ff);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(197, 163, 255, 0.2);
 }
 
 .comment-content {
@@ -2202,7 +2395,10 @@ onUnmounted(() => {
 
 .comment-author {
   font-weight: 500;
-  color: #333;
+  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   font-size: 14px;
 }
 
@@ -2214,7 +2410,7 @@ onUnmounted(() => {
 .comment-text {
   font-size: 14px;
   line-height: 1.6;
-  color: #666;
+  color: #6a5a7a;
   margin-bottom: 8px;
   word-break: break-word;
 }
@@ -2229,21 +2425,21 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
-  border-radius: 12px;
+  padding: 4px 10px;
+  border-radius: 48px;
   font-size: 12px;
   color: #999;
   cursor: pointer;
   transition: all 0.3s ease;
 
   &:hover {
-    background: #f5f5f5;
-    color: #ff2442;
+    background: rgba(197, 163, 255, 0.1);
+    color: #c5a3ff;
   }
 
   &.liked {
-    color: #ff2442;
-    background: #ffeef1;
+    color: #c5a3ff;
+    background: rgba(197, 163, 255, 0.15);
 
     .el-icon {
       animation: heartBeat 0.5s ease;
@@ -2257,15 +2453,15 @@ onUnmounted(() => {
 
 .comment-reply-btn {
   font-size: 12px;
-  color: #999;
+  color: #8a7a9a;
   cursor: pointer;
   transition: all 0.3s ease;
-  padding: 4px 8px;
-  border-radius: 12px;
+  padding: 4px 10px;
+  border-radius: 48px;
 
   &:hover {
-    background: #f5f5f5;
-    color: #ff2442;
+    background: rgba(197, 163, 255, 0.1);
+    color: #c5a3ff;
   }
 }
 
@@ -2279,7 +2475,7 @@ onUnmounted(() => {
 .no-comments {
   text-align: center;
   padding: 40px 20px;
-  color: #999;
+  color: #b0a7c0;
   font-size: 14px;
 }
 
@@ -2288,11 +2484,13 @@ onUnmounted(() => {
   .detail-content {
     grid-template-columns: 1fr;
   }
-  
+
   .detail-left {
     min-height: 50vh;
+    max-height: 70vh;
+    border-radius: 30px 30px 0 0;
   }
-  
+
   .detail-video-wrapper .detail-video {
     max-height: 60vh;
   }
@@ -2318,18 +2516,20 @@ onUnmounted(() => {
   .back-to-top {
     right: 16px;
     bottom: 60px;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
   }
-  
+
   .detail-dialog {
     width: 95% !important;
   }
-  
+
   .detail-left {
     min-height: 40vh;
+    max-height: 60vh;
+    border-radius: 30px 30px 0 0;
   }
-  
+
   .detail-video-wrapper .detail-video {
     max-height: 50vh;
   }

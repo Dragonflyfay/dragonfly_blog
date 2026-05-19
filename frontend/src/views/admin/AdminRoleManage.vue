@@ -268,42 +268,205 @@ onMounted(() => {
 <style lang="scss" scoped>
 .admin-role-manage-container {
   padding: 20px;
-  background: #f5f7fa;
+  background: linear-gradient(145deg, #f5f0ff 0%, #e8ddf8 50%, #fce4ec 100%);
   min-height: calc(100vh - 60px);
 }
 
 .search-bar {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.96);
   padding: 16px 20px;
-  border-radius: 8px;
+  border-radius: 30px;
   margin-bottom: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
+
+  :deep(.el-input__wrapper) {
+    border-radius: 48px;
+    padding: 8px 20px;
+    background-color: #faf7ff;
+    border: 1px solid #f0e5ff;
+    transition: all 0.3s ease;
+    box-shadow: none;
+
+    &:hover {
+      border-color: #d9b8ff;
+      background-color: #fff;
+    }
+
+    &.is-focus {
+      border-color: #c5a3ff;
+      background-color: #fff;
+      box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.12);
+    }
+  }
+
+  :deep(.el-button) {
+    border-radius: 48px;
+    padding: 10px 20px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+
+    &.el-button--primary {
+      background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
+      border: none;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
+      }
+    }
+  }
 }
 
 .action-bar {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.96);
   padding: 16px 20px;
-  border-radius: 8px;
+  border-radius: 30px;
   margin-bottom: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
+
+  :deep(.el-button) {
+    border-radius: 48px;
+    padding: 10px 20px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+
+    &.el-button--primary {
+      background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
+      border: none;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
+      }
+    }
+
+    &.el-button--danger {
+      background: linear-gradient(135deg, #ff9e9e 0%, #ffbaba 100%);
+      border: none;
+      color: white;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(255, 158, 158, 0.4);
+      }
+    }
+  }
 }
 
 .table-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 30px;
+  padding: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
+
+  :deep(.el-table) {
+    border-radius: 20px;
+    overflow: hidden;
+
+    .el-table__header {
+      th {
+        background: linear-gradient(135deg, #f8f3ff 0%, #faf7ff 100%);
+        color: #6a4a9c;
+        font-weight: 600;
+        font-size: 14px;
+      }
+    }
+
+    .el-table__body {
+      tr {
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: rgba(197, 163, 255, 0.08);
+          transform: scale(1.005);
+        }
+      }
+
+      td {
+        padding: 14px 0;
+      }
+    }
+  }
+
+  :deep(.el-tag) {
+    border-radius: 48px;
+    padding: 4px 12px;
+    font-weight: 500;
+    border: none;
+
+    &.el-tag--warning {
+      background: linear-gradient(135deg, #ffa726, #ffb74d);
+      color: white;
+    }
+
+    &.el-tag--danger {
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+      color: white;
+    }
+  }
+
+  :deep(.el-button) {
+    border-radius: 48px;
+    padding: 8px 16px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+    }
+
+    &.el-button--warning {
+      background: linear-gradient(135deg, #ffa726, #ffb74d);
+      border: none;
+      color: white;
+
+      &:hover {
+        box-shadow: 0 4px 12px rgba(255, 167, 38, 0.3);
+      }
+    }
+
+    &.el-button--info {
+      background: linear-gradient(135deg, #a8e6cf, #7ee0b5);
+      border: none;
+      color: #2c665a;
+
+      &:hover {
+        box-shadow: 0 4px 12px rgba(168, 230, 207, 0.3);
+      }
+    }
+  }
 }
 
 .pagination {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+
+  :deep(.el-pagination) {
+    .btn-prev,
+    .btn-next,
+    .el-pager li {
+      border-radius: 48px;
+      transition: all 0.3s ease;
+
+      &:hover {
+        color: #c5a3ff;
+      }
+
+      &.is-active {
+        background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+        color: white;
+      }
+    }
+  }
 }
 </style>
