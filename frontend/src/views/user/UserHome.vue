@@ -34,6 +34,11 @@ import {
   noteDetailService,
 } from '@/api/note'
 import { userInfoService, userListService } from '@/api/user.js'
+import useUserInfoStore from '@/stores/userInfo.js'
+
+// 用户信息 store
+const userInfoStore = useUserInfoStore()
+
 //用户信息缓存 - 使用 Map 提高查找效率
 const userInfoCache = new Map()
 const router = useRouter()
@@ -66,6 +71,7 @@ const videoPlayers = reactive({})
 const showDetailDialog = ref(false)
 const currentNote = ref(null)
 const dialogVideoPlayer = ref(null)
+const detailDialogRef = ref(null)
 
 // 回到顶部按钮显示状态
 const showBackToTop = ref(false)
@@ -83,10 +89,14 @@ const replyToComment = ref(null) // 回复的评论
 
 // 占位图
 const PLACEHOLDER_IMG =
-  'data:image/svg+xml,' +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="533" viewBox="0 0 400 533"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffeef8"/><stop offset="100%" stop-color="#e8f4ff"/></linearGradient></defs><rect width="400" height="533" fill="url(#g)"/><text x="200" y="270" text-anchor="middle" fill="#b8b0c8" font-family="system-ui" font-size="14">暂无封面</text></svg>`,
-  )
+    'data:image/svg+xml,' +
+    encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="533" viewBox="0 0 400 533"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffeef8"/><stop offset="100%" stop-color="#e8f4ff"/></linearGradient></defs><rect width="400" height="533" fill="url(#g)"/><text x="200" y="270" text-anchor="middle" fill="#b8b0c8" font-family="system-ui" font-size="14">暂无封面</text></svg>`,
+    )
+
+// 弹窗动画状态
+const dialogAnimation = ref('')
+const isDialogVisible = ref(false)
 
 // 切换话题
 const changeTopicId = (id) => {
@@ -166,6 +176,21 @@ const restoreUserCache = () => {
 const loadAllUsers = async () => {
   // 尝试从 sessionStorage 恢复
   restoreUserCache()
+  
+  // 优先缓存当前登录用户的信息（从 store 中获取）
+  if (userInfoStore.info && userInfoStore.info.id) {
+    const currentUser = {
+      id: userInfoStore.info.id,
+      username: userInfoStore.info.username,
+      nickname: userInfoStore.info.nickname,
+      userPic: userInfoStore.info.userPic || userInfoStore.info.avatar,
+      role: userInfoStore.info.role,
+    }
+    userInfoCache.set(currentUser.id, currentUser)
+    console.log('已缓存当前用户信息:', currentUser)
+  }
+  
+  // 如果缓存中已有数据，不再请求用户列表
   if (userInfoCache.size > 0) return
 
   try {
@@ -244,7 +269,7 @@ const loadNotes = async () => {
       notes.value.forEach((note) => {
         // 初始化图片加载状态
         note.imageLoaded = false
-        
+
         // 填充用户信息 - 优先使用缓存中的最新信息
         if (note.createUser) {
           const userInfo = getUserInfo(note.createUser)
@@ -254,12 +279,27 @@ const loadNotes = async () => {
             note.userPic = userInfo.userPic || ''
           } else {
             // 如果缓存中没有，使用后端返回的字段或默认值
-            note.userName = note.createUserName || note.userName || '匿名用户'
-            note.userPic = note.createUserAvatar || note.userPic || ''
+            // 尝试多种可能的字段名
+            note.userName = note.createUserName || note.userName || note.authorName || '匿名用户'
+            note.userPic = note.createUserAvatar || note.userPic || note.authorAvatar || ''
+            
+            // 调试日志：检查后端返回的用户信息字段
+            if (!note.userName || note.userName === '匿名用户') {
+              console.warn('笔记用户信息缺失，note数据:', {
+                id: note.id,
+                createUser: note.createUser,
+                createUserName: note.createUserName,
+                userName: note.userName,
+                authorName: note.authorName,
+                createUserAvatar: note.createUserAvatar,
+                userPic: note.userPic,
+                authorAvatar: note.authorAvatar
+              })
+            }
           }
         } else {
-          note.userName = note.userName || '匿名用户'
-          note.userPic = note.userPic || ''
+          note.userName = note.userName || note.authorName || '匿名用户'
+          note.userPic = note.userPic || note.authorAvatar || ''
         }
 
         // 确保统计数据有默认值
@@ -271,9 +311,9 @@ const loadNotes = async () => {
 
       // 检查是否有未缓存的用户，异步获取并更新
       const missingUserIds = [...new Set(
-        notes.value
-          .filter(note => note.createUser && !userInfoCache.has(note.createUser))
-          .map(note => note.createUser)
+          notes.value
+              .filter(note => note.createUser && !userInfoCache.has(note.createUser))
+              .map(note => note.createUser)
       )]
 
       if (missingUserIds.length > 0) {
@@ -340,6 +380,7 @@ const generateVideoThumbnail = (videoUrl) => {
 const currentImageIndex = ref(0)
 const showImageGallery = ref(false)
 const imageLoaded = ref(true)
+const galleryImageLoading = ref(false)
 
 // 打开图片画廊
 const openImageGallery = (note, index = 0) => {
@@ -357,21 +398,30 @@ const closeImageGallery = () => {
 // 图片加载完成
 const onImageLoad = () => {
   imageLoaded.value = true
+  galleryImageLoading.value = false
+}
+
+// 图片加载开始
+const onImageLoadStart = () => {
+  galleryImageLoading.value = true
+  imageLoaded.value = false
 }
 
 // 上一张图片
 const prevImage = () => {
   if (currentNote.value && currentNote.value.images) {
+    galleryImageLoading.value = true
     imageLoaded.value = false
     currentImageIndex.value =
-      (currentImageIndex.value - 1 + currentNote.value.images.length) %
-      currentNote.value.images.length
+        (currentImageIndex.value - 1 + currentNote.value.images.length) %
+        currentNote.value.images.length
   }
 }
 
 // 下一张图片
 const nextImage = () => {
   if (currentNote.value && currentNote.value.images) {
+    galleryImageLoading.value = true
     imageLoaded.value = false
     currentImageIndex.value = (currentImageIndex.value + 1) % currentNote.value.images.length
   }
@@ -428,11 +478,15 @@ const viewDetail = async (note) => {
       currentNote.value.userPic = currentNote.value.userPic || ''
     }
 
+    // 显示弹窗并播放动画
+    isDialogVisible.value = true
     showDetailDialog.value = true
+    dialogAnimation.value = 'dialog-enter-active'
 
     // 重置图片索引和加载状态
     currentImageIndex.value = 0
     imageLoaded.value = false
+    galleryImageLoading.value = false
 
     // 记录浏览
     await recordView(note.id)
@@ -476,7 +530,7 @@ const handleVideoError = (e) => {
 
   if (video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
     errorMsg =
-      '视频资源无法访问\n可能原因：\n1. OSS Bucket未设置为公共读\n2. CORS配置不正确\n3. 视频文件不存在或链接失效'
+        '视频资源无法访问\n可能原因：\n1. OSS Bucket未设置为公共读\n2. CORS配置不正确\n3. 视频文件不存在或链接失效'
   } else if (video.networkState === HTMLMediaElement.NETWORK_EMPTY) {
     errorMsg = '视频源未设置'
   } else if (video.networkState === HTMLMediaElement.NETWORK_LOADING) {
@@ -609,11 +663,11 @@ const handleScroll = () => {
   const windowHeight = window.innerHeight
   const documentHeight = document.documentElement.scrollHeight
 
-  // 显示/隐藏回到顶部按钮
-  showBackToTop.value = scrollTop > 300
+  // 显示/隐藏回到顶部按钮 - 有数据时始终显示，或滚动超过200px时显示
+  showBackToTop.value = notes.value.length > 0 && (scrollTop > 200 || documentHeight <= windowHeight)
 
   // 触底加载更多
-  if (scrollTop + windowHeight >= documentHeight - 100 && hasMore.value && !isLoadingMore.value) {
+  if (scrollTop + windowHeight >= documentHeight - 50 && hasMore.value && !isLoadingMore.value) {
     pageNum.value++
     loadNotes()
   }
@@ -627,14 +681,22 @@ const backToTop = () => {
   })
 }
 
-// 关闭弹窗
+// 关闭弹窗 - 带动画
 const closeDialog = () => {
-  showDetailDialog.value = false
-  currentNote.value = null
-  currentImageIndex.value = 0
-  if (dialogVideoPlayer.value) {
-    dialogVideoPlayer.value.pause()
-  }
+  dialogAnimation.value = 'dialog-leave-active'
+
+  setTimeout(() => {
+    showDetailDialog.value = false
+    isDialogVisible.value = false
+    currentNote.value = null
+    currentImageIndex.value = 0
+    imageLoaded.value = false
+    galleryImageLoading.value = false
+    if (dialogVideoPlayer.value) {
+      dialogVideoPlayer.value.pause()
+    }
+    dialogAnimation.value = ''
+  }, 300)
 }
 
 // 点赞笔记
@@ -806,7 +868,7 @@ const toggleCommentLike = async (comment, event) => {
 
       // 添加点赞动画效果
       const likeElement = document.querySelector(
-        `.comment-like-btn[data-comment-id="${comment.id}"]`,
+          `.comment-like-btn[data-comment-id="${comment.id}"]`,
       )
       if (likeElement) {
         likeElement.classList.add('like-animation')
@@ -889,28 +951,39 @@ const waterfallColumns = computed(() => {
 const handleUserInfoUpdate = (event) => {
   const updatedUser = event.detail
   if (updatedUser && updatedUser.id) {
+    console.log('收到用户信息更新事件:', updatedUser)
+    
     // 更新缓存中的用户信息
     if (userInfoCache.has(updatedUser.id)) {
       const cachedUser = userInfoCache.get(updatedUser.id)
       userInfoCache.set(updatedUser.id, { ...cachedUser, ...updatedUser })
+      console.log('已更新缓存中的用户信息')
     } else {
       // 如果缓存中没有，添加新用户信息
       userInfoCache.set(updatedUser.id, updatedUser)
+      console.log('已添加新用户信息到缓存')
     }
 
     // 更新当前页面中所有该用户的笔记显示
+    let updatedCount = 0
     notes.value.forEach(note => {
       if (note.createUser === updatedUser.id) {
         note.userName = updatedUser.nickname || updatedUser.username || '匿名用户'
-        note.userPic = updatedUser.userPic || ''
+        note.userPic = updatedUser.userPic || updatedUser.avatar || ''
+        updatedCount++
       }
     })
+    console.log(`已更新 ${updatedCount} 条笔记的用户信息显示`)
 
     // 如果当前正在查看笔记详情，也更新详情中的用户信息
     if (currentNote.value && currentNote.value.createUser === updatedUser.id) {
       currentNote.value.userName = updatedUser.nickname || updatedUser.username || '匿名用户'
-      currentNote.value.userPic = updatedUser.userPic || ''
+      currentNote.value.userPic = updatedUser.userPic || updatedUser.avatar || ''
+      console.log('已更新笔记详情中的用户信息')
     }
+    
+    // 强制触发响应式更新
+    notes.value = [...notes.value]
   }
 }
 
@@ -947,12 +1020,12 @@ onUnmounted(() => {
 
         <div class="search-section">
           <el-input
-            v-model="searchForm.keyword"
-            placeholder="搜索感兴趣的内容..."
-            prefix-icon="Search"
-            clearable
-            class="search-input"
-            @keyup.enter="handleSearch"
+              v-model="searchForm.keyword"
+              placeholder="搜索感兴趣的内容..."
+              prefix-icon="Search"
+              clearable
+              class="search-input"
+              @keyup.enter="handleSearch"
           />
         </div>
 
@@ -969,11 +1042,11 @@ onUnmounted(() => {
     <div class="topic-bar">
       <div class="topic-scroll-wrapper">
         <div
-          v-for="topic in topics"
-          :key="topic.id"
-          class="topic-tag"
-          :class="{ active: searchForm.topicId === topic.id }"
-          @click="changeTopicId(topic.id)"
+            v-for="topic in topics"
+            :key="topic.id"
+            class="topic-tag"
+            :class="{ active: searchForm.topicId === topic.id }"
+            @click="changeTopicId(topic.id)"
         >
           {{ topic.topicName }}
         </div>
@@ -992,10 +1065,10 @@ onUnmounted(() => {
       <div v-else class="waterfall-masonry">
         <div v-for="(column, colIndex) in waterfallColumns" :key="colIndex" class="masonry-column">
           <div
-            v-for="note in column"
-            :key="note.id"
-            class="waterfall-item"
-            @click="viewDetail(note)"
+              v-for="note in column"
+              :key="note.id"
+              class="waterfall-item"
+              @click="viewDetail(note)"
           >
             <article class="note-card xhs-note-card">
               <!-- 媒体区域 -->
@@ -1003,17 +1076,17 @@ onUnmounted(() => {
                 <!-- 视频内容 -->
                 <div v-if="note.noteCategory === 'video'" class="video-container">
                   <video
-                    :src="note.video"
-                    :poster="note.coverImg || ''"
-                    preload="metadata"
-                    crossorigin="anonymous"
-                    playsinline
-                    muted
-                    class="card-video"
-                    @error="handleVideoError"
-                    @loadedmetadata="(e) => onVideoLoaded(note.id, e)"
-                    @timeupdate="(e) => onVideoTimeUpdate(note.id, e)"
-                    @ended="() => onVideoEnded(note.id)"
+                      :src="note.video"
+                      :poster="note.coverImg || ''"
+                      preload="metadata"
+                      crossorigin="anonymous"
+                      playsinline
+                      muted
+                      class="card-video"
+                      @error="handleVideoError"
+                      @loadedmetadata="(e) => onVideoLoaded(note.id, e)"
+                      @timeupdate="(e) => onVideoTimeUpdate(note.id, e)"
+                      @ended="() => onVideoEnded(note.id)"
                   ></video>
 
                   <!-- 视频播放遮罩 -->
@@ -1027,8 +1100,8 @@ onUnmounted(() => {
                   <div class="video-progress" @click.stop="onVideoSeek(note.id, $event)">
                     <div class="progress-bar">
                       <div
-                        class="progress-fill"
-                        :style="{ width: `${videoPlayers[note.id]?.progress || 0}%` }"
+                          class="progress-fill"
+                          :style="{ width: `${videoPlayers[note.id]?.progress || 0}%` }"
                       ></div>
                     </div>
                   </div>
@@ -1045,13 +1118,13 @@ onUnmounted(() => {
                   <!-- 图片加载中骨架屏 -->
                   <div class="image-skeleton" v-if="!note.imageLoaded"></div>
                   <img
-                    :src="getCoverImage(note)"
-                    :alt="note.title"
-                    loading="lazy"
-                    @error="onImgError"
-                    @load="(e) => { onCardImageLoad(e); note.imageLoaded = true }"
-                    class="card-image"
-                    :class="{ 'image-loaded': note.imageLoaded }"
+                      :src="getCoverImage(note)"
+                      :alt="note.title"
+                      loading="lazy"
+                      @error="onImgError"
+                      @load="(e) => { onCardImageLoad(e); note.imageLoaded = true }"
+                      class="card-image"
+                      :class="{ 'image-loaded': note.imageLoaded }"
                   />
                 </template>
 
@@ -1072,18 +1145,18 @@ onUnmounted(() => {
                 <div class="xhs-meta-row">
                   <div class="xhs-author">
                     <img
-                      v-if="note.userPic"
-                      :src="note.userPic"
-                      class="author-avatar-img"
-                      alt="author"
+                        v-if="note.userPic"
+                        :src="note.userPic"
+                        class="author-avatar-img"
+                        alt="author"
                     />
                     <span class="xhs-name">{{ note.userName }}</span>
                   </div>
                   <button
-                    type="button"
-                    class="xhs-like"
-                    :class="{ liked: likedNotes[note.id] }"
-                    @click="toggleLike(note, $event)"
+                      type="button"
+                      class="xhs-like"
+                      :class="{ liked: likedNotes[note.id] }"
+                      @click="toggleLike(note, $event)"
                   >
                     <el-icon><Star /></el-icon>
                     <span>{{ formatNumber(note.likesCount || 0) }}</span>
@@ -1114,184 +1187,197 @@ onUnmounted(() => {
       </div>
     </transition>
 
-    <!-- 详情弹窗 -->
-    <el-dialog
-      v-model="showDetailDialog"
-      :show-close="true"
-      width="90%"
-      class="detail-dialog"
-      @close="closeDialog"
-    >
-      <div v-if="currentNote" class="detail-content">
-        <div class="detail-left">
-          <!-- 视频详情 -->
-          <div v-if="currentNote.noteCategory === 'video'" class="detail-video-wrapper">
-            <video
-              ref="dialogVideoPlayer"
-              :src="currentNote.video"
-              controls
-              autoplay
-              preload="metadata"
-              crossorigin="anonymous"
-              class="detail-video"
-              @error="handleVideoError"
-              @loadedmetadata="handleDialogVideoLoaded"
-            ></video>
+    <!-- 详情弹窗 - 带动画效果 -->
+    <Teleport to="body">
+      <div
+          v-if="showDetailDialog"
+          class="detail-dialog-overlay"
+          :class="dialogAnimation"
+          @click.self="closeDialog"
+      >
+        <div class="detail-dialog-container" :class="dialogAnimation">
+          <div class="detail-dialog-header">
+            <button class="dialog-close-btn" @click="closeDialog">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </button>
           </div>
 
-          <!-- 图片详情 -->
-          <div v-else class="detail-images">
-            <div class="image-gallery">
-              <img
-                :src="currentNote.images[currentImageIndex] || currentNote.coverImg"
-                :alt="`图片${currentImageIndex + 1}`"
-                @error="onImgError"
-                @load="onImageLoad"
-                class="detail-image"
-                :class="{ 'image-loading': !imageLoaded }"
-              />
-
-              <!-- 图片导航按钮 -->
-              <div v-if="currentNote.images && currentNote.images.length > 1" class="image-nav">
-                <button class="nav-btn prev-btn" @click="prevImage">
-                  <el-icon><ArrowLeft /></el-icon>
-                </button>
-                <button class="nav-btn next-btn" @click="nextImage">
-                  <el-icon><ArrowRight /></el-icon>
-                </button>
+          <div v-if="currentNote" class="detail-content">
+            <div class="detail-left">
+              <!-- 视频详情 -->
+              <div v-if="currentNote.noteCategory === 'video'" class="detail-video-wrapper">
+                <video
+                    ref="dialogVideoPlayer"
+                    :src="currentNote.video"
+                    controls
+                    autoplay
+                    preload="metadata"
+                    crossorigin="anonymous"
+                    class="detail-video"
+                    @error="handleVideoError"
+                    @loadedmetadata="handleDialogVideoLoaded"
+                ></video>
               </div>
 
-              <!-- 图片指示器 -->
-              <div
-                v-if="currentNote.images && currentNote.images.length > 1"
-                class="image-indicator"
-              >
-                {{ currentImageIndex + 1 }} / {{ currentNote.images.length }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="detail-right">
-          <h2 class="detail-title">{{ currentNote.title }}</h2>
-          <div class="detail-author-section">
-            <img
-              v-if="currentNote.userPic"
-              :src="currentNote.userPic"
-              class="author-avatar-detail"
-              alt="author avatar"
-              @error="(e) => (e.target.style.display = 'none')"
-            />
-            <div v-else class="author-avatar-placeholder">
-              {{ (currentNote.userName || '匿名用户').charAt(0).toUpperCase() }}
-            </div>
-            <span class="author-name-detail">{{ currentNote.userName || '匿名用户' }}</span>
-          </div>
-          <div class="detail-meta">
-            <span class="meta-item">📍 {{ currentNote.location || '未知地点' }}</span>
-            <span class="meta-item"
-              >🕒 {{ currentNote.publishTime || currentNote.createTime }}</span
-            >
-          </div>
-          <div class="detail-stats">
-            <span class="stat-badge">
-              <el-icon><View /></el-icon>
-              {{ currentNote.viewsCount || 0 }} 浏览
-            </span>
-            <span class="stat-badge">
-              <el-icon><ChatDotRound /></el-icon>
-              {{ currentNote.commentsCount || 0 }} 评论
-            </span>
-            <span
-              class="stat-badge like-badge"
-              :class="{ liked: likedNotes[currentNote.id] }"
-              :data-note-id="currentNote.id"
-              @click="toggleLike(currentNote, $event)"
-            >
-              <el-icon><Star /></el-icon>
-              {{ currentNote.likesCount || 0 }} 点赞
-            </span>
-            <span
-              class="stat-badge favorite-badge"
-              :class="{ favorited: favoritedNotes[currentNote.id] }"
-              :data-note-id="currentNote.id"
-              @click="toggleFavorite(currentNote, $event)"
-            >
-              <el-icon><Collection /></el-icon>
-              {{ currentNote.favoritesCount || 0 }} 收藏
-            </span>
-            <span class="stat-badge">
-              <el-icon><Clock /></el-icon>
-              {{ formatTimeAgo(currentNote.createTime) }}
-            </span>
-          </div>
-          <div class="detail-body" v-html="currentNote.content"></div>
-
-          <!-- 评论区 -->
-          <div class="comment-section">
-            <h3 class="comment-title">评论 ({{ comments.length }})</h3>
-
-            <!-- 评论输入框 -->
-            <div class="comment-input-wrapper">
-              <el-input
-                v-model="commentContent"
-                type="textarea"
-                :rows="3"
-                :placeholder="
-                  replyToComment
-                    ? `回复 @${replyToComment.nickname || replyToComment.username || '匿名用户'}...`
-                    : '写下你的评论...'
-                "
-                maxlength="500"
-                show-word-limit
-              />
-              <div class="comment-actions-bar">
-                <el-button
-                  v-if="replyToComment"
-                  size="small"
-                  @click="((replyToComment = null), (commentContent = ''))"
-                >
-                  取消回复
-                </el-button>
-                <el-button type="primary" round class="submit-comment-btn" @click="submitComment">
-                  {{ replyToComment ? '发送回复' : '发表评论' }}
-                </el-button>
-              </div>
-            </div>
-
-            <!-- 评论列表 -->
-            <div class="comment-list">
-              <div v-for="comment in comments" :key="comment.id" class="comment-item">
-                <div class="comment-avatar">👤</div>
-                <div class="comment-content">
-                  <div class="comment-header">
-                    <span class="comment-author">{{
-                      comment.nickname || comment.username || '匿名用户'
-                    }}</span>
-                    <span class="comment-time">{{ comment.createTime }}</span>
+              <!-- 图片详情 -->
+              <div v-else class="detail-images">
+                <div class="image-gallery">
+                  <div class="gallery-image-container">
+                    <!-- 图片加载骨架屏 -->
+                    <div class="gallery-skeleton" v-if="galleryImageLoading"></div>
+                    <img
+                        :src="currentNote.images[currentImageIndex] || currentNote.coverImg"
+                        :alt="`图片${currentImageIndex + 1}`"
+                        @error="onImgError"
+                        @load="onImageLoad"
+                        @loadstart="onImageLoadStart"
+                        class="detail-image"
+                        :class="{ 'image-loaded': imageLoaded, 'image-loading': !imageLoaded }"
+                    />
                   </div>
-                  <div class="comment-text">{{ comment.content }}</div>
-                  <div class="comment-actions">
-                    <span
-                      class="comment-like-btn"
-                      :class="{ liked: likedComments[comment.id] }"
-                      :data-comment-id="comment.id"
-                      @click="toggleCommentLike(comment, $event)"
-                    >
-                      <el-icon><Star /></el-icon>
-                      {{ comment.likesCount || 0 }}
-                    </span>
-                    <span class="comment-reply-btn" @click="replyComment(comment)"> 回复 </span>
+
+                  <!-- 图片导航按钮 -->
+                  <div v-if="currentNote.images && currentNote.images.length > 1" class="image-nav">
+                    <button class="nav-btn prev-btn" @click="prevImage">
+                      <el-icon><ArrowLeft /></el-icon>
+                    </button>
+                    <button class="nav-btn next-btn" @click="nextImage">
+                      <el-icon><ArrowRight /></el-icon>
+                    </button>
+                  </div>
+
+                  <!-- 图片指示器 -->
+                  <div
+                      v-if="currentNote.images && currentNote.images.length > 1"
+                      class="image-indicator"
+                  >
+                    {{ currentImageIndex + 1 }} / {{ currentNote.images.length }}
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div v-if="comments.length === 0" class="no-comments">暂无评论，快来抢沙发~</div>
+            <div class="detail-right">
+              <h2 class="detail-title">{{ currentNote.title }}</h2>
+              <div class="detail-author-section">
+                <img
+                    v-if="currentNote.userPic"
+                    :src="currentNote.userPic"
+                    class="author-avatar-detail"
+                    alt="author avatar"
+                    @error="(e) => (e.target.style.display = 'none')"
+                />
+                <div v-else class="author-avatar-placeholder">
+                  {{ (currentNote.userName || '匿名用户').charAt(0).toUpperCase() }}
+                </div>
+                <span class="author-name-detail">{{ currentNote.userName || '匿名用户' }}</span>
+              </div>
+              <div class="detail-meta">
+                <span class="meta-item">📍 {{ currentNote.location || '未知地点' }}</span>
+                <span class="meta-item"
+                >🕒 {{ formatTimeAgo(currentNote.publishTime || currentNote.createTime) }}</span
+                >
+              </div>
+              <div class="detail-stats">
+                <span class="stat-badge">
+                  <el-icon><View /></el-icon>
+                  {{ currentNote.viewsCount || 0 }} 浏览
+                </span>
+                <span class="stat-badge">
+                  <el-icon><ChatDotRound /></el-icon>
+                  {{ currentNote.commentsCount || 0 }} 评论
+                </span>
+                <span
+                    class="stat-badge like-badge"
+                    :class="{ liked: likedNotes[currentNote.id] }"
+                    :data-note-id="currentNote.id"
+                    @click="toggleLike(currentNote, $event)"
+                >
+                  <el-icon><Star /></el-icon>
+                  {{ currentNote.likesCount || 0 }} 点赞
+                </span>
+                <span
+                    class="stat-badge favorite-badge"
+                    :class="{ favorited: favoritedNotes[currentNote.id] }"
+                    :data-note-id="currentNote.id"
+                    @click="toggleFavorite(currentNote, $event)"
+                >
+                  <el-icon><Collection /></el-icon>
+                  {{ currentNote.favoritesCount || 0 }} 收藏
+                </span>
+
+              </div>
+              <div class="detail-body" v-html="currentNote.content"></div>
+
+              <!-- 评论区 -->
+              <div class="comment-section">
+                <h3 class="comment-title">评论 ({{ comments.length }})</h3>
+
+                <!-- 评论输入框 -->
+                <div class="comment-input-wrapper">
+                  <el-input
+                      v-model="commentContent"
+                      type="textarea"
+                      :rows="3"
+                      :placeholder="
+                      replyToComment
+                        ? `回复 @${replyToComment.nickname || replyToComment.username || '匿名用户'}...`
+                        : '写下你的评论...'
+                    "
+                      maxlength="500"
+                      show-word-limit
+                  />
+                  <div class="comment-actions-bar">
+                    <el-button
+                        v-if="replyToComment"
+                        size="small"
+                        @click="((replyToComment = null), (commentContent = ''))"
+                    >
+                      取消回复
+                    </el-button>
+                    <el-button type="primary" round class="submit-comment-btn" @click="submitComment">
+                      {{ replyToComment ? '发送回复' : '发表评论' }}
+                    </el-button>
+                  </div>
+                </div>
+
+                <!-- 评论列表 -->
+                <div class="comment-list">
+                  <div v-for="comment in comments" :key="comment.id" class="comment-item">
+                    <div class="comment-avatar">👤</div>
+                    <div class="comment-content">
+                      <div class="comment-header">
+                        <span class="comment-author">{{
+                            comment.nickname || comment.username || '匿名用户'
+                          }}</span>
+                        <span class="comment-time">{{ comment.createTime }}</span>
+                      </div>
+                      <div class="comment-text">{{ comment.content }}</div>
+                      <div class="comment-actions">
+                        <span
+                            class="comment-like-btn"
+                            :class="{ liked: likedComments[comment.id] }"
+                            :data-comment-id="comment.id"
+                            @click="toggleCommentLike(comment, $event)"
+                        >
+                          <el-icon><Star /></el-icon>
+                          {{ comment.likesCount || 0 }}
+                        </span>
+                        <span class="comment-reply-btn" @click="replyComment(comment)"> 回复 </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-if="comments.length === 0" class="no-comments">暂无评论，快来抢沙发~</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </el-dialog>
+    </Teleport>
   </div>
 </template>
 
@@ -1530,10 +1616,10 @@ onUnmounted(() => {
   width: 100%;
   overflow: hidden;
   background: #f0f0f0;
-  
+
   // 统一所有卡片的宽高比，确保瀑布流整齐
   aspect-ratio: 3 / 4;
-  
+
   .card-image {
     width: 100%;
     height: 100%;
@@ -1541,7 +1627,7 @@ onUnmounted(() => {
     display: block;
     opacity: 0;
     transition: opacity 0.3s ease, transform 0.3s ease;
-    
+
     &.image-loaded {
       opacity: 1;
     }
@@ -1559,8 +1645,6 @@ onUnmounted(() => {
     animation: skeleton-loading 1.5s ease-in-out infinite;
     z-index: 1;
   }
-
-
 
   &.media-ar-video {
     aspect-ratio: 9 / 16;
@@ -1947,46 +2031,136 @@ onUnmounted(() => {
   transform: translateY(20px);
 }
 
-// 详情弹窗
-.detail-dialog {
-  border-radius: 30px;
-  overflow: hidden;
+// 详情弹窗 - 现代化动画效果
+.detail-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
-  :deep(.el-dialog__header) {
-    background: linear-gradient(135deg, #f8b4d9 0%, #c5a3ff 100%);
-    padding: 20px;
-    margin: 0;
-
-    .el-dialog__title {
-      color: white;
-      font-weight: 600;
-    }
-
-    .el-dialog__headerbtn {
-      .el-dialog__close {
-        color: white;
-        font-size: 20px;
-
-        &:hover {
-          color: rgba(255, 255, 255, 0.8);
-        }
-      }
-    }
+  &.dialog-enter-active {
+    animation: overlayFadeIn 0.3s ease-out forwards;
   }
 
-  :deep(.el-dialog__body) {
-    padding: 0;
-    background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
+  &.dialog-leave-active {
+    animation: overlayFadeOut 0.3s ease-in forwards;
   }
 }
 
+.detail-dialog-container {
+  position: relative;
+  width: 90%;
+  max-width: 1400px;
+  height: 85vh;
+  background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.dialog-enter-active {
+    animation: modalZoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  &.dialog-leave-active {
+    animation: modalZoomOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlayFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modalZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalZoomOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+}
+
+.detail-dialog-header {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+
+  .dialog-close-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    color: #4a4a6a;
+
+    &:hover {
+      background: white;
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      color: #c5a3ff;
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
+// 弹窗内容样式优化
 .detail-content {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0;
-  max-height: 80vh;
+  height: 100%;
   overflow: hidden;
-  border-radius: 30px;
 }
 
 .detail-left {
@@ -1994,10 +2168,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
-  max-height: 90vh;
-  border-radius: 30px 0 0 30px;
   overflow: hidden;
+  transition: all 0.3s ease;
 }
 
 .detail-video-wrapper {
@@ -2011,10 +2183,8 @@ onUnmounted(() => {
   .detail-video {
     width: 100%;
     height: 100%;
-    max-height: 85vh;
     object-fit: contain;
     background: transparent;
-    border-radius: 20px;
   }
 }
 
@@ -2022,12 +2192,10 @@ onUnmounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 60vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
-  padding: 20px;
 
   .image-gallery {
     position: relative;
@@ -2038,18 +2206,61 @@ onUnmounted(() => {
     justify-content: center;
   }
 
+  .gallery-image-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .gallery-skeleton {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    border: 3px solid rgba(197, 163, 255, 0.2);
+    border-top-color: #c5a3ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: translate(-50%, -50%) rotate(360deg);
+    }
+  }
+
   .detail-image {
     max-width: 100%;
-    max-height: 85vh;
+    max-height: 100%;
     width: auto;
     height: auto;
     object-fit: contain;
-    border-radius: 20px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-    transition: opacity 0.3s ease;
+    transition: opacity 0.3s ease, transform 0.3s ease;
 
     &.image-loading {
       opacity: 0;
+    }
+
+    &.image-loaded {
+      opacity: 1;
+      animation: imageFadeIn 0.5s ease-out;
+    }
+  }
+
+  @keyframes imageFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
     }
   }
 
@@ -2066,8 +2277,8 @@ onUnmounted(() => {
     z-index: 10;
 
     .nav-btn {
-      width: 48px;
-      height: 48px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
       background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
       border: 2px solid rgba(255, 255, 255, 0.8);
@@ -2076,7 +2287,7 @@ onUnmounted(() => {
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
       pointer-events: auto;
       backdrop-filter: blur(4px);
       box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
@@ -2084,12 +2295,16 @@ onUnmounted(() => {
       &:hover {
         background: linear-gradient(135deg, #f8b4d9, #c5a3ff);
         border-color: white;
-        transform: scale(1.15);
+        transform: scale(1.1);
         box-shadow: 0 6px 16px rgba(197, 163, 255, 0.4);
       }
 
+      &:active {
+        transform: scale(0.95);
+      }
+
       .el-icon {
-        font-size: 24px;
+        font-size: 20px;
       }
     }
   }
@@ -2108,6 +2323,18 @@ onUnmounted(() => {
     backdrop-filter: blur(4px);
     z-index: 10;
     box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+    animation: indicatorFadeIn 0.3s ease;
+  }
+
+  @keyframes indicatorFadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
   }
 }
 
@@ -2115,6 +2342,26 @@ onUnmounted(() => {
   padding: 32px;
   overflow-y: auto;
   background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
+  scrollbar-width: thin;
+  scrollbar-color: #c5a3ff #f0e5ff;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f0e5ff;
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c5a3ff;
+    border-radius: 3px;
+
+    &:hover {
+      background: #f8b4d9;
+    }
+  }
 }
 
 .detail-title {
@@ -2126,6 +2373,18 @@ onUnmounted(() => {
   color: transparent;
   margin: 0 0 16px;
   line-height: 1.4;
+  animation: slideInFromLeft 0.4s ease-out;
+}
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .detail-author-section {
@@ -2133,6 +2392,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
+  animation: fadeInUp 0.4s ease-out 0.05s both;
 }
 
 .author-avatar-detail {
@@ -2141,6 +2401,11 @@ onUnmounted(() => {
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid #f0f0f0;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
 }
 
 .author-avatar-placeholder {
@@ -2156,6 +2421,11 @@ onUnmounted(() => {
   font-size: 18px;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(197, 163, 255, 0.3);
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
 }
 
 .author-name-detail {
@@ -2172,6 +2442,7 @@ onUnmounted(() => {
   gap: 16px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  animation: fadeInUp 0.4s ease-out 0.1s both;
 
   .meta-item {
     font-size: 14px;
@@ -2184,6 +2455,7 @@ onUnmounted(() => {
   gap: 12px;
   margin-bottom: 24px;
   flex-wrap: wrap;
+  animation: fadeInUp 0.4s ease-out 0.15s both;
 
   .stat-badge {
     padding: 6px 14px;
@@ -2213,6 +2485,7 @@ onUnmounted(() => {
       &.liked {
         background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
         color: white;
+        animation: pulse 0.4s ease;
 
         .el-icon {
           animation: heartBeat 0.5s ease;
@@ -2229,6 +2502,7 @@ onUnmounted(() => {
       &.favorited {
         background: linear-gradient(135deg, #a8e6cf, #7ee0b5);
         color: #2c665a;
+        animation: pulse 0.4s ease;
 
         .el-icon {
           animation: heartBeat 0.5s ease;
@@ -2243,64 +2517,47 @@ onUnmounted(() => {
   }
 }
 
-@keyframes heartBeat {
+@keyframes pulse {
   0% {
     transform: scale(1);
   }
-  25% {
-    transform: scale(1.2);
-  }
   50% {
-    transform: scale(0.95);
-  }
-  75% {
-    transform: scale(1.1);
+    transform: scale(1.05);
   }
   100% {
     transform: scale(1);
   }
-}
-
-@keyframes skeleton-loading {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-.like-animation {
-  animation: heartBeat 0.5s ease;
 }
 
 .detail-body {
   font-size: 15px;
   line-height: 1.8;
   color: #4a4a6a;
+  animation: fadeInUp 0.4s ease-out 0.2s both;
+  transition: all 0.3s ease;
 
   :deep(img) {
     max-width: 100%;
     border-radius: 12px;
     margin: 12px 0;
+    transition: transform 0.3s ease;
+
+    &:hover {
+      transform: scale(1.02);
+    }
+  }
+
+  :deep(p) {
+    margin-bottom: 12px;
   }
 }
 
-// 评论区样式
+// 评论区样式优化
 .comment-section {
   margin-top: 32px;
   padding-top: 24px;
   border-top: 1px solid rgba(197, 163, 255, 0.15);
+  animation: fadeInUp 0.4s ease-out 0.25s both;
 }
 
 .comment-title {
@@ -2355,6 +2612,22 @@ onUnmounted(() => {
 .comment-list {
   max-height: 400px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c5a3ff #f0e5ff;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f0e5ff;
+    border-radius: 2px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c5a3ff;
+    border-radius: 2px;
+  }
 }
 
 .comment-item {
@@ -2362,6 +2635,12 @@ onUnmounted(() => {
   gap: 12px;
   padding: 16px 0;
   border-bottom: 1px solid rgba(197, 163, 255, 0.1);
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(197, 163, 255, 0.02);
+    transform: translateX(4px);
+  }
 
   &:last-child {
     border-bottom: none;
@@ -2379,6 +2658,11 @@ onUnmounted(() => {
   font-size: 20px;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(197, 163, 255, 0.2);
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.05);
+  }
 }
 
 .comment-content {
@@ -2485,14 +2769,18 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .detail-left {
-    min-height: 50vh;
-    max-height: 70vh;
-    border-radius: 30px 30px 0 0;
+  .detail-dialog-container {
+    height: 90vh;
+    width: 95%;
   }
 
-  .detail-video-wrapper .detail-video {
-    max-height: 60vh;
+  .detail-left {
+    min-height: 40vh;
+    max-height: 45vh;
+  }
+
+  .detail-right {
+    overflow-y: auto;
   }
 }
 
@@ -2520,18 +2808,61 @@ onUnmounted(() => {
     height: 44px;
   }
 
-  .detail-dialog {
-    width: 95% !important;
+  .detail-dialog-container {
+    width: 100%;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .detail-dialog-header {
+    top: 12px;
+    right: 12px;
+
+    .dialog-close-btn {
+      width: 36px;
+      height: 36px;
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.7);
+      }
+    }
   }
 
   .detail-left {
-    min-height: 40vh;
-    max-height: 60vh;
-    border-radius: 30px 30px 0 0;
+    min-height: 35vh;
+    max-height: 40vh;
   }
 
   .detail-video-wrapper .detail-video {
-    max-height: 50vh;
+    max-height: 40vh;
+  }
+
+  .detail-right {
+    padding: 20px;
+  }
+
+  .detail-title {
+    font-size: 18px;
+  }
+
+  .detail-stats {
+    gap: 8px;
+
+    .stat-badge {
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+  }
+
+  .image-nav .nav-btn {
+    width: 36px;
+    height: 36px;
+
+    .el-icon {
+      font-size: 16px;
+    }
   }
 }
 </style>
