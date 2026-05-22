@@ -61,8 +61,8 @@ const loading = ref(false)
 const hasMore = ref(true)
 const isLoadingMore = ref(false)
 
-// 瀑布流列数
-const columnCount = ref(4)
+// // 瀑布流列数
+// const columnCount = ref(4)
 
 // 视频播放器状态
 const videoPlayers = reactive({})
@@ -72,9 +72,6 @@ const showDetailDialog = ref(false)
 const currentNote = ref(null)
 const dialogVideoPlayer = ref(null)
 const detailDialogRef = ref(null)
-
-// 回到顶部按钮显示状态
-const showBackToTop = ref(false)
 
 // 点赞状态管理
 const likedNotes = reactive({})
@@ -544,6 +541,17 @@ const handleVideoError = (e) => {
     errorMsg = '视频格式不支持或CORS跨域限制\n请在阿里云OSS控制台配置CORS规则'
   }
 
+  // 对于缓存相关错误，尝试重新加载（添加时间戳参数）
+  if (video.error?.code === MediaError.MEDIA_ERR_NETWORK && 
+      (video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE || 
+       video.networkState === HTMLMediaElement.NETWORK_IDLE)) {
+    console.warn('检测到网络/缓存错误，尝试添加时间戳参数重新加载...')
+    const originalSrc = video.src.split('?')[0]
+    video.src = `${originalSrc}?t=${Date.now()}`
+    video.load()
+    return // 不显示错误消息，等待重试结果
+  }
+
   ElMessage.error({
     message: errorMsg,
     duration: 5000,
@@ -657,29 +665,7 @@ const onVideoEnded = (noteId) => {
   videoPlayers[noteId].progress = 0
 }
 
-// 滚动事件处理
-const handleScroll = () => {
-  const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-  const windowHeight = window.innerHeight
-  const documentHeight = document.documentElement.scrollHeight
 
-  // 显示/隐藏回到顶部按钮 - 有数据时始终显示，或滚动超过200px时显示
-  showBackToTop.value = notes.value.length > 0 && (scrollTop > 200 || documentHeight <= windowHeight)
-
-  // 触底加载更多
-  if (scrollTop + windowHeight >= documentHeight - 50 && hasMore.value && !isLoadingMore.value) {
-    pageNum.value++
-    loadNotes()
-  }
-}
-
-// 回到顶部
-const backToTop = () => {
-  window.scrollTo({
-    top: 0,
-    behavior: 'smooth',
-  })
-}
 
 // 关闭弹窗 - 带动画
 const closeDialog = () => {
@@ -897,20 +883,47 @@ const checkCommentLiked = async (commentId) => {
 }
 
 // 响应式列数调整
-const updateColumnCount = () => {
-  const width = window.innerWidth
-  if (width < 768) {
-    columnCount.value = 2
-  } else if (width < 1024) {
-    columnCount.value = 3
-  } else if (width < 1440) {
-    columnCount.value = 4
-  } else {
-    columnCount.value = 5
+// const updateColumnCount = () => {
+//   const width = window.innerWidth
+//   if (width < 768) {
+//     columnCount.value = 2
+//   } else if (width < 1024) {
+//     columnCount.value = 3
+//   } else if (width < 1440) {
+//     columnCount.value = 4
+//   } else {
+//     columnCount.value = 5
+//   }
+// }
+
+// 滚动处理 - 实现无限加载
+const showBackToTop = ref(false)
+
+const handleScroll = () => {
+  // 控制回到顶部按钮显示
+  //showBackToTop.value = window.scrollY > 300
+
+  // 无限滚动加载
+  const scrollTop = window.scrollY || document.documentElement.scrollTop
+  const windowHeight = window.innerHeight
+  const documentHeight = document.documentElement.scrollHeight
+
+  // 当滚动到距离底部200px时加载更多
+  if (scrollTop + windowHeight >= documentHeight - 200 && hasMore.value && !isLoadingMore.value) {
+    pageNum.value++
+    loadNotes()
   }
 }
 
-/** 封面区域宽高比 class（模拟小红书不规则竖版） */
+// 回到顶部
+// const backToTop = () => {
+//   window.scrollTo({
+//     top: 0,
+//     behavior: 'smooth'
+//   })
+// }
+
+/** 封面区域宽高比  */
 const getMediaAspectClass = (note) => {
   if (note.noteCategory === 'video') return 'media-ar-video'
   const v = (note.id || 0) % 5
@@ -932,20 +945,20 @@ const estimateNoteHeight = (note) => {
 }
 
 /** 瀑布流：按估算高度依次放入当前最短的列 */
-const waterfallColumns = computed(() => {
-  const n = Math.max(1, columnCount.value)
-  const cols = Array.from({ length: n }, () => [])
-  const heights = Array(n).fill(0)
-  for (const note of notes.value) {
-    let minIdx = 0
-    for (let i = 1; i < n; i++) {
-      if (heights[i] < heights[minIdx]) minIdx = i
-    }
-    cols[minIdx].push(note)
-    heights[minIdx] += estimateNoteHeight(note)
-  }
-  return cols
-})
+// const waterfallColumns = computed(() => {
+//   const n = Math.max(1, columnCount.value)
+//   const cols = Array.from({ length: n }, () => [])
+//   const heights = Array(n).fill(0)
+//   for (const note of notes.value) {
+//     let minIdx = 0
+//     for (let i = 1; i < n; i++) {
+//       if (heights[i] < heights[minIdx]) minIdx = i
+//     }
+//     cols[minIdx].push(note)
+//     heights[minIdx] += estimateNoteHeight(note)
+//   }
+//   return cols
+// })
 
 // 监听用户信息更新事件，实时更新页面显示
 const handleUserInfoUpdate = (event) => {
@@ -993,9 +1006,9 @@ onMounted(async () => {
   await Promise.all([loadTopics(), loadAllUsers()])
   // 然后加载笔记（此时用户缓存已有数据）
   await loadNotes()
-  updateColumnCount()
+ // updateColumnCount()
   window.addEventListener('scroll', handleScroll)
-  window.addEventListener('resize', updateColumnCount)
+ // window.addEventListener('resize', updateColumnCount)
 
   // 监听用户信息更新事件
   window.addEventListener('userInfoUpdated', handleUserInfoUpdate)
@@ -1003,7 +1016,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
-  window.removeEventListener('resize', updateColumnCount)
+  //window.removeEventListener('resize', updateColumnCount)
   // 移除用户信息更新事件监听
   window.removeEventListener('userInfoUpdated', handleUserInfoUpdate)
 })
@@ -1054,6 +1067,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 瀑布流内容区 -->
+    <!-- 瀑布流内容区 -->
     <div class="waterfall-container" v-loading="loading && pageNum === 1">
       <!-- 无笔记，空状态 -->
       <div v-if="notes.length === 0 && !loading" class="empty-state">
@@ -1062,109 +1076,109 @@ onUnmounted(() => {
         <p class="empty-hint">快来发布第一篇笔记吧~</p>
       </div>
 
+      <!-- 使用 CSS column-count 瀑布流 -->
       <div v-else class="waterfall-masonry">
-        <div v-for="(column, colIndex) in waterfallColumns" :key="colIndex" class="masonry-column">
-          <div
-              v-for="note in column"
-              :key="note.id"
-              class="waterfall-item"
-              @click="viewDetail(note)"
-          >
-            <article class="note-card xhs-note-card">
-              <!-- 媒体区域 -->
-              <div class="card-media" :class="getMediaAspectClass(note)">
-                <!-- 视频内容 -->
-                <div v-if="note.noteCategory === 'video'" class="video-container">
-                  <video
-                      :src="note.video"
-                      :poster="note.coverImg || ''"
-                      preload="metadata"
-                      crossorigin="anonymous"
-                      playsinline
-                      muted
-                      class="card-video"
-                      @error="handleVideoError"
-                      @loadedmetadata="(e) => onVideoLoaded(note.id, e)"
-                      @timeupdate="(e) => onVideoTimeUpdate(note.id, e)"
-                      @ended="() => onVideoEnded(note.id)"
-                  ></video>
+        <div
+            v-for="note in notes"
+            :key="note.id"
+            class="waterfall-item"
+            @click="viewDetail(note)"
+        >
+          <article class="note-card xhs-note-card">
+            <!-- 媒体区域 -->
+            <div class="card-media" :class="getMediaAspectClass(note)">
+              <!-- 视频内容 -->
+              <div v-if="note.noteCategory === 'video'" class="video-container">
+                <video
+                    :key="note.video"
+                    :src="note.video"
+                    :poster="note.coverImg || ''"
+                    preload="metadata"
+                    crossorigin="anonymous"
+                    playsinline
+                    muted
+                    class="card-video"
+                    @error="handleVideoError"
+                    @loadedmetadata="(e) => onVideoLoaded(note.id, e)"
+                    @timeupdate="(e) => onVideoTimeUpdate(note.id, e)"
+                    @ended="() => onVideoEnded(note.id)"
+                ></video>
 
-                  <!-- 视频播放遮罩 -->
-                  <div class="video-overlay" @click.stop="toggleVideoPlay(note.id, $event)">
-                    <el-icon v-if="!videoPlayers[note.id]?.isPlaying" class="play-icon">
-                      <VideoPlay />
-                    </el-icon>
-                  </div>
+                <!-- 视频播放遮罩 -->
+                <div class="video-overlay" @click.stop="toggleVideoPlay(note.id, $event)">
+                  <el-icon v-if="!videoPlayers[note.id]?.isPlaying" class="play-icon">
+                    <VideoPlay />
+                  </el-icon>
+                </div>
 
-                  <!-- 视频进度条 -->
-                  <div class="video-progress" @click.stop="onVideoSeek(note.id, $event)">
-                    <div class="progress-bar">
-                      <div
-                          class="progress-fill"
-                          :style="{ width: `${videoPlayers[note.id]?.progress || 0}%` }"
-                      ></div>
-                    </div>
-                  </div>
-
-                  <!-- 视频标识 -->
-                  <div class="video-badge">
-                    <el-icon><VideoPlay /></el-icon>
-                    <span>视频</span>
+                <!-- 视频进度条 -->
+                <div class="video-progress" @click.stop="onVideoSeek(note.id, $event)">
+                  <div class="progress-bar">
+                    <div
+                        class="progress-fill"
+                        :style="{ width: `${videoPlayers[note.id]?.progress || 0}%` }"
+                    ></div>
                   </div>
                 </div>
 
-                <!-- 图片内容 -->
-                <template v-else>
-                  <!-- 图片加载中骨架屏 -->
-                  <div class="image-skeleton" v-if="!note.imageLoaded"></div>
-                  <img
-                      :src="getCoverImage(note)"
-                      :alt="note.title"
-                      loading="lazy"
-                      @error="onImgError"
-                      @load="(e) => { onCardImageLoad(e); note.imageLoaded = true }"
-                      class="card-image"
-                      :class="{ 'image-loaded': note.imageLoaded }"
-                  />
-                </template>
-
-                <!-- 悬停遮罩层（小红书风格） -->
-                <div class="card-hover-overlay">
-                  <div class="hover-actions">
-                    <button class="action-btn view-btn" @click.stop="viewDetail(note)">
-                      <el-icon><View /></el-icon>
-                      <span>查看</span>
-                    </button>
-                  </div>
+                <!-- 视频标识 -->
+                <div class="video-badge">
+                  <el-icon><VideoPlay /></el-icon>
+                  <span>视频</span>
                 </div>
               </div>
 
-              <!-- 卡片内容区 -->
-              <div class="xhs-card-body">
-                <h3 class="xhs-title">{{ note.title }}</h3>
-                <div class="xhs-meta-row">
-                  <div class="xhs-author">
-                    <img
-                        v-if="note.userPic"
-                        :src="note.userPic"
-                        class="author-avatar-img"
-                        alt="author"
-                    />
-                    <span class="xhs-name">{{ note.userName }}</span>
-                  </div>
-                  <button
-                      type="button"
-                      class="xhs-like"
-                      :class="{ liked: likedNotes[note.id] }"
-                      @click="toggleLike(note, $event)"
-                  >
-                    <el-icon><Star /></el-icon>
-                    <span>{{ formatNumber(note.likesCount || 0) }}</span>
+              <!-- 图片内容 -->
+              <template v-else>
+                <!-- 图片加载中骨架屏 -->
+                <div class="image-skeleton" v-if="!note.imageLoaded"></div>
+                <img
+                    :src="getCoverImage(note)"
+                    :alt="note.title"
+                    loading="lazy"
+                    @error="onImgError"
+                    @load="(e) => { onCardImageLoad(e); note.imageLoaded = true }"
+                    class="card-image"
+                    :class="{ 'image-loaded': note.imageLoaded }"
+                />
+              </template>
+
+              <!-- 悬停遮罩层 -->
+              <div class="card-hover-overlay">
+                <div class="hover-actions">
+                  <button class="action-btn view-btn" @click.stop="viewDetail(note)">
+                    <el-icon><View /></el-icon>
+                    <span>查看</span>
                   </button>
                 </div>
               </div>
-            </article>
-          </div>
+            </div>
+
+            <!-- 卡片内容区 -->
+            <div class="xhs-card-body">
+              <h3 class="xhs-title">{{ note.title }}</h3>
+              <div class="xhs-meta-row">
+                <div class="xhs-author">
+                  <img
+                      v-if="note.userPic"
+                      :src="note.userPic"
+                      class="author-avatar-img"
+                      alt="author"
+                  />
+                  <span class="xhs-name">{{ note.userName }}</span>
+                </div>
+                <button
+                    type="button"
+                    class="xhs-like"
+                    :class="{ liked: likedNotes[note.id] }"
+                    @click="toggleLike(note, $event)"
+                >
+                  <el-icon><Star /></el-icon>
+                  <span>{{ formatNumber(note.likesCount || 0) }}</span>
+                </button>
+              </div>
+            </div>
+          </article>
         </div>
       </div>
 
@@ -1178,14 +1192,13 @@ onUnmounted(() => {
         <span>没有更多了~</span>
       </div>
     </div>
-
     <!-- 回到顶部按钮 -->
-    <transition name="fade-slide">
-      <div v-show="showBackToTop" class="back-to-top" @click="backToTop">
-        <el-icon><Top /></el-icon>
-        <span>顶部</span>
-      </div>
-    </transition>
+<!--    <transition name="fade-slide">-->
+<!--      <div v-show="showBackToTop" class="back-to-top" @click="backToTop">-->
+<!--        <el-icon><Top /></el-icon>-->
+<!--        <span>顶部</span>-->
+<!--      </div>-->
+<!--    </transition>-->
 
     <!-- 详情弹窗 - 带动画效果 -->
     <Teleport to="body">
@@ -1210,6 +1223,7 @@ onUnmounted(() => {
               <div v-if="currentNote.noteCategory === 'video'" class="detail-video-wrapper">
                 <video
                     ref="dialogVideoPlayer"
+                    :key="currentNote.video"
                     :src="currentNote.video"
                     controls
                     autoplay
@@ -1561,19 +1575,88 @@ onUnmounted(() => {
   }
 }
 
+// 瀑布流容器 - 使用 CSS column-count
 .waterfall-masonry {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  column-count: 4;
+  column-gap: 16px;
+
+  // 响应式列数
+  @media (max-width: 1200px) {
+    column-count: 3;
+  }
+
+  @media (max-width: 768px) {
+    column-count: 2;
+    column-gap: 12px;
+  }
+
+  @media (max-width: 480px) {
+    column-count: 1;
+  }
 }
 
-.masonry-column {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.waterfall-item {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: fadeInUp 0.5s ease-out;
+
+  &:hover {
+    transform: translateY(-4px);
+  }
 }
+
+// 卡片媒体区域 - 让图片按原始比例显示
+.card-media {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: #f0f0f0;
+  // 不设置固定宽高比，让图片自适应
+
+  .card-image {
+    width: 100%;
+    height: auto;  // 高度自适应，保持原始比例
+    display: block;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+
+    &.image-loaded {
+      opacity: 1;
+    }
+  }
+
+  // 视频保持固定宽高比
+  &.media-ar-video {
+    aspect-ratio: 9 / 16;
+
+    .card-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  // 图片骨架屏
+  .image-skeleton {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+    z-index: 1;
+  }
+}
+
+
+// .xhs-avatar（如果没有其他地方使用）
+
+
 
 .waterfall-item {
   cursor: pointer;
@@ -1890,18 +1973,7 @@ onUnmounted(() => {
   }
 }
 
-.xhs-avatar {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #e0c3ff, #c5a3ff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(197, 163, 255, 0.2);
-}
+
 .author-avatar-img {
   width: 22px;
   height: 22px;
@@ -1990,9 +2062,11 @@ onUnmounted(() => {
   position: fixed;
   right: 32px;
   bottom: 80px;
-  width: 52px;
-  height: 52px;
-  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+  width: 56px;
+  height: 56px;
+  // 使用更醒目的颜色
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: 2px solid rgba(255, 255, 255, 0.9);
   border-radius: 50%;
   display: flex;
   flex-direction: column;
@@ -2000,25 +2074,81 @@ onUnmounted(() => {
   justify-content: center;
   color: white;
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(197, 163, 255, 0.3);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
   transition: all 0.3s ease;
-  z-index: 99;
+  z-index: 9999; // 提高 z-index 确保在最上层
+
+  // 添加脉冲动画吸引注意
+  animation: pulse-ring 2s infinite;
+
+  // 添加一个外发光效果
+  &::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 50%;
+    opacity: 0.3;
+    z-index: -1;
+    transition: opacity 0.3s ease;
+  }
+
+  // 内圈光晕
+  &::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    bottom: 2px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+    border-radius: 50%;
+    z-index: -1;
+  }
 
   &:hover {
-    transform: translateY(-4px) scale(1.05);
-    box-shadow: 0 8px 24px rgba(197, 163, 255, 0.4);
+    transform: translateY(-4px) scale(1.1);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+
+    &::before {
+      opacity: 0.6;
+    }
+  }
+
+  &:active {
+    transform: translateY(0px) scale(0.95);
   }
 
   .el-icon {
-    font-size: 22px;
+    font-size: 24px;
+    margin-bottom: 2px;
   }
 
   span {
-    font-size: 10px;
+    font-size: 11px;
     margin-top: 2px;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 1px;
   }
 }
+
+// 脉冲动画效果
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+  }
+}git config user.email
+ git config user.name
 
 .fade-slide-enter-active,
 .fade-slide-leave-active {
