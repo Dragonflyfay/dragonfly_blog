@@ -114,6 +114,10 @@ getUserInfo()
           <el-icon><ChatDotRound /></el-icon>
           <span>话题管理</span>
         </el-menu-item>
+        <el-menu-item index="/admin/comment">
+          <el-icon><ChatDotRound /></el-icon>
+          <span>评论管理</span>
+        </el-menu-item>
         <el-sub-menu index="/role">
           <template #title>
             <el-icon><UserFilled /></el-icon>

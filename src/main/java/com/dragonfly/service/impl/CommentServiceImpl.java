@@ -3,6 +3,7 @@ import com.dragonfly.mapper.CommentMapper;
 import com.dragonfly.mapper.NoteMapper;
 import com.dragonfly.pojo.Comment;
 import com.dragonfly.pojo.Note;
+import com.dragonfly.pojo.PageBean;
 import com.dragonfly.service.CommentService;
 import com.dragonfly.utils.ThreadLocalUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 描述：评论service实现类
@@ -52,7 +55,32 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public List<Comment> listByNoteId(Integer noteId) {
-        return commentMapper.listByNoteId(noteId);
+        List<Comment> flatList = commentMapper.listByNoteId(noteId);
+        return buildCommentTree(flatList);
+    }
+
+    /**
+     * 将平级评论列表构建为树形结构
+     */
+    private List<Comment> buildCommentTree(List<Comment> flatList) {
+        if (flatList == null || flatList.isEmpty()) {
+            return new ArrayList<>();
+        }
+        // parentId -> children 映射
+        Map<Integer, List<Comment>> childrenMap = flatList.stream()
+                .filter(c -> c.getParentId() != null && c.getParentId() != 0)
+                .collect(Collectors.groupingBy(Comment::getParentId));
+
+        // 设置子评论
+        for (Comment comment : flatList) {
+            List<Comment> children = childrenMap.get(comment.getId());
+            comment.setChildren(children != null ? children : new ArrayList<>());
+        }
+
+        // 返回顶层评论（parentId == null 或 parentId == 0）
+        return flatList.stream()
+                .filter(c -> c.getParentId() == null || c.getParentId() == 0)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -132,5 +160,13 @@ public class CommentServiceImpl implements CommentService {
     public void unlike(Integer id) {
         commentMapper.decrementLikesCount(id);
 
+    }
+
+    @Override
+    public PageBean<Comment> pageList(Integer pageNum, Integer pageSize, String keyword) {
+        int offset = (pageNum - 1) * pageSize;
+        List<Comment> items = commentMapper.listAll(offset, pageSize, keyword);
+        int total = commentMapper.countAll(keyword);
+        return new PageBean<>((long) total, items);
     }
 }

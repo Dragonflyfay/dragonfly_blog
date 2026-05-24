@@ -35,7 +35,10 @@ import {
 } from '@/api/note'
 import { userInfoService, userListService } from '@/api/user.js'
 import useUserInfoStore from '@/stores/userInfo.js'
-
+// 导入评论子组件
+import CommentItem from '@/components/CommentItem.vue'
+// 添加评论提交状态
+const submittingComment = ref(false)
 // 用户信息 store
 const userInfoStore = useUserInfoStore()
 
@@ -61,8 +64,8 @@ const loading = ref(false)
 const hasMore = ref(true)
 const isLoadingMore = ref(false)
 
-// // 瀑布流列数
-// const columnCount = ref(4)
+// 瀑布流列数
+const columnCount = ref(4)
 
 // 视频播放器状态
 const videoPlayers = reactive({})
@@ -74,15 +77,43 @@ const dialogVideoPlayer = ref(null)
 const detailDialogRef = ref(null)
 
 // 点赞状态管理
-const likedNotes = reactive({})
-const likedComments = reactive({})
-const favoritedNotes = reactive({})
+const likedNotes = reactive({})//笔记点赞状态
+const likedComments = reactive({})//评论点赞状态
+const favoritedNotes = reactive({})//收藏状态
 
 // 评论相关
 const comments = ref([])
 const commentContent = ref('')
 const showCommentInput = ref(false)
 const replyToComment = ref(null) // 回复的评论
+
+// 递归计算总评论数（含子回复）
+const countAllComments = (list) => {
+  if (!list || !list.length) return 0
+  let count = 0
+  for (const c of list) {
+    count += 1 + countAllComments(c.children || [])
+  }
+  return count
+}
+
+// 扁平化评论树用于渲染（带深度层级）
+const flatComments = computed(() => {
+  const result = []
+  const walk = (list, depth) => {
+    if (!list) return
+    for (const c of list) {
+      result.push({ ...c, _depth: depth, _hasChildren: !!(c.children && c.children.length) })
+      if (c.children && c.children.length) {
+        walk(c.children, depth + 1)
+      }
+    }
+  }
+  walk(comments.value, 0)
+  return result
+})
+
+
 
 // 占位图
 const PLACEHOLDER_IMG =
@@ -305,6 +336,46 @@ const loadNotes = async () => {
         note.commentsCount = note.commentsCount || 0
         note.favoritesCount = note.favoritesCount || 0
       })
+      const noteIds = newNotes.map(note => note.id)
+
+      if (noteIds.length > 0) {
+        // 并行获取所有笔记的点赞状态
+        const likePromises = noteIds.map(async (noteId) => {
+          try {
+            const res = await checkLikeNoteService(noteId)
+            console.log(`笔记 ${noteId} 点赞状态:`, res.data)
+            return { noteId, liked: res.data === true || res.data === 'true' }
+          } catch (error) {
+            console.warn(`检查笔记 ${noteId} 点赞状态失败:`, error)
+            return { noteId, liked: false }
+          }
+        })
+
+        const likeResults = await Promise.all(likePromises)
+        likeResults.forEach(({ noteId, liked }) => {
+          likedNotes[noteId] = liked
+        })
+
+        // // 可选：同时检查收藏状态（如果需要首页显示收藏状态）
+        // const favoritePromises = noteIds.map(async (noteId) => {
+        //   try {
+        //     const res = await checkFavoriteNoteService(noteId)
+        //     return { noteId, favorited: res.data }
+        //   } catch (error) {
+        //     console.warn(`检查笔记 ${noteId} 收藏状态失败:`, error)
+        //     return { noteId, favorited: false }
+        //   }
+        // })
+
+        // const favoriteResults = await Promise.all(favoritePromises)
+        // favoriteResults.forEach(({ noteId, favorited }) => {
+        //   favoritedNotes[noteId] = favorited
+        // })
+      }
+
+
+
+
 
       // 检查是否有未缓存的用户，异步获取并更新
       const missingUserIds = [...new Set(
@@ -686,36 +757,35 @@ const closeDialog = () => {
 }
 
 // 点赞笔记
+// 点赞笔记（带乐观更新和错误回滚）
 const toggleLike = async (note, event) => {
-  event.stopPropagation() // 阻止事件冒泡，避免触发卡片点击
+  event.stopPropagation()
+
+  const currentLiked = likedNotes[note.id] || false
+  const originalLikesCount = note.likesCount || 0
+
+  // 乐观更新UI
+  likedNotes[note.id] = !currentLiked
+  note.likesCount = currentLiked
+      ? Math.max(0, originalLikesCount - 1)
+      : originalLikesCount + 1
 
   try {
-    if (likedNotes[note.id]) {
+    if (currentLiked) {
       // 取消点赞
       await unlikeNoteService(note.id)
-      likedNotes[note.id] = false
-      note.likesCount = Math.max(0, (note.likesCount || 0) - 1)
-      ElMessage.success('已取消点赞')
+      console.log(`取消点赞笔记 ${note.id} 成功`)
     } else {
       // 点赞
       await likeNoteService(note.id)
-      likedNotes[note.id] = true
-      note.likesCount = (note.likesCount || 0) + 1
-
-      // 添加点赞动画效果
-      const likeElement = document.querySelector(`.like-badge[data-note-id="${note.id}"]`)
-      if (likeElement) {
-        likeElement.classList.add('like-animation')
-        setTimeout(() => {
-          likeElement.classList.remove('like-animation')
-        }, 500)
-      }
-
-      ElMessage.success('点赞成功')
+      console.log(`点赞笔记 ${note.id} 成功`)
     }
   } catch (error) {
-    console.error('点赞失败:', error)
-    ElMessage.error(error.response?.data?.message || '操作失败')
+    // 请求失败，回滚状态
+    console.error('点赞操作失败:', error)
+    likedNotes[note.id] = currentLiked
+    note.likesCount = originalLikesCount
+    ElMessage.error(error.response?.data?.message || '操作失败，请重试')
   }
 }
 
@@ -736,17 +806,15 @@ const toggleFavorite = async (note, event) => {
 
   try {
     if (favoritedNotes[note.id]) {
-      // 取消收藏
       await unfavoriteNoteService(note.id)
       favoritedNotes[note.id] = false
       note.favoritesCount = Math.max(0, (note.favoritesCount || 0) - 1)
-      ElMessage.success('已取消收藏')
+      // 移除 ElMessage.success('已取消收藏')
     } else {
-      // 收藏
       await favoriteNoteService(note.id)
       favoritedNotes[note.id] = true
       note.favoritesCount = (note.favoritesCount || 0) + 1
-      ElMessage.success('收藏成功')
+      // 移除 ElMessage.success('收藏成功')
     }
   } catch (error) {
     console.error('收藏失败:', error)
@@ -775,39 +843,50 @@ const recordView = async (noteId) => {
   }
 }
 
-// 加载评论
+// 加载评论（修改原有函数）
 const loadComments = async (noteId) => {
   try {
     const res = await getCommentsByNoteIdService(noteId)
-    comments.value = res.data || []
+    // 构建树形结构
+    comments.value = buildCommentTree(res.data || [])
 
-    // 检查每个评论的点赞状态
-    for (const comment of comments.value) {
-      await checkCommentLiked(comment.id)
+    // 检查每个评论的点赞状态（包括子评论）
+    const checkAllCommentsLiked = async (commentList) => {
+      if (!commentList) return
+      for (const comment of commentList) {
+        await checkCommentLiked(comment.id)
+        if (comment.children && comment.children.length) {
+          await checkAllCommentsLiked(comment.children)
+        }
+      }
     }
+    await checkAllCommentsLiked(comments.value)
   } catch (error) {
     console.error('加载评论失败:', error)
     ElMessage.error('加载评论失败')
   }
 }
 
-// 提交评论
+// 修改提交评论函数
 const submitComment = async () => {
   if (!commentContent.value.trim()) {
     ElMessage.warning('请输入评论内容')
     return
   }
 
+  submittingComment.value = true
   try {
     const commentData = {
       noteId: currentNote.value.id,
       content: commentContent.value,
-      parentId: replyToComment.value ? replyToComment.value.id : 0, // 顶级评论或回复
-      replyToUserId: replyToComment.value ? replyToComment.value.userId : null,
+      parentId: replyToComment.value ? replyToComment.value.id : 0,
+      replyToUserId: replyToComment.value ? replyToComment.value.userId : null
     }
 
     await addCommentService(commentData)
-    ElMessage.success('评论成功')
+    ElMessage.success(replyToComment.value ? '回复成功' : '评论成功')
+
+    // 重置表单
     commentContent.value = ''
     replyToComment.value = null
 
@@ -818,58 +897,76 @@ const submitComment = async () => {
     currentNote.value.commentsCount = (currentNote.value.commentsCount || 0) + 1
   } catch (error) {
     console.error('评论失败:', error)
-    ElMessage.error(error.response?.data?.message || '评论失败')
+    ElMessage.error(error.response?.data?.message || '操作失败')
+  } finally {
+    submittingComment.value = false
   }
 }
 
-// 回复评论
+// 取消回复
+const cancelReply = () => {
+  replyToComment.value = null
+  commentContent.value = ''
+}
+
+// 修改回复评论函数（支持更深层级）
 const replyComment = (comment) => {
   replyToComment.value = comment
   commentContent.value = `@${comment.nickname || comment.username || '匿名用户'} `
   // 聚焦到评论输入框
   nextTick(() => {
-    const textarea = document.querySelector('.comment-input-wrapper textarea')
+    const textarea = document.querySelector('.comment-textarea textarea')
     if (textarea) {
       textarea.focus()
     }
   })
 }
 
-// 点赞评论
+// 修改评论点赞函数（支持子评论）
 const toggleCommentLike = async (comment, event) => {
-  event.stopPropagation()
+  event?.stopPropagation()
 
   try {
     if (likedComments[comment.id]) {
-      // 取消点赞
       await unlikeCommentService(comment.id)
       likedComments[comment.id] = false
       comment.likesCount = Math.max(0, (comment.likesCount || 0) - 1)
-      ElMessage.success('已取消点赞')
     } else {
-      // 点赞
       await likeCommentService(comment.id)
       likedComments[comment.id] = true
       comment.likesCount = (comment.likesCount || 0) + 1
 
       // 添加点赞动画效果
-      const likeElement = document.querySelector(
-          `.comment-like-btn[data-comment-id="${comment.id}"]`,
-      )
+      const likeElement = document.querySelector(`.comment-like-btn[data-comment-id="${comment.id}"]`)
       if (likeElement) {
         likeElement.classList.add('like-animation')
         setTimeout(() => {
           likeElement.classList.remove('like-animation')
         }, 500)
       }
-
-      ElMessage.success('点赞成功')
     }
   } catch (error) {
     console.error('点赞失败:', error)
-    ElMessage.error(error.response?.data?.message || '操作失败')
+    //ElMessage.error(error.response?.data?.message || '操作失败')
   }
 }
+
+// 计算总评论数（树形结构）
+const totalCommentCount = computed(() => {
+  const countRecursive = (list) => {
+    if (!list || !list.length) return 0
+    let count = 0
+    for (const item of list) {
+      count += 1 + countRecursive(item.children)
+    }
+    return count
+  }
+  return countRecursive(comments.value)
+})
+
+
+
+
 
 // 检查评论是否已点赞
 const checkCommentLiked = async (commentId) => {
@@ -883,18 +980,18 @@ const checkCommentLiked = async (commentId) => {
 }
 
 // 响应式列数调整
-// const updateColumnCount = () => {
-//   const width = window.innerWidth
-//   if (width < 768) {
-//     columnCount.value = 2
-//   } else if (width < 1024) {
-//     columnCount.value = 3
-//   } else if (width < 1440) {
-//     columnCount.value = 4
-//   } else {
-//     columnCount.value = 5
-//   }
-// }
+const updateColumnCount = () => {
+  const width = window.innerWidth
+  if (width < 768) {
+    columnCount.value = 2
+  } else if (width < 1024) {
+    columnCount.value = 3
+  } else if (width < 1440) {
+    columnCount.value = 4
+  } else {
+    columnCount.value = 5
+  }
+}
 
 // 滚动处理 - 实现无限加载
 const showBackToTop = ref(false)
@@ -945,20 +1042,20 @@ const estimateNoteHeight = (note) => {
 }
 
 /** 瀑布流：按估算高度依次放入当前最短的列 */
-// const waterfallColumns = computed(() => {
-//   const n = Math.max(1, columnCount.value)
-//   const cols = Array.from({ length: n }, () => [])
-//   const heights = Array(n).fill(0)
-//   for (const note of notes.value) {
-//     let minIdx = 0
-//     for (let i = 1; i < n; i++) {
-//       if (heights[i] < heights[minIdx]) minIdx = i
-//     }
-//     cols[minIdx].push(note)
-//     heights[minIdx] += estimateNoteHeight(note)
-//   }
-//   return cols
-// })
+const waterfallColumns = computed(() => {
+  const n = Math.max(1, columnCount.value)
+  const cols = Array.from({ length: n }, () => [])
+  const heights = Array(n).fill(0)
+  for (const note of notes.value) {
+    let minIdx = 0
+    for (let i = 1; i < n; i++) {
+      if (heights[i] < heights[minIdx]) minIdx = i
+    }
+    cols[minIdx].push(note)
+    heights[minIdx] += estimateNoteHeight(note)
+  }
+  return cols
+})
 
 // 监听用户信息更新事件，实时更新页面显示
 const handleUserInfoUpdate = (event) => {
@@ -999,16 +1096,52 @@ const handleUserInfoUpdate = (event) => {
     notes.value = [...notes.value]
   }
 }
+// 构建评论树形结构
+const buildCommentTree = (commentsList) => {
+  if (!commentsList || !commentsList.length) return []
 
+  const commentMap = new Map()
+  const rootComments = []
+
+  // 先建立所有评论的映射
+  commentsList.forEach(comment => {
+    comment.children = []
+    commentMap.set(comment.id, comment)
+  })
+
+  // 构建树形结构
+  commentsList.forEach(comment => {
+    if (comment.parentId && comment.parentId !== 0 && commentMap.has(comment.parentId)) {
+      const parent = commentMap.get(comment.parentId)
+      parent.children = parent.children || []
+      parent.children.push(comment)
+    } else {
+      rootComments.push(comment)
+    }
+  })
+
+  // 对每一层按时间排序
+  const sortByTime = (items) => {
+    items.sort((a, b) => new Date(a.createTime) - new Date(b.createTime))
+    items.forEach(item => {
+      if (item.children && item.children.length) {
+        sortByTime(item.children)
+      }
+    })
+  }
+  sortByTime(rootComments)
+
+  return rootComments
+}
 // 生命周期
 onMounted(async () => {
   // 先加载用户信息和话题列表
   await Promise.all([loadTopics(), loadAllUsers()])
   // 然后加载笔记（此时用户缓存已有数据）
   await loadNotes()
- // updateColumnCount()
+  updateColumnCount()
   window.addEventListener('scroll', handleScroll)
- // window.addEventListener('resize', updateColumnCount)
+  window.addEventListener('resize', updateColumnCount)
 
   // 监听用户信息更新事件
   window.addEventListener('userInfoUpdated', handleUserInfoUpdate)
@@ -1016,7 +1149,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
-  //window.removeEventListener('resize', updateColumnCount)
+  window.removeEventListener('resize', updateColumnCount)
   // 移除用户信息更新事件监听
   window.removeEventListener('userInfoUpdated', handleUserInfoUpdate)
 })
@@ -1028,7 +1161,7 @@ onUnmounted(() => {
     <div class="top-navbar">
       <div class="navbar-content">
         <div class="logo-section">
-          <span class="logo-text"> dragonfly 博客</span>
+          <span class="logo-text"> dragonfly  笔记</span>
         </div>
 
         <div class="search-section">
@@ -1067,7 +1200,6 @@ onUnmounted(() => {
     </div>
 
     <!-- 瀑布流内容区 -->
-    <!-- 瀑布流内容区 -->
     <div class="waterfall-container" v-loading="loading && pageNum === 1">
       <!-- 无笔记，空状态 -->
       <div v-if="notes.length === 0 && !loading" class="empty-state">
@@ -1076,10 +1208,11 @@ onUnmounted(() => {
         <p class="empty-hint">快来发布第一篇笔记吧~</p>
       </div>
 
-      <!-- 使用 CSS column-count 瀑布流 -->
+      <!-- 使用 JS 瀑布流，按最短列优先放置 -->
       <div v-else class="waterfall-masonry">
+        <div v-for="(column, colIndex) in waterfallColumns" :key="colIndex" class="waterfall-column">
         <div
-            v-for="note in notes"
+            v-for="note in column"
             :key="note.id"
             class="waterfall-item"
             @click="viewDetail(note)"
@@ -1167,18 +1300,19 @@ onUnmounted(() => {
                   />
                   <span class="xhs-name">{{ note.userName }}</span>
                 </div>
-                <button
-                    type="button"
-                    class="xhs-like"
-                    :class="{ liked: likedNotes[note.id] }"
-                    @click="toggleLike(note, $event)"
-                >
-                  <el-icon><Star /></el-icon>
+                <button type="button" class="xhs-like" :class="{ liked: likedNotes[note.id] }" @click="toggleLike(note, $event)">
+                  <svg v-if="!likedNotes[note.id]" class="like-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                  </svg>
+                  <svg v-else class="like-icon liked-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                  </svg>
                   <span>{{ formatNumber(note.likesCount || 0) }}</span>
                 </button>
               </div>
             </div>
           </article>
+        </div>
         </div>
       </div>
 
@@ -1303,15 +1437,15 @@ onUnmounted(() => {
                   <el-icon><ChatDotRound /></el-icon>
                   {{ currentNote.commentsCount || 0 }} 评论
                 </span>
-                <span
-                    class="stat-badge like-badge"
-                    :class="{ liked: likedNotes[currentNote.id] }"
-                    :data-note-id="currentNote.id"
-                    @click="toggleLike(currentNote, $event)"
-                >
-                  <el-icon><Star /></el-icon>
-                  {{ currentNote.likesCount || 0 }} 点赞
-                </span>
+                <span class="stat-badge like-badge" :class="{ liked: likedNotes[currentNote.id] }" @click="toggleLike(currentNote, $event)">
+  <svg v-if="!likedNotes[currentNote.id]" class="like-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+  </svg>
+  <svg v-else class="like-icon liked-icon" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+  </svg>
+  {{ currentNote.likesCount || 0 }} 点赞
+</span>
                 <span
                     class="stat-badge favorite-badge"
                     :class="{ favorited: favoritedNotes[currentNote.id] }"
@@ -1325,66 +1459,80 @@ onUnmounted(() => {
               </div>
               <div class="detail-body" v-html="currentNote.content"></div>
 
-              <!-- 评论区 -->
+              <!-- 评论区 - 完整版 -->
               <div class="comment-section">
-                <h3 class="comment-title">评论 ({{ comments.length }})</h3>
+                <h3 class="comment-title">
+                  评论 ({{ totalCommentCount }})
+                  <span class="comment-subtitle">共 {{ comments.length }} 条主评论</span>
+                </h3>
 
                 <!-- 评论输入框 -->
-                <div class="comment-input-wrapper">
-                  <el-input
-                      v-model="commentContent"
-                      type="textarea"
-                      :rows="3"
-                      :placeholder="
-                      replyToComment
-                        ? `回复 @${replyToComment.nickname || replyToComment.username || '匿名用户'}...`
-                        : '写下你的评论...'
-                    "
-                      maxlength="500"
-                      show-word-limit
-                  />
-                  <div class="comment-actions-bar">
-                    <el-button
-                        v-if="replyToComment"
-                        size="small"
-                        @click="((replyToComment = null), (commentContent = ''))"
-                    >
-                      取消回复
-                    </el-button>
-                    <el-button type="primary" round class="submit-comment-btn" @click="submitComment">
-                      {{ replyToComment ? '发送回复' : '发表评论' }}
-                    </el-button>
+                <div class="comment-input-wrapper" :class="{ 'has-reply': replyToComment }">
+                  <div class="input-avatar">
+                    <img
+                        v-if="userInfoStore.info.userPic"
+                        :src="userInfoStore.info.userPic"
+                        class="input-avatar-img"
+                    />
+                    <div v-else class="input-avatar-placeholder">
+                      {{ (userInfoStore.info.nickname || '我').charAt(0).toUpperCase() }}
+                    </div>
+                  </div>
+                  <div class="input-content">
+                    <div v-if="replyToComment" class="reply-badge">
+        <span class="reply-badge-text">
+          回复 @{{ replyToComment.nickname || replyToComment.username || '匿名用户' }}
+        </span>
+                      <el-button
+                          size="small"
+                          text
+                          @click="cancelReply"
+                          class="cancel-reply-btn"
+                      >
+                        取消
+                      </el-button>
+                    </div>
+                    <el-input
+                        v-model="commentContent"
+                        type="textarea"
+                        :rows="3"
+                        :placeholder="replyToComment ? '写下你的回复...' : '写下你的评论...'"
+                        maxlength="500"
+                        show-word-limit
+                        class="comment-textarea"
+                    />
+                    <div class="comment-actions-bar">
+                      <span class="comment-tip">✨ 友善发言，分享美好</span>
+                      <el-button
+                          type="primary"
+                          round
+                          class="submit-comment-btn"
+                          @click="submitComment"
+                          :loading="submittingComment"
+                      >
+                        {{ replyToComment ? '发送回复' : '发表评论' }}
+                      </el-button>
+                    </div>
                   </div>
                 </div>
 
-                <!-- 评论列表 -->
+                <!-- 评论列表 - 树形结构展示 -->
                 <div class="comment-list">
-                  <div v-for="comment in comments" :key="comment.id" class="comment-item">
-                    <div class="comment-avatar">👤</div>
-                    <div class="comment-content">
-                      <div class="comment-header">
-                        <span class="comment-author">{{
-                            comment.nickname || comment.username || '匿名用户'
-                          }}</span>
-                        <span class="comment-time">{{ comment.createTime }}</span>
-                      </div>
-                      <div class="comment-text">{{ comment.content }}</div>
-                      <div class="comment-actions">
-                        <span
-                            class="comment-like-btn"
-                            :class="{ liked: likedComments[comment.id] }"
-                            :data-comment-id="comment.id"
-                            @click="toggleCommentLike(comment, $event)"
-                        >
-                          <el-icon><Star /></el-icon>
-                          {{ comment.likesCount || 0 }}
-                        </span>
-                        <span class="comment-reply-btn" @click="replyComment(comment)"> 回复 </span>
-                      </div>
-                    </div>
-                  </div>
+                  <template v-for="comment in comments" :key="comment.id">
+                    <!-- 递归渲染评论组件 -->
+                    <CommentItem
+                        :comment="comment"
+                        :depth="0"
+                        :liked-comments="likedComments"
+                        @reply="replyComment"
+                        @toggle-like="toggleCommentLike"
+                    />
+                  </template>
 
-                  <div v-if="comments.length === 0" class="no-comments">暂无评论，快来抢沙发~</div>
+                  <div v-if="comments.length === 0" class="no-comments">
+                    <span class="no-comments-emoji">💬</span>
+                    <p>暂无评论，快来抢沙发~</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1575,30 +1723,22 @@ onUnmounted(() => {
   }
 }
 
-// 瀑布流容器 - 使用 CSS column-count
+// 瀑布流容器 - 使用 JS 瀑布流 + Flexbox 布局
 .waterfall-masonry {
-  column-count: 4;
-  column-gap: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
 
-  // 响应式列数
-  @media (max-width: 1200px) {
-    column-count: 3;
-  }
-
-  @media (max-width: 768px) {
-    column-count: 2;
-    column-gap: 12px;
-  }
-
-  @media (max-width: 480px) {
-    column-count: 1;
-  }
+.waterfall-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .waterfall-item {
-  break-inside: avoid;
-  page-break-inside: avoid;
-  margin-bottom: 16px;
   cursor: pointer;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   animation: fadeInUp 0.5s ease-out;
@@ -1731,6 +1871,22 @@ onUnmounted(() => {
 
   &.media-ar-video {
     aspect-ratio: 9 / 16;
+  }
+
+  &.media-ar-1-1 {
+    aspect-ratio: 1 / 1;
+  }
+
+  &.media-ar-4-5 {
+    aspect-ratio: 4 / 5;
+  }
+
+  &.media-ar-3-4 {
+    aspect-ratio: 3 / 4;
+  }
+
+  &.media-ar-5-7 {
+    aspect-ratio: 5 / 7;
   }
 
   // 悬停遮罩层（小红书风格）
@@ -2690,6 +2846,15 @@ onUnmounted(() => {
   animation: fadeInUp 0.4s ease-out 0.25s both;
 }
 
+
+
+
+// 在 UserHome.vue 样式末尾添加以下代码
+
+// 评论区样式增强（保留原有渐变文字效果）
+
+
+// 保留原有的渐变文字样式，只添加子标题样式
 .comment-title {
   font-size: 18px;
   font-weight: 600;
@@ -2698,52 +2863,136 @@ onUnmounted(() => {
   background-clip: text;
   color: transparent;
   margin: 0 0 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  .comment-subtitle {
+    font-size: 13px;
+    font-weight: normal;
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+    color: #a09abf;
+  }
 }
 
+// 评论输入框样式
 .comment-input-wrapper {
-  margin-bottom: 24px;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding: 16px;
+  background: rgba(197, 163, 255, 0.03);
+  border-radius: 20px;
+  transition: all 0.3s ease;
 
-  :deep(.el-textarea__inner) {
-    border-radius: 16px;
-    padding: 12px 16px;
-    background-color: #faf7ff;
-    border: 1px solid #f0e5ff;
-    transition: all 0.3s ease;
-    box-shadow: none;
+  &.has-reply {
+    background: rgba(197, 163, 255, 0.08);
+    border-left: 3px solid #c5a3ff;
+  }
 
-    &:hover {
-      border-color: #d9b8ff;
-      background-color: #fff;
+  .input-avatar {
+    flex-shrink: 0;
+  }
+
+  .input-avatar-img {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #c5a3ff;
+  }
+
+  .input-avatar-placeholder {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+  }
+
+  .input-content {
+    flex: 1;
+  }
+
+  .reply-badge {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding: 6px 12px;
+    background: rgba(197, 163, 255, 0.12);
+    border-radius: 48px;
+
+    .reply-badge-text {
+      font-size: 12px;
+      color: #c5a3ff;
     }
 
-    &:focus {
-      border-color: #c5a3ff;
-      background-color: #fff;
-      box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.12);
+    .cancel-reply-btn {
+      padding: 0;
+      height: auto;
+      color: #a09abf;
+
+      &:hover {
+        color: #ff6b6b;
+      }
     }
   }
 
-  .submit-comment-btn {
-    margin-top: 12px;
-    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-    border: none;
-    border-radius: 48px;
-    padding: 10px 24px;
-    font-weight: 500;
-    transition: all 0.3s ease;
+  .comment-textarea {
+    :deep(.el-textarea__inner) {
+      border-radius: 16px;
+      background: #faf7ff;
+      border: 1px solid #f0e5ff;
+      transition: all 0.3s ease;
 
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
+      &:focus {
+        border-color: #c5a3ff;
+        box-shadow: 0 0 0 3px rgba(197, 163, 255, 0.1);
+      }
+    }
+  }
+
+  .comment-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+
+    .comment-tip {
+      font-size: 11px;
+      color: #b0a7c0;
+    }
+
+    .submit-comment-btn {
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+      border: none;
+      border-radius: 48px;
+      padding: 8px 24px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+      }
     }
   }
 }
 
+// 评论列表容器
 .comment-list {
-  max-height: 400px;
+  max-height: 500px;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #c5a3ff #f0e5ff;
+  padding-right: 8px;
 
   &::-webkit-scrollbar {
     width: 4px;
@@ -2760,239 +3009,80 @@ onUnmounted(() => {
   }
 }
 
-.comment-item {
-  display: flex;
-  gap: 12px;
-  padding: 16px 0;
-  border-bottom: 1px solid rgba(197, 163, 255, 0.1);
+// 无评论状态
+.no-comments {
+  text-align: center;
+  padding: 48px 20px;
+
+  .no-comments-emoji {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+
+  p {
+    font-size: 14px;
+    color: #b0a7c0;
+    margin: 0;
+  }
+}
+
+//爱心
+// 爱心图标通用样式
+.like-icon {
+  width: 16px;
+  height: 16px;
   transition: all 0.2s ease;
-
-  &:hover {
-    background: rgba(197, 163, 255, 0.02);
-    transform: translateX(4px);
-  }
-
-  &:last-child {
-    border-bottom: none;
-  }
 }
 
-.comment-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #e0c3ff, #c5a3ff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(197, 163, 255, 0.2);
-  transition: transform 0.2s ease;
-
-  &:hover {
-    transform: scale(1.05);
-  }
+.liked-icon {
+  color: #c5a3ff;
+  animation: heartBeat 0.4s ease;
 }
 
-.comment-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.comment-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.comment-author {
-  font-weight: 500;
-  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  font-size: 14px;
-}
-
-.comment-time {
-  font-size: 12px;
-  color: #999;
-}
-
-.comment-text {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #6a5a7a;
-  margin-bottom: 8px;
-  word-break: break-word;
-}
-
-.comment-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.comment-like-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 48px;
-  font-size: 12px;
-  color: #999;
-  cursor: pointer;
-  transition: all 0.3s ease;
-
-  &:hover {
-    background: rgba(197, 163, 255, 0.1);
-    color: #c5a3ff;
+// 笔记卡片点赞按钮样式增强
+.xhs-like {
+  .like-icon {
+    width: 14px;
+    height: 14px;
   }
 
   &.liked {
-    color: #c5a3ff;
-    background: rgba(197, 163, 255, 0.15);
-
-    .el-icon {
-      animation: heartBeat 0.5s ease;
+    .liked-icon {
+      color: #c5a3ff;
     }
   }
-
-  .el-icon {
-    font-size: 14px;
-  }
 }
 
-.comment-reply-btn {
-  font-size: 12px;
-  color: #8a7a9a;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  padding: 4px 10px;
-  border-radius: 48px;
-
-  &:hover {
-    background: rgba(197, 163, 255, 0.1);
-    color: #c5a3ff;
-  }
-}
-
-.comment-actions-bar {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.no-comments {
-  text-align: center;
-  padding: 40px 20px;
-  color: #b0a7c0;
-  font-size: 14px;
-}
-
-// 响应式设计
-@media (max-width: 1024px) {
-  .detail-content {
-    grid-template-columns: 1fr;
+// 弹窗点赞统计样式增强
+.stat-badge.like-badge {
+  .like-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
   }
 
-  .detail-dialog-container {
-    height: 90vh;
-    width: 95%;
-  }
-
-  .detail-left {
-    min-height: 40vh;
-    max-height: 45vh;
-  }
-
-  .detail-right {
-    overflow-y: auto;
-  }
-}
-
-@media (max-width: 768px) {
-  .navbar-content {
-    padding: 0 16px;
-  }
-
-  .logo-text {
-    font-size: 20px !important;
-  }
-
-  .search-section {
-    display: none;
-  }
-
-  .waterfall-container {
-    padding: 0 12px 40px;
-  }
-
-  .back-to-top {
-    right: 16px;
-    bottom: 60px;
-    width: 44px;
-    height: 44px;
-  }
-
-  .detail-dialog-container {
-    width: 100%;
-    height: 100vh;
-    border-radius: 0;
-  }
-
-  .detail-dialog-header {
-    top: 12px;
-    right: 12px;
-
-    .dialog-close-btn {
-      width: 36px;
-      height: 36px;
-      background: rgba(0, 0, 0, 0.5);
+  &.liked {
+    .liked-icon {
       color: white;
-
-      &:hover {
-        background: rgba(0, 0, 0, 0.7);
-      }
     }
   }
+}
 
-  .detail-left {
-    min-height: 35vh;
-    max-height: 40vh;
+// 心跳动画
+@keyframes heartBeat {
+  0% {
+    transform: scale(1);
   }
-
-  .detail-video-wrapper .detail-video {
-    max-height: 40vh;
+  30% {
+    transform: scale(1.3);
   }
-
-  .detail-right {
-    padding: 20px;
+  60% {
+    transform: scale(1.1);
   }
-
-  .detail-title {
-    font-size: 18px;
-  }
-
-  .detail-stats {
-    gap: 8px;
-
-    .stat-badge {
-      padding: 4px 10px;
-      font-size: 11px;
-    }
-  }
-
-  .image-nav .nav-btn {
-    width: 36px;
-    height: 36px;
-
-    .el-icon {
-      font-size: 16px;
-    }
+  100% {
+    transform: scale(1);
   }
 }
 </style>

@@ -3,6 +3,7 @@ package com.dragonfly.pojo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 @Data
 
 public class Comment {
@@ -13,6 +14,16 @@ public class Comment {
     private Integer replyToUserId;
     private String content;
     private Integer likesCount;
-    private Integer status;//1:正常，2:删除
+    private Integer status;//1:正常，0:删除
     private LocalDateTime createTime;
+    private LocalDateTime updateTime;
+    // 关联查询字段
+    private String username;
+    private String nickname;
+    private String userPic;//用户头像
+    private String noteTitle;
+    // 回复目标用户昵称
+    private String replyToUserName;
+    // 子评论列表（树形结构）
+    private List<Comment> children;
 }

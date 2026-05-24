@@ -1,6 +1,7 @@
 package com.dragonfly.controller;
 
 import com.dragonfly.pojo.Comment;
+import com.dragonfly.pojo.PageBean;
 import com.dragonfly.pojo.Result;
 import com.dragonfly.service.CommentService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,5 +64,15 @@ public class CommentController {
     public Result unlike(@PathVariable Integer id) {
         commentService.unlike(id);
         return Result.success();
+    }
+
+    // 管理员分页查询所有评论
+    @GetMapping("/page")
+    public Result<PageBean<Comment>> pageList(
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) String keyword) {
+        PageBean<Comment> pageBean = commentService.pageList(pageNum, pageSize, keyword);
+        return Result.success(pageBean);
     }
 }

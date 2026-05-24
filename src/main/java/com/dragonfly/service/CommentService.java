@@ -1,7 +1,7 @@
 package com.dragonfly.service;
 
 import com.dragonfly.pojo.Comment;
-import org.springframework.stereotype.Service;
+import com.dragonfly.pojo.PageBean;
 
 import java.util.List;
 
@@ -26,4 +26,7 @@ public interface CommentService {
     void like(Integer id);
 
     void unlike(Integer id);
+
+    // 管理员分页查询评论
+    PageBean<Comment> pageList(Integer pageNum, Integer pageSize, String keyword);
 }
