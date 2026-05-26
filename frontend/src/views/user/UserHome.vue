@@ -96,6 +96,112 @@ const countAllComments = (list) => {
   }
   return count
 }
+// ========== 回复评论相关状态 ==========
+const replyingCommentId = ref(null)  // 当前正在回复的评论ID
+// 使用 Map 存储每个评论的回复内容，而不是单一变量
+const replyInputContentMap = ref(new Map())
+
+// 处理回复评论（点击回复按钮时调用）
+// 处理回复评论（点击回复按钮时调用）
+const handleReplyComment = (comment) => {
+  // 如果点击的是同一个评论，关闭回复框
+  if (replyingCommentId.value === comment.id) {
+    replyingCommentId.value = null
+    return
+  }
+
+  // 关闭其他回复框，设置当前回复的评论ID
+  replyingCommentId.value = comment.id
+
+  // 如果该评论还没有回复内容，初始化一个
+  if (!replyInputContentMap.value.has(comment.id)) {
+    replyInputContentMap.value.set(comment.id, `@${comment.nickname || comment.username || '匿名用户'} `)
+  }
+
+  // 聚焦到回复输入框
+  nextTick(() => {
+    // 使用更精确的选择器，找到对应评论的回复输入框
+    const replyInput = document.querySelector(`.comment-item-wrapper[data-comment-id="${comment.id}"] .reply-input-container .el-textarea__inner`)
+    if (replyInput) {
+      replyInput.focus()
+    }
+  })
+}
+
+// 取消回复
+const cancelReplyInline = (commentId) => {
+  if (replyingCommentId.value === commentId) {
+    replyingCommentId.value = null
+    // 不清空内容，保留以便再次回复时使用
+  }
+}
+
+
+
+// 更新回复内容
+// 更新回复内容
+const updateReplyContent = (commentId, content) => {
+  replyInputContentMap.value.set(commentId, content)
+}
+
+// 获取指定评论的回复内容
+const getReplyContent = (commentId) => {
+  return replyInputContentMap.value.get(commentId) || ''
+}
+
+// 提交回复
+const submitReply = async (parentCommentId) => {
+  const replyContent = replyInputContentMap.value.get(parentCommentId) || ''
+  if (!replyContent.trim()) {
+    ElMessage.warning('请输入回复内容')
+    return
+  }
+
+  if (!currentNote.value) return
+
+  // 递归查找被回复的评论
+  const findCommentById = (list, id) => {
+    for (const comment of list) {
+      if (comment.id === id) return comment
+      if (comment.children && comment.children.length) {
+        const found = findCommentById(comment.children, id)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  const parentComment = findCommentById(comments.value, parentCommentId)
+  if (!parentComment) return
+
+  submittingComment.value = true
+  try {
+    const commentData = {
+      noteId: currentNote.value.id,
+      content: replyContent,
+      parentId: parentCommentId,
+      replyToUserId: parentComment.userId
+    }
+
+    await addCommentService(commentData)
+    ElMessage.success('回复成功')
+
+    // 重置回复状态
+    replyingCommentId.value = null
+    replyInputContentMap.value.delete(parentCommentId)
+
+    // 重新加载评论列表
+    await loadComments(currentNote.value.id)
+
+    // 更新笔记的评论数
+    currentNote.value.commentsCount = (currentNote.value.commentsCount || 0) + 1
+  } catch (error) {
+    console.error('回复失败:', error)
+    ElMessage.error(error.response?.data?.message || '操作失败')
+  } finally {
+    submittingComment.value = false
+  }
+}
 
 // 扁平化评论树用于渲染（带深度层级）
 const flatComments = computed(() => {
@@ -298,32 +404,15 @@ const loadNotes = async () => {
         // 初始化图片加载状态
         note.imageLoaded = false
 
-        // 填充用户信息 - 优先使用缓存中的最新信息
+        // 填充用户信息...
         if (note.createUser) {
           const userInfo = getUserInfo(note.createUser)
           if (userInfo) {
-            // 使用缓存中的最新用户信息
             note.userName = userInfo.nickname || userInfo.username || '匿名用户'
             note.userPic = userInfo.userPic || ''
           } else {
-            // 如果缓存中没有，使用后端返回的字段或默认值
-            // 尝试多种可能的字段名
             note.userName = note.createUserName || note.userName || note.authorName || '匿名用户'
             note.userPic = note.createUserAvatar || note.userPic || note.authorAvatar || ''
-            
-            // 调试日志：检查后端返回的用户信息字段
-            if (!note.userName || note.userName === '匿名用户') {
-              console.warn('笔记用户信息缺失，note数据:', {
-                id: note.id,
-                createUser: note.createUser,
-                createUserName: note.createUserName,
-                userName: note.userName,
-                authorName: note.authorName,
-                createUserAvatar: note.createUserAvatar,
-                userPic: note.userPic,
-                authorAvatar: note.authorAvatar
-              })
-            }
           }
         } else {
           note.userName = note.userName || note.authorName || '匿名用户'
@@ -336,17 +425,21 @@ const loadNotes = async () => {
         note.commentsCount = note.commentsCount || 0
         note.favoritesCount = note.favoritesCount || 0
       })
-      const noteIds = newNotes.map(note => note.id)
+
+      //批量检查点赞状态
+      // 获取所有新加载的笔记ID
+      const noteIds = newNotes.map(note => note.id).filter(id=>id)
 
       if (noteIds.length > 0) {
-        // 并行获取所有笔记的点赞状态
+        // 并行请求所有笔记的点赞状态
         const likePromises = noteIds.map(async (noteId) => {
           try {
             const res = await checkLikeNoteService(noteId)
-            console.log(`笔记 ${noteId} 点赞状态:`, res.data)
-            return { noteId, liked: res.data === true || res.data === 'true' }
+
+            return { noteId, liked: res.data === true }
+
           } catch (error) {
-            console.warn(`检查笔记 ${noteId} 点赞状态失败:`, error)
+
             return { noteId, liked: false }
           }
         })
@@ -354,30 +447,11 @@ const loadNotes = async () => {
         const likeResults = await Promise.all(likePromises)
         likeResults.forEach(({ noteId, liked }) => {
           likedNotes[noteId] = liked
+
         })
-
-        // // 可选：同时检查收藏状态（如果需要首页显示收藏状态）
-        // const favoritePromises = noteIds.map(async (noteId) => {
-        //   try {
-        //     const res = await checkFavoriteNoteService(noteId)
-        //     return { noteId, favorited: res.data }
-        //   } catch (error) {
-        //     console.warn(`检查笔记 ${noteId} 收藏状态失败:`, error)
-        //     return { noteId, favorited: false }
-        //   }
-        // })
-
-        // const favoriteResults = await Promise.all(favoritePromises)
-        // favoriteResults.forEach(({ noteId, favorited }) => {
-        //   favoritedNotes[noteId] = favorited
-        // })
       }
 
-
-
-
-
-      // 检查是否有未缓存的用户，异步获取并更新
+      // 检查是否有未缓存的用户...
       const missingUserIds = [...new Set(
           notes.value
               .filter(note => note.createUser && !userInfoCache.has(note.createUser))
@@ -385,12 +459,10 @@ const loadNotes = async () => {
       )]
 
       if (missingUserIds.length > 0) {
-        // 异步获取缺失的用户信息，不阻塞当前渲染
         setTimeout(async () => {
           for (const userId of missingUserIds) {
             await fetchUserInfo(userId)
           }
-          // 重新触发响应式更新，刷新用户信息显示
           notes.value = [...notes.value]
         }, 100)
       }
@@ -843,16 +915,17 @@ const recordView = async (noteId) => {
   }
 }
 
-// 加载评论（修改原有函数）
+// 加载评论 - 确保子评论的点赞状态也被检查
 const loadComments = async (noteId) => {
   try {
     const res = await getCommentsByNoteIdService(noteId)
     // 构建树形结构
     comments.value = buildCommentTree(res.data || [])
+    console.log('构建后的评论树:', JSON.parse(JSON.stringify(comments.value)))
 
-    // 检查每个评论的点赞状态（包括子评论）
+    // 递归检查所有评论的点赞状态
     const checkAllCommentsLiked = async (commentList) => {
-      if (!commentList) return
+      if (!commentList || !commentList.length) return
       for (const comment of commentList) {
         await checkCommentLiked(comment.id)
         if (comment.children && comment.children.length) {
@@ -861,6 +934,8 @@ const loadComments = async (noteId) => {
       }
     }
     await checkAllCommentsLiked(comments.value)
+
+    console.log('评论点赞状态已加载:', likedComments)
   } catch (error) {
     console.error('加载评论失败:', error)
     ElMessage.error('加载评论失败')
@@ -922,32 +997,36 @@ const replyComment = (comment) => {
   })
 }
 
-// 修改评论点赞函数（支持子评论）
+// 修改评论点赞函数 - 支持乐观更新和状态同步
 const toggleCommentLike = async (comment, event) => {
   event?.stopPropagation()
 
-  try {
-    if (likedComments[comment.id]) {
-      await unlikeCommentService(comment.id)
-      likedComments[comment.id] = false
-      comment.likesCount = Math.max(0, (comment.likesCount || 0) - 1)
-    } else {
-      await likeCommentService(comment.id)
-      likedComments[comment.id] = true
-      comment.likesCount = (comment.likesCount || 0) + 1
+  const commentId = comment.id
+  const currentLiked = likedComments[commentId] || false
+  const originalLikesCount = comment.likesCount || 0
 
-      // 添加点赞动画效果
-      const likeElement = document.querySelector(`.comment-like-btn[data-comment-id="${comment.id}"]`)
-      if (likeElement) {
-        likeElement.classList.add('like-animation')
-        setTimeout(() => {
-          likeElement.classList.remove('like-animation')
-        }, 500)
-      }
+  // 乐观更新 UI
+  likedComments[commentId] = !currentLiked
+  comment.likesCount = currentLiked
+      ? Math.max(0, originalLikesCount - 1)
+      : originalLikesCount + 1
+
+  try {
+    if (currentLiked) {
+      // 取消点赞
+      await unlikeCommentService(commentId)
+      console.log(`取消点赞评论 ${commentId} 成功`)
+    } else {
+      // 点赞
+      await likeCommentService(commentId)
+      console.log(`点赞评论 ${commentId} 成功`)
     }
   } catch (error) {
-    console.error('点赞失败:', error)
-    //ElMessage.error(error.response?.data?.message || '操作失败')
+    // 请求失败，回滚状态
+    console.error('评论点赞操作失败:', error)
+    likedComments[commentId] = currentLiked
+    comment.likesCount = originalLikesCount
+    ElMessage.error(error.response?.data?.message || '操作失败，请重试')
   }
 }
 
@@ -1466,8 +1545,8 @@ onUnmounted(() => {
                   <span class="comment-subtitle">共 {{ comments.length }} 条主评论</span>
                 </h3>
 
-                <!-- 评论输入框 -->
-                <div class="comment-input-wrapper" :class="{ 'has-reply': replyToComment }">
+                <!-- 顶部评论输入框 -->
+                <div class="top-comment-input-wrapper">
                   <div class="input-avatar">
                     <img
                         v-if="userInfoStore.info.userPic"
@@ -1479,24 +1558,11 @@ onUnmounted(() => {
                     </div>
                   </div>
                   <div class="input-content">
-                    <div v-if="replyToComment" class="reply-badge">
-        <span class="reply-badge-text">
-          回复 @{{ replyToComment.nickname || replyToComment.username || '匿名用户' }}
-        </span>
-                      <el-button
-                          size="small"
-                          text
-                          @click="cancelReply"
-                          class="cancel-reply-btn"
-                      >
-                        取消
-                      </el-button>
-                    </div>
                     <el-input
                         v-model="commentContent"
                         type="textarea"
                         :rows="3"
-                        :placeholder="replyToComment ? '写下你的回复...' : '写下你的评论...'"
+                        placeholder="写下你的评论..."
                         maxlength="500"
                         show-word-limit
                         class="comment-textarea"
@@ -1510,30 +1576,34 @@ onUnmounted(() => {
                           @click="submitComment"
                           :loading="submittingComment"
                       >
-                        {{ replyToComment ? '发送回复' : '发表评论' }}
+                        发表评论
                       </el-button>
                     </div>
                   </div>
                 </div>
 
                 <!-- 评论列表 - 树形结构展示 -->
-                <div class="comment-list">
-                  <template v-for="comment in comments" :key="comment.id">
-                    <!-- 递归渲染评论组件 -->
-                    <CommentItem
-                        :comment="comment"
-                        :depth="0"
-                        :liked-comments="likedComments"
-                        @reply="replyComment"
-                        @toggle-like="toggleCommentLike"
-                    />
-                  </template>
+                <<div class="comment-list">
+                <template v-for="comment in comments" :key="comment.id">
+                  <CommentItem
+                      :comment="comment"
+                      :depth="0"
+                      :liked-comments="likedComments"
+                      :replying-comment-id="replyingCommentId"
+                      :reply-content="getReplyContent(comment.id)"
+                      @reply="handleReplyComment"
+                      @toggle-like="toggleCommentLike"
+                      @cancel-reply="cancelReplyInline"
+                      @submit-reply="submitReply"
+                      @update-reply-content="updateReplyContent"
+                  />
+                </template>
 
-                  <div v-if="comments.length === 0" class="no-comments">
-                    <span class="no-comments-emoji">💬</span>
-                    <p>暂无评论，快来抢沙发~</p>
-                  </div>
+                <div v-if="comments.length === 0" class="no-comments">
+                  <span class="no-comments-emoji">💬</span>
+                  <p>暂无评论，快来抢沙发~</p>
                 </div>
+              </div>
               </div>
             </div>
           </div>
@@ -2878,8 +2948,30 @@ onUnmounted(() => {
   }
 }
 
-// 评论输入框样式
-.comment-input-wrapper {
+
+
+// 评论列表容器
+.comment-list {
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 8px;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f0e5ff;
+    border-radius: 2px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c5a3ff;
+    border-radius: 2px;
+  }
+}
+// 顶部评论输入框样式
+.top-comment-input-wrapper {
   display: flex;
   gap: 12px;
   margin-bottom: 28px;
@@ -2887,11 +2979,6 @@ onUnmounted(() => {
   background: rgba(197, 163, 255, 0.03);
   border-radius: 20px;
   transition: all 0.3s ease;
-
-  &.has-reply {
-    background: rgba(197, 163, 255, 0.08);
-    border-left: 3px solid #c5a3ff;
-  }
 
   .input-avatar {
     flex-shrink: 0;
@@ -2920,31 +3007,6 @@ onUnmounted(() => {
 
   .input-content {
     flex: 1;
-  }
-
-  .reply-badge {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-    padding: 6px 12px;
-    background: rgba(197, 163, 255, 0.12);
-    border-radius: 48px;
-
-    .reply-badge-text {
-      font-size: 12px;
-      color: #c5a3ff;
-    }
-
-    .cancel-reply-btn {
-      padding: 0;
-      height: auto;
-      color: #a09abf;
-
-      &:hover {
-        color: #ff6b6b;
-      }
-    }
   }
 
   .comment-textarea {
@@ -2985,27 +3047,6 @@ onUnmounted(() => {
         box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
       }
     }
-  }
-}
-
-// 评论列表容器
-.comment-list {
-  max-height: 500px;
-  overflow-y: auto;
-  padding-right: 8px;
-
-  &::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #f0e5ff;
-    border-radius: 2px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #c5a3ff;
-    border-radius: 2px;
   }
 }
 

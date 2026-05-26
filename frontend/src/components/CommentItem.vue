@@ -1,8 +1,6 @@
 <!-- CommentItem.vue - 完整修复版 -->
 <script setup>
 import { computed } from 'vue'
-import { ElMessage } from 'element-plus'
-import { likeCommentService, unlikeCommentService } from '@/api/note.js'
 
 const props = defineProps({
   comment: {
@@ -16,10 +14,18 @@ const props = defineProps({
   likedComments: {
     type: Object,
     default: () => ({})
+  },
+  replyingCommentId: {
+    type: Number,
+    default: null
+  },
+  replyContent: {
+    type: String,
+    default: ''
   }
 })
 
-const emit = defineEmits(['reply', 'toggle-like'])
+const emit = defineEmits(['reply', 'toggle-like', 'cancel-reply', 'submit-reply', 'update-reply-content'])
 
 // 最大缩进深度
 const MAX_DEPTH = 5
@@ -33,6 +39,17 @@ const indentStyle = computed(() => {
 // 是否有子评论
 const hasChildren = computed(() => {
   return props.comment.children && props.comment.children.length > 0
+})
+
+// 是否正在回复这条评论
+const isReplying = computed(() => {
+  return props.replyingCommentId === props.comment.id
+})
+
+// 当前评论的回复内容（使用 v-model 双向绑定）
+const localReplyContent = computed({
+  get: () => props.replyContent,
+  set: (val) => emit('update-reply-content', props.comment.id, val)
 })
 
 // 格式化时间
@@ -60,19 +77,21 @@ const handleReply = () => {
 // 处理点赞
 const handleToggleLike = async (event) => {
   event.stopPropagation()
+  emit('toggle-like', props.comment)
+}
 
-  try {
-    if (props.likedComments[props.comment.id]) {
-      await unlikeCommentService(props.comment.id)
-      emit('toggle-like', props.comment)
-    } else {
-      await likeCommentService(props.comment.id)
-      emit('toggle-like', props.comment)
-    }
-  } catch (error) {
-    console.error('点赞失败:', error)
-    ElMessage.error(error.response?.data?.message || '操作失败')
+// 取消回复
+const handleCancelReply = () => {
+  emit('cancel-reply', props.comment.id)
+}
+
+// 提交回复
+const handleSubmitReply = () => {
+  if (!localReplyContent.value.trim()) {
+    ElMessage.warning('请输入回复内容')
+    return
   }
+  emit('submit-reply', props.comment.id)
 }
 
 // 检查是否已点赞
@@ -82,7 +101,7 @@ const isLiked = computed(() => {
 </script>
 
 <template>
-  <div class="comment-item-wrapper" :style="indentStyle">
+  <div class="comment-item-wrapper" :style="indentStyle" :data-comment-id="comment.id">
     <div class="comment-item" :class="{ 'has-children': hasChildren }">
       <!-- 用户头像 -->
       <div class="comment-avatar">
@@ -118,11 +137,9 @@ const isLiked = computed(() => {
               :class="{ liked: isLiked }"
               @click="handleToggleLike"
           >
-            <!-- 未点赞：空心红心 -->
             <svg v-if="!isLiked" class="like-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
             </svg>
-            <!-- 已点赞：实心红心 -->
             <svg v-else class="like-icon liked-icon" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
             </svg>
@@ -135,20 +152,49 @@ const isLiked = computed(() => {
             回复
           </button>
         </div>
-      </div>
-    </div>
 
-    <!-- 子评论递归渲染 -->
-    <div v-if="hasChildren" class="comment-children">
-      <CommentItem
-          v-for="child in comment.children"
-          :key="child.id"
-          :comment="child"
-          :depth="depth + 1"
-          :liked-comments="likedComments"
-          @reply="emit('reply', $event)"
-          @toggle-like="emit('toggle-like', $event)"
-      />
+        <!-- 回复输入框 - 只在点击回复后显示 -->
+        <div v-if="isReplying" class="reply-input-wrapper">
+          <div class="reply-input-header">
+            <span class="reply-to-text">回复 @{{ comment.nickname || comment.username || '匿名用户' }}</span>
+            <button class="cancel-reply-inline" @click="handleCancelReply">取消</button>
+          </div>
+          <div class="reply-input-container">
+            <el-input
+                v-model="localReplyContent"
+                type="textarea"
+                :rows="2"
+                :placeholder="`写下你的回复...`"
+                maxlength="500"
+                show-word-limit
+                @keyup.enter.ctrl="handleSubmitReply"
+            />
+            <div class="reply-actions">
+              <el-button type="primary" size="small" @click="handleSubmitReply">
+                发送回复
+              </el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 子评论递归渲染 - 关键修复点：正确传递所有必要的 props 和 events -->
+        <div v-if="hasChildren" class="comment-children">
+          <CommentItem
+              v-for="child in comment.children"
+              :key="child.id"
+              :comment="child"
+              :depth="depth + 1"
+              :liked-comments="likedComments"
+              :replying-comment-id="replyingCommentId"
+              :reply-content="''"
+              @reply="(data) => $emit('reply', data)"
+              @toggle-like="(data) => $emit('toggle-like', data)"
+              @cancel-reply="(id) => $emit('cancel-reply', id)"
+              @submit-reply="(id) => $emit('submit-reply', id)"
+              @update-reply-content="(id, content) => $emit('update-reply-content', id, content)"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -310,8 +356,79 @@ const isLiked = computed(() => {
   }
 }
 
+// 内嵌回复输入框样式
+.reply-input-wrapper {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(197, 163, 255, 0.2);
+
+  .reply-input-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+
+    .reply-to-text {
+      font-size: 12px;
+      color: #c5a3ff;
+      font-weight: 500;
+    }
+
+    .cancel-reply-inline {
+      background: none;
+      border: none;
+      color: #a09abf;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 48px;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: rgba(197, 163, 255, 0.1);
+        color: #ff6b6b;
+      }
+    }
+  }
+
+  .reply-input-container {
+    :deep(.el-textarea__inner) {
+      border-radius: 12px;
+      background: #faf7ff;
+      border: 1px solid #f0e5ff;
+      font-size: 13px;
+
+      &:focus {
+        border-color: #c5a3ff;
+        box-shadow: 0 0 0 2px rgba(197, 163, 255, 0.1);
+      }
+    }
+  }
+
+  .reply-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+
+    .el-button {
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+      border: none;
+      border-radius: 48px;
+      padding: 6px 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: white;
+
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(197, 163, 255, 0.3);
+      }
+    }
+  }
+}
+
 .comment-children {
-  margin-left: 20px;
+  margin-top: 12px;
   border-left: 2px dashed rgba(197, 163, 255, 0.2);
   padding-left: 12px;
 }
