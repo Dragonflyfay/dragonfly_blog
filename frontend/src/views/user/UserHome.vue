@@ -919,10 +919,8 @@ const recordView = async (noteId) => {
 const loadComments = async (noteId) => {
   try {
     const res = await getCommentsByNoteIdService(noteId)
-    // 构建树形结构
-    comments.value = buildCommentTree(res.data || [])
-    console.log('构建后的评论树:', JSON.parse(JSON.stringify(comments.value)))
-
+    // 后端已经返回树形结构，直接使用，不要再调用 buildCommentTree
+    comments.value = res.data || []
     // 递归检查所有评论的点赞状态
     const checkAllCommentsLiked = async (commentList) => {
       if (!commentList || !commentList.length) return
@@ -1583,27 +1581,28 @@ onUnmounted(() => {
                 </div>
 
                 <!-- 评论列表 - 树形结构展示 -->
-                <<div class="comment-list">
-                <template v-for="comment in comments" :key="comment.id">
-                  <CommentItem
-                      :comment="comment"
-                      :depth="0"
-                      :liked-comments="likedComments"
-                      :replying-comment-id="replyingCommentId"
-                      :reply-content="getReplyContent(comment.id)"
-                      @reply="handleReplyComment"
-                      @toggle-like="toggleCommentLike"
-                      @cancel-reply="cancelReplyInline"
-                      @submit-reply="submitReply"
-                      @update-reply-content="updateReplyContent"
-                  />
-                </template>
+                <div class="comment-list">
+                  <template v-for="comment in comments" :key="comment.id">
+                    <CommentItem
+                        :comment="comment"
+                        :depth="0"
+                        :liked-comments="likedComments"
+                        :replying-comment-id="replyingCommentId"
+                        :reply-content-map="replyInputContentMap"
+                        :submitting="submittingComment"
+                        @reply="handleReplyComment"
+                        @toggle-like="toggleCommentLike"
+                        @cancel-reply="cancelReplyInline"
+                        @submit-reply="submitReply"
+                        @update-reply-content="updateReplyContent"
+                    />
+                  </template>
 
-                <div v-if="comments.length === 0" class="no-comments">
-                  <span class="no-comments-emoji">💬</span>
-                  <p>暂无评论，快来抢沙发~</p>
+                  <div v-if="comments.length === 0" class="no-comments">
+                    <span class="no-comments-emoji">💬</span>
+                    <p>暂无评论，快来抢沙发~</p>
+                  </div>
                 </div>
-              </div>
               </div>
             </div>
           </div>

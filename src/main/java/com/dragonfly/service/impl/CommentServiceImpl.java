@@ -11,25 +11,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * 描述：评论service实现类
- *
- * @param
- * @author 蜻蜓大王
- * @date 2026/5/9 17:11
- */
 @Service
 public class CommentServiceImpl implements CommentService {
     @Autowired
     private CommentMapper commentMapper;
     @Autowired
     private NoteMapper noteMapper;
-
 
     @Override
     public void add(Comment comment) {
@@ -41,9 +31,12 @@ public class CommentServiceImpl implements CommentService {
         comment.setStatus(1);
         comment.setCreateTime(LocalDateTime.now());
 
+        // 设置 parentId，如果为 null 则设为 0
+        if (comment.getParentId() == null) {
+            comment.setParentId(0);
+        }
 
         commentMapper.add(comment);
-
 
         Note note = noteMapper.findById(comment.getNoteId());
         if (note != null) {
@@ -55,32 +48,70 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public List<Comment> listByNoteId(Integer noteId) {
-        List<Comment> flatList = commentMapper.listByNoteId(noteId);
-        return buildCommentTree(flatList);
+       List<Comment> flatList = commentMapper.listByNoteId(noteId);
+        if (flatList == null || flatList.isEmpty()) {
+           return new ArrayList<>();
+       }
+       return buildCommentTree(flatList);
+
     }
 
+
+
     /**
-     * 将平级评论列表构建为树形结构
+     * 将平级评论列表构建为树形结构（支持多级嵌套）
      */
     private List<Comment> buildCommentTree(List<Comment> flatList) {
         if (flatList == null || flatList.isEmpty()) {
             return new ArrayList<>();
         }
-        // parentId -> children 映射
-        Map<Integer, List<Comment>> childrenMap = flatList.stream()
-                .filter(c -> c.getParentId() != null && c.getParentId() != 0)
-                .collect(Collectors.groupingBy(Comment::getParentId));
 
-        // 设置子评论
+        // 1. 创建 id -> Comment 的映射
+        Map<Integer, Comment> commentMap = new HashMap<>();
         for (Comment comment : flatList) {
-            List<Comment> children = childrenMap.get(comment.getId());
-            comment.setChildren(children != null ? children : new ArrayList<>());
+            comment.setChildren(new ArrayList<>());
+            commentMap.put(comment.getId(), comment);
         }
 
-        // 返回顶层评论（parentId == null 或 parentId == 0）
-        return flatList.stream()
-                .filter(c -> c.getParentId() == null || c.getParentId() == 0)
-                .collect(Collectors.toList());
+        // 2. 构建树形结构
+        List<Comment> rootComments = new ArrayList<>();
+        for (Comment comment : flatList) {
+            Integer parentId = comment.getParentId();
+            // 如果 parentId 为 null 或 0，则是根评论
+            if (parentId == null || parentId == 0) {
+                rootComments.add(comment);
+            } else {
+                // 找到父评论，将当前评论添加到父评论的 children 中
+                Comment parent = commentMap.get(parentId);
+                if (parent != null) {
+                    parent.getChildren().add(comment);
+                } else {
+                    // 如果父评论不存在，也作为根评论处理
+                    rootComments.add(comment);
+                }
+            }
+        }
+
+        // 3. 对每一层按时间排序
+        sortCommentsByTime(rootComments);
+
+        return rootComments;
+    }
+
+    /**
+     * 递归按时间排序评论
+     */
+    private void sortCommentsByTime(List<Comment> comments) {
+        if (comments == null || comments.isEmpty()) {
+            return;
+        }
+        // 按创建时间升序排序（旧的在上，新的在下）
+        comments.sort(Comparator.comparing(Comment::getCreateTime));
+        for (Comment comment : comments) {
+            if (comment.getChildren() != null && !comment.getChildren().isEmpty()) {
+                sortCommentsByTime(comment.getChildren());
+            }
+        }
     }
 
     @Override
@@ -97,69 +128,75 @@ public class CommentServiceImpl implements CommentService {
             throw new RuntimeException("只能修改自己的评论");
         }
 
-
         commentMapper.update(comment);
-
     }
 
     @Override
     @Transactional
     public void delete(Integer id) {
-        Map<String ,Object>map=ThreadLocalUtil.get();
-        Integer userId=(Integer)map.get("id");
-        String role=(String) map.get("role");
+        Map<String ,Object> map = ThreadLocalUtil.get();
+        Integer userId = (Integer) map.get("id");
+        String role = (String) map.get("role");
 
-        Comment comment=commentMapper.findById(id);
-        if(comment==null){
+        Comment comment = commentMapper.findById(id);
+        if (comment == null) {
             throw new RuntimeException("评论不存在");
         }
-        //只有笔记的作者或者发表评论的人或者管理员可以删除
 
-        //是否是笔记作者
         Note note = noteMapper.findById(comment.getNoteId());
         if (note == null) {
             throw new RuntimeException("笔记不存在");
         }
+
         boolean isAuthor = note.getCreateUser().equals(userId);
         boolean isOwner = comment.getUserId().equals(userId);
         boolean isAdmin = role != null && role.equals("ADMIN");
 
-        if(!isAuthor&&!isOwner&&!isAdmin){
+        if (!isAuthor && !isOwner && !isAdmin) {
             throw new RuntimeException("无权限删除");
         }
-        commentMapper.delete(id);
 
-        if(note!=null&&note.getCommentsCount()>0){
-            note.setCommentsCount(note.getCommentsCount()-1);
+        // 递归删除所有子评论
+        deleteCommentAndChildren(id);
+
+        if (note != null && note.getCommentsCount() > 0) {
+            // 重新计算评论数
+            int remainingCount = commentMapper.countByNoteId(comment.getNoteId());
+            note.setCommentsCount(remainingCount);
             note.setUpdateTime(LocalDateTime.now());
             noteMapper.update(note);
         }
+    }
 
-
-
+    /**
+     * 递归删除评论及其所有子评论
+     */
+    private void deleteCommentAndChildren(Integer commentId) {
+        // 获取所有子评论
+        List<Comment> children = commentMapper.findByParentId(commentId);
+        if (children != null && !children.isEmpty()) {
+            for (Comment child : children) {
+                deleteCommentAndChildren(child.getId());
+            }
+        }
+        // 删除当前评论
+        commentMapper.delete(commentId);
     }
 
     @Override
     @Transactional
     public void like(Integer id) {
-        //查看用户是否点赞，一点赞则操作
         Comment comment = commentMapper.findById(id);
         if (comment == null) {
             throw new RuntimeException("评论不存在");
         }
-        Map<String, Object> map = ThreadLocalUtil.get();
-        Integer userId = (Integer) map.get("id");
-
-
         commentMapper.incrementLikesCount(id);
-
     }
 
     @Override
     @Transactional
     public void unlike(Integer id) {
         commentMapper.decrementLikesCount(id);
-
     }
 
     @Override

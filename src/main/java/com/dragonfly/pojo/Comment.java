@@ -3,6 +3,7 @@ package com.dragonfly.pojo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 @Data
 
@@ -25,5 +26,6 @@ public class Comment {
     // 回复目标用户昵称
     private String replyToUserName;
     // 子评论列表（树形结构）
-    private List<Comment> children;
+    // 子评论列表
+    private List<Comment> children = new ArrayList<>();
 }

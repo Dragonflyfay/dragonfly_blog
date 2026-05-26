@@ -20,7 +20,7 @@ public interface CommentMapper {
     @Options(useGeneratedKeys = true, keyProperty = "id")
     void add(Comment comment);
 
-    @Select("SELECT c.*, u.username, u.nickname, u.user_pic, ru.nickname AS reply_to_user_name FROM comment c " +
+    @Select("SELECT c.*, u.username, u.nickname, u.user_pic, ru.nickname AS replyToUserName FROM comment c " +
             "LEFT JOIN user u ON c.user_id = u.id " +
             "LEFT JOIN user ru ON c.reply_to_user_id = ru.id " +
             "WHERE c.note_id = #{noteId} AND c.status = 1 " +
@@ -73,4 +73,12 @@ public interface CommentMapper {
             "</if>" +
             "</script>")
     int countAll(@Param("keyword") String keyword);
+
+    /**
+     * 根据父评论ID查找子评论
+     */
+    @Select("SELECT * FROM comment WHERE parent_id = #{parentId} AND status = 1 ORDER BY create_time ASC")
+    List<Comment> findByParentId(Integer parentId);
+
+
 }
