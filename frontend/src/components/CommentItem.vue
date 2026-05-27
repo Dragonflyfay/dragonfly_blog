@@ -91,7 +91,7 @@
           @toggle-like="$emit('toggle-like', $event)"
           @cancel-reply="$emit('cancel-reply', $event)"
           @submit-reply="$emit('submit-reply', $event)"
-          @update-reply-content="$emit('update-reply-content', $event.commentId, $event.content)"
+          @update-reply-content="(commentId, content) => $emit('update-reply-content', commentId, content)"
       />
     </div>
   </div>

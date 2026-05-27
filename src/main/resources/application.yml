@@ -12,6 +12,9 @@ spring:
     multipart:
       max-file-size: 500MB
       max-request-size: 500MB
+#    level:
+#          # 开发环境：只打印 SQL，不打印参数和结果
+#          com.yourpackage.mapper: DEBUG
 #  profiles:
 #    group:
 #      "dev": devServer,devDB,devSelf
@@ -41,3 +44,5 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+

@@ -40,13 +40,13 @@ public class NoteServiceImpl implements NoteService {
         Integer userId = (Integer) map.get("id");
 
         note.setCreateUser(userId);
-        System.out.println("=== 笔记添加调试信息 ===");
-        System.out.println("标题: " + note.getTitle());
-        System.out.println("状态: " + note.getState());
-        System.out.println("话题ID: " + note.getTopicId());
-        System.out.println("媒体类型: " + note.getNoteCategory());
-        System.out.println("视频URL: " + note.getVideo());
-        System.out.println("封面图: " + note.getCoverImg());
+//        System.out.println("=== 笔记添加调试信息 ===");
+//        System.out.println("标题: " + note.getTitle());
+//        System.out.println("状态: " + note.getState());
+//        System.out.println("话题ID: " + note.getTopicId());
+//        System.out.println("媒体类型: " + note.getNoteCategory());
+//        System.out.println("视频URL: " + note.getVideo());
+//        System.out.println("封面图: " + note.getCoverImg());
 
         if ("已发布".equals(note.getState())) {
             note.setPublishTime(LocalDateTime.now());
@@ -76,7 +76,7 @@ public class NoteServiceImpl implements NoteService {
         }
     }
 
-    /** 封面优先写入图片列表首位，便于前端「小红书」封面展示 */
+    /** 封面优先写入图片列表首位 */
     private void syncCoverIntoImages(Note note) {
         if (note.getCoverImg() == null || note.getCoverImg().isEmpty()) {
             return;
