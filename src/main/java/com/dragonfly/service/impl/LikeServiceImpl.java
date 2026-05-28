@@ -170,4 +170,74 @@ public class LikeServiceImpl implements LikeService {
         LikeRecord existing=likeRecordMapper.findByUserAndTarget(userId,2,commentId);
         return existing != null;
     }
+
+    @Override
+    public Map<Integer, Boolean> batchCheckLikedNotes(List<Integer> noteIds) {
+        Map<Integer, Boolean> result = new HashMap<>();
+        
+        if (noteIds == null || noteIds.isEmpty()) {
+            return result;
+        }
+        
+        Map<String,Object> map = ThreadLocalUtil.get();
+        if (map == null) {
+            // 未登录用户，所有笔记都返回false
+            for (Integer noteId : noteIds) {
+                result.put(noteId, false);
+            }
+            return result;
+        }
+        
+        Integer userId = (Integer) map.get("id");
+        
+        // 批量查询点赞记录
+        List<LikeRecord> likedRecords = likeRecordMapper.batchFindByUserAndTarget(userId, 1, noteIds);
+        
+        // 初始化所有笔记为未点赞
+        for (Integer noteId : noteIds) {
+            result.put(noteId, false);
+        }
+        
+        // 标记已点赞的笔记
+        for (LikeRecord record : likedRecords) {
+            result.put(record.getTargetId(), true);
+        }
+        
+        return result;
+    }
+
+    @Override
+    public Map<Integer, Boolean> batchCheckLikedComments(List<Integer> commentIds) {
+        Map<Integer, Boolean> result = new HashMap<>();
+        
+        if (commentIds == null || commentIds.isEmpty()) {
+            return result;
+        }
+        
+        Map<String,Object> map = ThreadLocalUtil.get();
+        if (map == null) {
+            // 未登录用户，所有评论都返回false
+            for (Integer commentId : commentIds) {
+                result.put(commentId, false);
+            }
+            return result;
+        }
+        
+        Integer userId = (Integer) map.get("id");
+        
+        // 批量查询点赞记录
+        List<LikeRecord> likedRecords = likeRecordMapper.batchFindByUserAndTarget(userId, 2, commentIds);
+        
+        // 初始化所有评论为未点赞
+        for (Integer commentId : commentIds) {
+            result.put(commentId, false);
+        }
+        
+        // 标记已点赞的评论
+        for (LikeRecord record : likedRecords) {
+            result.put(record.getTargetId(), true);
+        }
+        
+        return result;
+    }
 }

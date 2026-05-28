@@ -80,6 +80,11 @@ export const checkLikeNoteService = (noteId) => {
   return request.get(`/like/note/${noteId}/check`)
 }
 
+// 批量检查笔记点赞状态
+export const batchCheckNoteLikedService = (noteIds) => {
+  return request.post('/like/note/batch-check', noteIds)
+}
+
 // 点赞评论
 export const likeCommentService = (commentId) => {
   return request.post(`/like/comment/${commentId}`)
@@ -93,6 +98,11 @@ export const unlikeCommentService = (commentId) => {
 // 检查是否点赞评论
 export const checkLikeCommentService = (commentId) => {
   return request.get(`/like/comment/${commentId}/check`)
+}
+
+// 批量检查评论点赞状态
+export const batchCheckCommentLikedService = (commentIds) => {
+  return request.post('/like/comment/batch-check', commentIds)
 }
 
 // 评论相关接口

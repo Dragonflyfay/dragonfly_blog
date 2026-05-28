@@ -5,8 +5,11 @@ import com.dragonfly.service.LikeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+
 /**
- * 描述：点赞控制器
+ * 描述:点赞控制器
  *
  * @param
  * @author 蜻蜓大王
@@ -17,6 +20,20 @@ import org.springframework.web.bind.annotation.*;
 public class LikeController {
     @Autowired
     private LikeService likeService;
+
+    // 批量检查是否点赞笔记（必须放在 /note/{noteId} 之前）
+    @PostMapping("/note/batch-check")
+    public Result<Map<Integer, Boolean>> batchCheckLikedNotes(@RequestBody List<Integer> noteIds) {
+        Map<Integer, Boolean> likedMap = likeService.batchCheckLikedNotes(noteIds);
+        return Result.success(likedMap);
+    }
+
+    // 批量检查是否点赞评论（必须放在 /comment/{commentId} 之前）
+    @PostMapping("/comment/batch-check")
+    public Result<Map<Integer, Boolean>> batchCheckLikedComments(@RequestBody List<Integer> commentIds) {
+        Map<Integer, Boolean> likedMap = likeService.batchCheckLikedComments(commentIds);
+        return Result.success(likedMap);
+    }
 
     // 点赞笔记
     @PostMapping("/note/{noteId}")

@@ -22,6 +22,7 @@ import {
   likeNoteService,
   unlikeNoteService,
   checkLikeNoteService,
+  batchCheckNoteLikedService,
   recordViewService,
   getCommentsByNoteIdService,
   addCommentService,
@@ -31,6 +32,7 @@ import {
   likeCommentService,
   unlikeCommentService,
   checkLikeCommentService,
+  batchCheckCommentLikedService,
   noteDetailService,
 } from '@/api/note'
 import { userInfoService, userListService } from '@/api/user.js'
@@ -363,6 +365,7 @@ const fetchUserInfo = async (userId) => {
 const loadNotes = async () => {
   if (loading.value || !hasMore.value) return
 
+  // 提前设置 loading 状态，避免页面闪烁
   if (pageNum.value === 1) {
     loading.value = true
   } else {
@@ -426,32 +429,19 @@ const loadNotes = async () => {
         note.favoritesCount = note.favoritesCount || 0
       })
 
-      //批量检查点赞状态
-      // 获取所有新加载的笔记ID
-      const noteIds = newNotes.map(note => note.id).filter(id=>id)
-
+      // 批量检查点赞状态（一次性请求）
+      const noteIds = newNotes.map(note => note.id).filter(id => id)
       if (noteIds.length > 0) {
-        // 并行请求所有笔记的点赞状态
-        const likePromises = noteIds.map(async (noteId) => {
-          try {
-            const res = await checkLikeNoteService(noteId)
-
-            return { noteId, liked: res.data === true }
-
-          } catch (error) {
-
-            return { noteId, liked: false }
-          }
-        })
-
-        const likeResults = await Promise.all(likePromises)
-        likeResults.forEach(({ noteId, liked }) => {
-          likedNotes[noteId] = liked
-
-        })
+        try {
+          const res = await batchCheckNoteLikedService(noteIds)
+          // 将结果合并到 likedNotes
+          Object.assign(likedNotes, res.data)
+        } catch (error) {
+          console.warn('批量检查点赞状态失败:', error)
+        }
       }
 
-      // 检查是否有未缓存的用户...
+      // 异步加载缺失的用户信息（不阻塞主流程）
       const missingUserIds = [...new Set(
           notes.value
               .filter(note => note.createUser && !userInfoCache.has(note.createUser))
@@ -459,12 +449,10 @@ const loadNotes = async () => {
       )]
 
       if (missingUserIds.length > 0) {
-        setTimeout(async () => {
-          for (const userId of missingUserIds) {
-            await fetchUserInfo(userId)
-          }
-          notes.value = [...notes.value]
-        }, 100)
+        // 使用 Promise.all 并行加载，而不是串行
+        Promise.all(missingUserIds.map(userId => fetchUserInfo(userId))).catch(err => {
+          console.warn('加载用户信息失败:', err)
+        })
       }
     }
   } catch (error) {
@@ -921,17 +909,30 @@ const loadComments = async (noteId) => {
     const res = await getCommentsByNoteIdService(noteId)
     // 后端已经返回树形结构，直接使用，不要再调用 buildCommentTree
     comments.value = res.data || []
-    // 递归检查所有评论的点赞状态
-    const checkAllCommentsLiked = async (commentList) => {
+    
+    // 收集所有评论ID
+    const allCommentIds = []
+    const collectCommentIds = (commentList) => {
       if (!commentList || !commentList.length) return
       for (const comment of commentList) {
-        await checkCommentLiked(comment.id)
+        allCommentIds.push(comment.id)
         if (comment.children && comment.children.length) {
-          await checkAllCommentsLiked(comment.children)
+          collectCommentIds(comment.children)
         }
       }
     }
-    await checkAllCommentsLiked(comments.value)
+    collectCommentIds(comments.value)
+    
+    // 批量检查所有评论的点赞状态（一次性请求）
+    if (allCommentIds.length > 0) {
+      try {
+        const res = await batchCheckCommentLikedService(allCommentIds)
+        // 将结果合并到 likedComments
+        Object.assign(likedComments, res.data)
+      } catch (error) {
+        console.warn('批量检查评论点赞状态失败:', error)
+      }
+    }
 
     console.log('评论点赞状态已加载:', likedComments)
   } catch (error) {

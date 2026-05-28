@@ -2,6 +2,8 @@ package com.dragonfly.mapper;
 import com.dragonfly.pojo.LikeRecord;
 import org.apache.ibatis.annotations.*;
 
+import java.util.List;
+
 /**
  * 描述：点赞mapper
  *
@@ -29,4 +31,14 @@ public interface LikeRecordMapper {
     @Select("SELECT COUNT(*) FROM like_record WHERE target_type = #{targetType} AND target_id = #{targetId}")
     int countByTarget(@Param("targetType") Integer targetType,
                       @Param("targetId") Integer targetId);
+
+    @Select("<script>" +
+            "SELECT * FROM like_record WHERE user_id = #{userId} AND target_type = #{targetType} AND target_id IN " +
+            "<foreach item='id' collection='targetIds' open='(' separator=',' close=')'>" +
+            "#{id}" +
+            "</foreach>" +
+            "</script>")
+    List<LikeRecord> batchFindByUserAndTarget(@Param("userId") Integer userId,
+                                               @Param("targetType") Integer targetType,
+                                               @Param("targetIds") List<Integer> targetIds);
 }
