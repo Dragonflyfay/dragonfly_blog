@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted, shallowRef, onBeforeUnmount } from 'vue'
+import { ref, reactive, onMounted, shallowRef, onBeforeUnmount,nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Delete,
@@ -38,6 +38,8 @@ const coverInput = ref()
 const videoPreview = ref()
 // 新增：用于从视频中提取封面
 const canvasRef = ref(null)
+// 新增：用于保存视频封面
+const isVideoTranscoding = ref(false)
 // 视频上传进度
 const videoUploadProgress = ref(0)
 const isUploadingVideo = ref(false)
@@ -224,6 +226,7 @@ const triggerVideoUpload = () => {
 }
 
 // 处理视频上传
+// 处理视频上传
 const handleVideoUpload = async (event) => {
   const file = event.target.files[0]
   if (!file) return
@@ -241,7 +244,6 @@ const handleVideoUpload = async (event) => {
   const formData = new FormData()
   formData.append('file', file)
 
-  // 重置进度
   videoUploadProgress.value = 0
   isUploadingVideo.value = true
 
@@ -252,44 +254,44 @@ const handleVideoUpload = async (event) => {
     })
 
     uploadInstance.interceptors.request.use(
-      (config) => {
-        const tokenStore = useTokenStore()
-        let token = tokenStore.token
-        if (!token) {
-          token = localStorage.getItem('global_token')
+        (config) => {
+          const tokenStore = useTokenStore()
+          let token = tokenStore.token
           if (!token) {
-            const tabId = sessionStorage.getItem('tab_id')
-            if (tabId) {
-              token = sessionStorage.getItem(`token_${tabId}`)
+            token = localStorage.getItem('global_token')
+            if (!token) {
+              const tabId = sessionStorage.getItem('tab_id')
+              if (tabId) {
+                token = sessionStorage.getItem(`token_${tabId}`)
+              }
             }
           }
-        }
-        if (token) {
-          config.headers.Authorization = token
-        }
-        return config
-      },
-      (err) => Promise.reject(err),
+          if (token) {
+            config.headers.Authorization = token
+          }
+          return config
+        },
+        (err) => Promise.reject(err),
     )
 
     uploadInstance.interceptors.response.use(
-      (result) => {
-        if (result.data.code === 0) {
-          return result.data
-        }
-        ElMessage.error(result.data.message || '服务异常')
-        return Promise.reject(result.data)
-      },
-      (err) => {
-        if (err.code === 'ECONNABORTED') {
-          ElMessage.error('上传超时，请检查网络连接或尝试上传较小的视频')
-        } else if (!err.response) {
-          ElMessage.error('网络异常，请检查网络连接')
-        } else {
-          ElMessage.error(err.response?.data?.message || '上传失败')
-        }
-        return Promise.reject(err)
-      },
+        (result) => {
+          if (result.data.code === 0) {
+            return result.data
+          }
+          ElMessage.error(result.data.message || '服务异常')
+          return Promise.reject(result.data)
+        },
+        (err) => {
+          if (err.code === 'ECONNABORTED') {
+            ElMessage.error('上传超时，请检查网络连接或尝试上传较小的视频')
+          } else if (!err.response) {
+            ElMessage.error('网络异常，请检查网络连接')
+          } else {
+            ElMessage.error(err.response?.data?.message || '上传失败')
+          }
+          return Promise.reject(err)
+        },
     )
 
     const result = await uploadInstance.post('/upload', formData, {
@@ -305,7 +307,40 @@ const handleVideoUpload = async (event) => {
 
     if (result.code === 0) {
       videoUrl.value = result.data
-      ElMessage.success('视频上传成功')
+      isVideoTranscoding.value = true
+      ElMessage.info('视频上传成功，正在转码中（约1-2分钟）...')
+
+      // 轮询检查视频是否可播放
+      let retryCount = 0
+      const maxRetries = 40
+      const checkInterval = setInterval(() => {
+        if (!videoUrl.value) {
+          clearInterval(checkInterval)
+          return
+        }
+
+        const testVideo = document.createElement('video')
+        testVideo.src = videoUrl.value + '?t=' + Date.now()
+
+        testVideo.onloadedmetadata = () => {
+          clearInterval(checkInterval)
+          isVideoTranscoding.value = false
+          ElMessage.success('视频转码完成，可以预览了')
+          if (videoPreview.value) {
+            videoPreview.value.load()
+          }
+        }
+
+        testVideo.onerror = () => {
+          retryCount++
+          console.log(`等待转码... 第${retryCount}次检查`)
+          if (retryCount >= maxRetries) {
+            clearInterval(checkInterval)
+            isVideoTranscoding.value = false
+            ElMessage.warning('视频转码超时，请稍后刷新页面重试')
+          }
+        }
+      }, 3000)
     }
   } catch (error) {
     console.error('视频上传失败:', error)
@@ -588,7 +623,26 @@ onMounted(() => {
           </div>
 
           <div v-else class="video-preview">
-            <video ref="videoPreview" :src="videoUrl" controls class="preview-video"></video>
+            <video
+                ref="videoPreview"
+                :src="videoUrl"
+                controls
+                class="preview-video"
+                preload="auto"
+                @error="(e) => console.error('视频加载错误:', e)"
+            ></video>
+
+            <!-- 转码中的提示 -->
+            <div class="video-tip" v-if="isVideoTranscoding">
+              <el-alert
+                  type="info"
+                  :closable="false"
+                  title="视频正在转码中"
+                  description="视频上传后需要1-2分钟转码，转码完成后会自动显示预览。您可以先发布笔记，稍后查看。"
+                  show-icon
+              />
+            </div>
+
             <div class="video-actions">
               <el-button type="danger" size="small" @click="removeVideo">
                 <el-icon><Delete /></el-icon> 重新上传
@@ -603,11 +657,11 @@ onMounted(() => {
                   </div>
                 </div>
                 <input
-                  ref="coverInput"
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                  style="display: none"
-                  @change="handleCoverUpload"
+                    ref="coverInput"
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    style="display: none"
+                    @change="handleCoverUpload"
                 />
               </div>
             </div>
@@ -1002,6 +1056,26 @@ onMounted(() => {
     width: 100%;
     border-radius: 16px;
     max-height: 400px;
+    background: #000;
+  }
+  .video-tip {
+    margin-top: 12px;
+
+    :deep(.el-alert) {
+      background: linear-gradient(135deg, #f0f7ff 0%, #f0e5ff 100%);
+      border: none;
+      border-radius: 12px;
+
+      .el-alert__title {
+        color: #6a4a9c;
+        font-weight: 600;
+      }
+
+      .el-alert__description {
+        color: #a09abf;
+        font-size: 12px;
+      }
+    }
   }
 
   .video-actions {
