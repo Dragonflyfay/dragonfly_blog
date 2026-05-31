@@ -1,5 +1,8 @@
 package com.dragonfly.service;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * 描述：收藏服务接口
  *
@@ -11,4 +14,6 @@ public interface FavoriteService {
     void favoriteNote(Integer noteId); // 收藏笔记
     void unfavoriteNote(Integer noteId); // 取消收藏笔记
     boolean isFavoritedNote(Integer noteId); // 判断用户是否收藏笔记
+
+    Map<Integer, Boolean> batchCheckFavoritedNotes(List<Integer> noteIds);
 }

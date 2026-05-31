@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -66,6 +68,7 @@ public class FavoriteServiceImpl implements FavoriteService {
     @Override
     public boolean isFavoritedNote(Integer noteId) {
         Map<String,Object> map= ThreadLocalUtil.get();
+        System.out.println("》》》》=== ThreadLocal 内容: " + map);
         if (map == null) {
             // 未登录用户，返回false
             return false;
@@ -74,6 +77,46 @@ public class FavoriteServiceImpl implements FavoriteService {
         Integer userId=(Integer) map.get("id");
         
         FavoriteRecord existing=favoriteRecordMapper.findByUserAndTarget(userId,1,noteId);
+        System.out.println("===♥ 收藏检查结果: " + existing);
+        if (existing != null) {
+            System.out.println("♥=== 找到收藏记录: userId=" + existing.getUserId() + ", noteId=" + existing.getTargetId());
+        }
         return existing != null;
     }
+
+    @Override
+    public Map<Integer, Boolean> batchCheckFavoritedNotes(List<Integer> noteIds) {
+        Map<Integer, Boolean> result = new HashMap<>();
+
+        if (noteIds == null || noteIds.isEmpty()) {
+            return result;
+        }
+
+        Map<String,Object> map = ThreadLocalUtil.get();
+        if (map == null) {
+            for (Integer noteId : noteIds) {
+                result.put(noteId, false);
+            }
+            return result;
+        }
+
+        Integer userId = (Integer) map.get("id");
+
+        // 批量查询收藏记录
+        List<FavoriteRecord> favoritedRecords = favoriteRecordMapper.batchFindByUserAndTarget(userId, 1, noteIds);
+
+        // 初始化所有笔记为未收藏
+        for (Integer noteId : noteIds) {
+            result.put(noteId, false);
+        }
+
+        // 标记已收藏的笔记
+        for (FavoriteRecord record : favoritedRecords) {
+            result.put(record.getTargetId(), true);
+        }
+
+        return result;
+    }
+
+
 }

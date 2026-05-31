@@ -16,6 +16,6 @@ public class FavoriteRecord {
     private Integer id;
     private Integer userId;
     private Integer targetType; // 1:笔记, 2:评论
-    private Integer targetId;
+    private Integer targetId;// 目标ID
     private LocalDateTime createTime;
 }

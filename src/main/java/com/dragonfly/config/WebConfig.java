@@ -26,8 +26,8 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         //登录和注册放行
-       registry.addInterceptor(loginInterceptor).excludePathPatterns("/user/login","/user/register","/upload",
-               "/view/**", "/favorite/**/check", "/like/**/check");
+       registry.addInterceptor(loginInterceptor).excludePathPatterns("/user/login","/user/register","/upload"
+               );
        //权限拦截器
         // 权限拦截器（验证角色）- 在登录拦截器之后执行
         // 注意：Spring Boot会按添加顺序执行，loginInterceptor先执行，authInterceptor后执行

@@ -34,6 +34,7 @@ import {
   checkLikeCommentService,
   batchCheckCommentLikedService,
   noteDetailService,
+  batchCheckNoteFavoritedService,
 } from '@/api/note'
 import { userInfoService, userListService } from '@/api/user.js'
 import useUserInfoStore from '@/stores/userInfo.js'
@@ -438,6 +439,15 @@ const loadNotes = async () => {
           Object.assign(likedNotes, res.data)
         } catch (error) {
           console.warn('批量检查点赞状态失败:', error)
+        }
+      }
+      //批量检查收藏状态
+      if (noteIds.length > 0) {
+        try {
+          const res = await batchCheckNoteFavoritedService(noteIds)
+          Object.assign(favoritedNotes, res.data)
+        } catch (error) {
+          console.warn('批量检查收藏状态失败:', error)
         }
       }
 
@@ -887,6 +897,7 @@ const checkFavorited = async (noteId) => {
   try {
     const res = await checkFavoriteNoteService(noteId)
     favoritedNotes[noteId] = res.data
+    console.log('收藏状态检查结果:', noteId, res.data)  // 添加日志调试
   } catch (error) {
     // 静默失败，不影响用户体验
     console.warn('检查收藏状态失败:', error.message || error)
@@ -1387,6 +1398,17 @@ onUnmounted(() => {
                   </svg>
                   <span>{{ formatNumber(note.likesCount || 0) }}</span>
                 </button>
+
+                <!-- 收藏按钮 -->
+                <button type="button" class="xhs-favorite" :class="{ favorited: favoritedNotes[note.id] }" @click="toggleFavorite(note, $event)">
+                  <svg v-if="!favoritedNotes[note.id]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                  <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                  <span>{{ formatNumber(note.favoritesCount || 0) }}</span>
+                </button>
               </div>
             </div>
           </article>
@@ -1507,33 +1529,46 @@ onUnmounted(() => {
                 >
               </div>
               <div class="detail-stats">
-                <span class="stat-badge">
+                <!-- 浏览量 -->
+                <div class="stat-item">
                   <el-icon><View /></el-icon>
-                  {{ currentNote.viewsCount || 0 }} 浏览
-                </span>
-                <span class="stat-badge">
+                  <span>{{ currentNote.viewsCount || 0 }}</span>
+                  <span class="stat-label">浏览</span>
+                </div>
+
+                <!-- 评论数 -->
+                <div class="stat-item">
                   <el-icon><ChatDotRound /></el-icon>
-                  {{ currentNote.commentsCount || 0 }} 评论
-                </span>
-                <span class="stat-badge like-badge" :class="{ liked: likedNotes[currentNote.id] }" @click="toggleLike(currentNote, $event)">
-  <svg v-if="!likedNotes[currentNote.id]" class="like-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-  </svg>
-  <svg v-else class="like-icon liked-icon" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-  </svg>
-  {{ currentNote.likesCount || 0 }} 点赞
-</span>
-                <span
-                    class="stat-badge favorite-badge"
+                  <span>{{ currentNote.commentsCount || 0 }}</span>
+                  <span class="stat-label">评论</span>
+                </div>
+
+                <!-- 点赞 -->
+                <div
+                    class="stat-item like-item"
+                    :class="{ liked: likedNotes[currentNote.id] }"
+                    @click="toggleLike(currentNote, $event)"
+                >
+                  <svg v-if="!likedNotes[currentNote.id]" class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                  </svg>
+                  <svg v-else class="stat-icon liked-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                  </svg>
+                  <span>{{ currentNote.likesCount || 0 }}</span>
+                  <span class="stat-label">点赞</span>
+                </div>
+
+                <!-- 收藏 -->
+                <div
+                    class="stat-item favorite-item"
                     :class="{ favorited: favoritedNotes[currentNote.id] }"
-                    :data-note-id="currentNote.id"
                     @click="toggleFavorite(currentNote, $event)"
                 >
                   <el-icon><Collection /></el-icon>
-                  {{ currentNote.favoritesCount || 0 }} 收藏
-                </span>
-
+                  <span>{{ currentNote.favoritesCount || 0 }}</span>
+                  <span class="stat-label">收藏</span>
+                </div>
               </div>
               <div class="detail-body" v-html="currentNote.content"></div>
 
@@ -2269,861 +2304,912 @@ onUnmounted(() => {
     }
   }
 }
-
-// 加载更多
-.loading-more,
-.no-more {
-  text-align: center;
-  padding: 24px;
-  color: #b0a7c0;
-  font-size: 14px;
-  display: flex;
+.xhs-favorite {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-// 回到顶部按钮
-.back-to-top {
-  position: fixed;
-  right: 32px;
-  bottom: 80px;
-  width: 56px;
-  height: 56px;
-  // 使用更醒目的颜色
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  border-radius: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: white;
+  gap: 4px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 48px;
+  background: transparent;
+  font-size: 12px;
+  color: #999;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-  transition: all 0.3s ease;
-  z-index: 9999; // 提高 z-index 确保在最上层
-
-  // 添加脉冲动画吸引注意
-  animation: pulse-ring 2s infinite;
-
-  // 添加一个外发光效果
-  &::before {
-    content: '';
-    position: absolute;
-    top: -4px;
-    left: -4px;
-    right: -4px;
-    bottom: -4px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    border-radius: 50%;
-    opacity: 0.3;
-    z-index: -1;
-    transition: opacity 0.3s ease;
-  }
-
-  // 内圈光晕
-  &::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    right: 2px;
-    bottom: 2px;
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
-    border-radius: 50%;
-    z-index: -1;
-  }
+  transition: all 0.2s ease;
 
   &:hover {
-    transform: translateY(-4px) scale(1.1);
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
-    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-
-    &::before {
-      opacity: 0.6;
-    }
+    background: rgba(197, 163, 255, 0.1);
+    transform: scale(1.05);
   }
 
-  &:active {
-    transform: translateY(0px) scale(0.95);
-  }
-
-  .el-icon {
-    font-size: 24px;
-    margin-bottom: 2px;
-  }
-
-  span {
-    font-size: 11px;
-    margin-top: 2px;
-    font-weight: 600;
-    letter-spacing: 1px;
+  &.favorited {
+    color: #f5a623;
+    background: rgba(245, 166, 35, 0.1);
   }
 }
-
-// 脉冲动画效果
-@keyframes pulse-ring {
-  0% {
-    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
-  }
-}git config user.email
- git config user.name
-
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition: all 0.3s ease;
-}
-
-.fade-slide-enter-from,
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-// 详情弹窗 - 现代化动画效果
-.detail-dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-  &.dialog-enter-active {
-    animation: overlayFadeIn 0.3s ease-out forwards;
-  }
-
-  &.dialog-leave-active {
-    animation: overlayFadeOut 0.3s ease-in forwards;
-  }
-}
-
-.detail-dialog-container {
-  position: relative;
-  width: 90%;
-  max-width: 1400px;
-  height: 85vh;
-  background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
-  border-radius: 32px;
-  overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-  &.dialog-enter-active {
-    animation: modalZoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  }
-
-  &.dialog-leave-active {
-    animation: modalZoomOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  }
-}
-
-@keyframes overlayFadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes overlayFadeOut {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes modalZoomIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-@keyframes modalZoomOut {
-  from {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.95) translateY(20px);
-  }
-}
-
-.detail-dialog-header {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 10;
-
-  .dialog-close-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(4px);
-    border: none;
-    cursor: pointer;
+  // 加载更多
+  .loading-more,
+  .no-more {
+    text-align: center;
+    padding: 24px;
+    color: #b0a7c0;
+    font-size: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    color: #4a4a6a;
+    gap: 8px;
+  }
+
+  // 回到顶部按钮
+  .back-to-top {
+    position: fixed;
+    right: 32px;
+    bottom: 80px;
+    width: 56px;
+    height: 56px;
+    // 使用更醒目的颜色
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    transition: all 0.3s ease;
+    z-index: 9999; // 提高 z-index 确保在最上层
+
+    // 添加脉冲动画吸引注意
+    animation: pulse-ring 2s infinite;
+
+    // 添加一个外发光效果
+    &::before {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      right: -4px;
+      bottom: -4px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 50%;
+      opacity: 0.3;
+      z-index: -1;
+      transition: opacity 0.3s ease;
+    }
+
+    // 内圈光晕
+    &::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      right: 2px;
+      bottom: 2px;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+      border-radius: 50%;
+      z-index: -1;
+    }
 
     &:hover {
-      background: white;
-      transform: scale(1.1);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      color: #c5a3ff;
+      transform: translateY(-4px) scale(1.1);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+
+      &::before {
+        opacity: 0.6;
+      }
     }
 
     &:active {
-      transform: scale(0.95);
+      transform: translateY(0px) scale(0.95);
     }
 
-    svg {
-      width: 18px;
-      height: 18px;
+    .el-icon {
+      font-size: 24px;
+      margin-bottom: 2px;
     }
-  }
-}
 
-// 弹窗内容样式优化
-.detail-content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0;
-  height: 100%;
-  overflow: hidden;
-}
-
-.detail-left {
-  background: linear-gradient(135deg, #f0e5ff, #fce4ec);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.detail-video-wrapper {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-
-  .detail-video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    background: transparent;
-  }
-}
-
-.detail-images {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-
-  .image-gallery {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .gallery-image-container {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-
-  .gallery-skeleton {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 60px;
-    height: 60px;
-    border: 3px solid rgba(197, 163, 255, 0.2);
-    border-top-color: #c5a3ff;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to {
-      transform: translate(-50%, -50%) rotate(360deg);
+    span {
+      font-size: 11px;
+      margin-top: 2px;
+      font-weight: 600;
+      letter-spacing: 1px;
     }
   }
 
-  .detail-image {
-    max-width: 100%;
-    max-height: 100%;
-    width: auto;
-    height: auto;
-    object-fit: contain;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-
-    &.image-loading {
-      opacity: 0;
+  // 脉冲动画效果
+  @keyframes pulse-ring {
+    0% {
+      box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
     }
-
-    &.image-loaded {
-      opacity: 1;
-      animation: imageFadeIn 0.5s ease-out;
+    70% {
+      box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
     }
   }
 
-  @keyframes imageFadeIn {
-    from {
-      opacity: 0;
-      transform: scale(0.98);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
+  git config user.email
+  git config user.name
+  .fade-slide-enter-active,
+  .fade-slide-leave-active {
+    transition: all 0.3s ease;
   }
 
-  .image-nav {
-    position: absolute;
-    top: 50%;
+  .fade-slide-enter-from,
+  .fade-slide-leave-to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  // 详情弹窗 - 现代化动画效果
+  .detail-dialog-overlay {
+    position: fixed;
+    top: 0;
     left: 0;
     right: 0;
-    transform: translateY(-50%);
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    z-index: 2000;
     display: flex;
-    justify-content: space-between;
-    padding: 0 20px;
-    pointer-events: none;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &.dialog-enter-active {
+      animation: overlayFadeIn 0.3s ease-out forwards;
+    }
+
+    &.dialog-leave-active {
+      animation: overlayFadeOut 0.3s ease-in forwards;
+    }
+  }
+
+  .detail-dialog-container {
+    position: relative;
+    width: 90%;
+    max-width: 1400px;
+    height: 85vh;
+    background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
+    border-radius: 32px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &.dialog-enter-active {
+      animation: modalZoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    &.dialog-leave-active {
+      animation: modalZoomOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+  }
+
+  @keyframes overlayFadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes overlayFadeOut {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes modalZoomIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95) translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes modalZoomOut {
+    from {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.95) translateY(20px);
+    }
+  }
+
+  .detail-dialog-header {
+    position: absolute;
+    top: 20px;
+    right: 20px;
     z-index: 10;
 
-    .nav-btn {
-      width: 44px;
-      height: 44px;
+    .dialog-close-btn {
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-      border: 2px solid rgba(255, 255, 255, 0.8);
-      color: white;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(4px);
+      border: none;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: all 0.2s ease;
-      pointer-events: auto;
-      backdrop-filter: blur(4px);
-      box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      color: #4a4a6a;
 
       &:hover {
-        background: linear-gradient(135deg, #f8b4d9, #c5a3ff);
-        border-color: white;
+        background: white;
         transform: scale(1.1);
-        box-shadow: 0 6px 16px rgba(197, 163, 255, 0.4);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        color: #c5a3ff;
       }
 
       &:active {
         transform: scale(0.95);
       }
 
-      .el-icon {
-        font-size: 20px;
+      svg {
+        width: 18px;
+        height: 18px;
       }
     }
   }
 
-  .image-indicator {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-    color: white;
-    padding: 6px 16px;
-    border-radius: 48px;
-    font-size: 13px;
-    font-weight: 500;
-    backdrop-filter: blur(4px);
-    z-index: 10;
-    box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
-    animation: indicatorFadeIn 0.3s ease;
+  // 弹窗内容样式优化
+  .detail-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    height: 100%;
+    overflow: hidden;
   }
 
-  @keyframes indicatorFadeIn {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-  }
-}
-
-.detail-right {
-  padding: 32px;
-  overflow-y: auto;
-  background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
-  scrollbar-width: thin;
-  scrollbar-color: #c5a3ff #f0e5ff;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #f0e5ff;
-    border-radius: 3px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #c5a3ff;
-    border-radius: 3px;
-
-    &:hover {
-      background: #f8b4d9;
-    }
-  }
-}
-
-.detail-title {
-  font-size: 24px;
-  font-weight: bold;
-  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  margin: 0 0 16px;
-  line-height: 1.4;
-  animation: slideInFromLeft 0.4s ease-out;
-}
-
-@keyframes slideInFromLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.detail-author-section {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  animation: fadeInUp 0.4s ease-out 0.05s both;
-}
-
-.author-avatar-detail {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid #f0f0f0;
-  transition: transform 0.2s ease;
-
-  &:hover {
-    transform: scale(1.1);
-  }
-}
-
-.author-avatar-placeholder {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #e0c3ff, #c5a3ff);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 18px;
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(197, 163, 255, 0.3);
-  transition: transform 0.2s ease;
-
-  &:hover {
-    transform: scale(1.1);
-  }
-}
-
-.author-name-detail {
-  font-size: 16px;
-  font-weight: 500;
-  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.detail-meta {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  animation: fadeInUp 0.4s ease-out 0.1s both;
-
-  .meta-item {
-    font-size: 14px;
-    color: #8a7a9a;
-  }
-}
-
-.detail-stats {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-  animation: fadeInUp 0.4s ease-out 0.15s both;
-
-  .stat-badge {
-    padding: 6px 14px;
-    background: rgba(197, 163, 255, 0.1);
-    border-radius: 48px;
-    font-size: 13px;
-    color: #8a7a9a;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: 1px solid rgba(197, 163, 255, 0.15);
-
-    .el-icon {
-      font-size: 14px;
-    }
-
-    &:hover {
-      background: rgba(197, 163, 255, 0.18);
-      border-color: rgba(197, 163, 255, 0.3);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(197, 163, 255, 0.15);
-    }
-
-    &.like-badge {
-      &.liked {
-        background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-        color: white;
-        animation: pulse 0.4s ease;
-
-        .el-icon {
-          animation: heartBeat 0.5s ease;
-        }
-      }
-
-      &:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
-      }
-    }
-
-    &.favorite-badge {
-      &.favorited {
-        background: linear-gradient(135deg, #a8e6cf, #7ee0b5);
-        color: #2c665a;
-        animation: pulse 0.4s ease;
-
-        .el-icon {
-          animation: heartBeat 0.5s ease;
-        }
-      }
-
-      &:hover {
-        transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(168, 230, 207, 0.3);
-      }
-    }
-  }
-}
-
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.detail-body {
-  font-size: 15px;
-  line-height: 1.8;
-  color: #4a4a6a;
-  animation: fadeInUp 0.4s ease-out 0.2s both;
-  transition: all 0.3s ease;
-
-  :deep(img) {
-    max-width: 100%;
-    border-radius: 12px;
-    margin: 12px 0;
-    transition: transform 0.3s ease;
-
-    &:hover {
-      transform: scale(1.02);
-    }
-  }
-
-  :deep(p) {
-    margin-bottom: 12px;
-  }
-}
-
-// 评论区样式优化
-.comment-section {
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(197, 163, 255, 0.15);
-  animation: fadeInUp 0.4s ease-out 0.25s both;
-}
-
-
-
-
-// 在 UserHome.vue 样式末尾添加以下代码
-
-// 评论区样式增强（保留原有渐变文字效果）
-
-
-// 保留原有的渐变文字样式，只添加子标题样式
-.comment-title {
-  font-size: 18px;
-  font-weight: 600;
-  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  margin: 0 0 20px;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-
-  .comment-subtitle {
-    font-size: 13px;
-    font-weight: normal;
-    background: none;
-    -webkit-background-clip: unset;
-    background-clip: unset;
-    color: #a09abf;
-  }
-}
-
-
-
-// 评论列表容器
-.comment-list {
-  max-height: 500px;
-  overflow-y: auto;
-  padding-right: 8px;
-
-  &::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #f0e5ff;
-    border-radius: 2px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #c5a3ff;
-    border-radius: 2px;
-  }
-}
-// 顶部评论输入框样式
-.top-comment-input-wrapper {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 28px;
-  padding: 16px;
-  background: rgba(197, 163, 255, 0.03);
-  border-radius: 20px;
-  transition: all 0.3s ease;
-
-  .input-avatar {
-    flex-shrink: 0;
-  }
-
-  .input-avatar-img {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid #c5a3ff;
-  }
-
-  .input-avatar-placeholder {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+  .detail-left {
+    background: linear-gradient(135deg, #f0e5ff, #fce4ec);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
-    font-weight: 600;
-    color: white;
+    overflow: hidden;
+    transition: all 0.3s ease;
   }
 
-  .input-content {
-    flex: 1;
+  .detail-video-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+
+    .detail-video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: transparent;
+    }
   }
 
-  .comment-textarea {
-    :deep(.el-textarea__inner) {
-      border-radius: 16px;
-      background: #faf7ff;
-      border: 1px solid #f0e5ff;
-      transition: all 0.3s ease;
+  .detail-images {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
 
-      &:focus {
-        border-color: #c5a3ff;
-        box-shadow: 0 0 0 3px rgba(197, 163, 255, 0.1);
+    .image-gallery {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gallery-image-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .gallery-skeleton {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60px;
+      height: 60px;
+      border: 3px solid rgba(197, 163, 255, 0.2);
+      border-top-color: #c5a3ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: translate(-50%, -50%) rotate(360deg);
+      }
+    }
+
+    .detail-image {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+
+      &.image-loading {
+        opacity: 0;
+      }
+
+      &.image-loaded {
+        opacity: 1;
+        animation: imageFadeIn 0.5s ease-out;
+      }
+    }
+
+    @keyframes imageFadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .image-nav {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      transform: translateY(-50%);
+      display: flex;
+      justify-content: space-between;
+      padding: 0 20px;
+      pointer-events: none;
+      z-index: 10;
+
+      .nav-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        pointer-events: auto;
+        backdrop-filter: blur(4px);
+        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+
+        &:hover {
+          background: linear-gradient(135deg, #f8b4d9, #c5a3ff);
+          border-color: white;
+          transform: scale(1.1);
+          box-shadow: 0 6px 16px rgba(197, 163, 255, 0.4);
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
+
+        .el-icon {
+          font-size: 20px;
+        }
+      }
+    }
+
+    .image-indicator {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+      color: white;
+      padding: 6px 16px;
+      border-radius: 48px;
+      font-size: 13px;
+      font-weight: 500;
+      backdrop-filter: blur(4px);
+      z-index: 10;
+      box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+      animation: indicatorFadeIn 0.3s ease;
+    }
+
+    @keyframes indicatorFadeIn {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
       }
     }
   }
 
-  .comment-actions-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 12px;
+  .detail-right {
+    padding: 32px;
+    overflow-y: auto;
+    background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
+    scrollbar-width: thin;
+    scrollbar-color: #c5a3ff #f0e5ff;
 
-    .comment-tip {
-      font-size: 11px;
-      color: #b0a7c0;
+    &::-webkit-scrollbar {
+      width: 6px;
     }
 
-    .submit-comment-btn {
-      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-      border: none;
-      border-radius: 48px;
-      padding: 8px 24px;
-      font-weight: 500;
-      transition: all 0.3s ease;
+    &::-webkit-scrollbar-track {
+      background: #f0e5ff;
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #c5a3ff;
+      border-radius: 3px;
 
       &:hover {
+        background: #f8b4d9;
+      }
+    }
+  }
+
+  .detail-title {
+    font-size: 24px;
+    font-weight: bold;
+    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin: 0 0 16px;
+    line-height: 1.4;
+    animation: slideInFromLeft 0.4s ease-out;
+  }
+
+  @keyframes slideInFromLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .detail-author-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    animation: fadeInUp 0.4s ease-out 0.05s both;
+  }
+
+  .author-avatar-detail {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid #f0f0f0;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.1);
+    }
+  }
+
+  .author-avatar-placeholder {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #e0c3ff, #c5a3ff);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(197, 163, 255, 0.3);
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.1);
+    }
+  }
+
+  .author-name-detail {
+    font-size: 16px;
+    font-weight: 500;
+    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .detail-meta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    animation: fadeInUp 0.4s ease-out 0.1s both;
+
+    .meta-item {
+      font-size: 14px;
+      color: #8a7a9a;
+    }
+  }
+
+ .detail-stats {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-top: 1px solid rgba(197, 163, 255, 0.12);
+  border-bottom: 1px solid rgba(197, 163, 255, 0.12);
+  animation: fadeInUp 0.4s ease-out 0.15s both;
+
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: rgba(197, 163, 255, 0.08);
+    border-radius: 48px;
+    font-size: 14px;
+    color: #6a4a9c;
+    transition: all 0.3s ease;
+    cursor: default;
+
+    .el-icon, .stat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #a09abf;
+      margin-left: 2px;
+    }
+
+    span:not(.stat-label) {
+      font-weight: 600;
+      color: #6a4a9c;
+    }
+
+    // 点赞按钮样式
+    &.like-item {
+      cursor: pointer;
+      background: rgba(197, 163, 255, 0.1);
+
+      &:hover {
+        background: rgba(197, 163, 255, 0.2);
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+
+      &.liked {
+        background: linear-gradient(135deg, rgba(197, 163, 255, 0.2), rgba(248, 180, 217, 0.2));
+
+        span:not(.stat-label) {
+          color: #c5a3ff;
+        }
+
+        .liked-icon {
+          color: #c5a3ff;
+          animation: heartBeat 0.4s ease;
+        }
+      }
+    }
+
+    // 收藏按钮样式
+    &.favorite-item {
+      cursor: pointer;
+      background: rgba(168, 230, 207, 0.1);
+
+      &:hover {
+        background: rgba(168, 230, 207, 0.2);
+        transform: translateY(-2px);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+
+      &.favorited {
+        background: linear-gradient(135deg, rgba(168, 230, 207, 0.2), rgba(126, 224, 181, 0.2));
+
+        span:not(.stat-label) {
+          color: #2c665a;
+        }
+
+        .el-icon {
+          color: #2c665a;
+          animation: heartBeat 0.4s ease;
+        }
       }
     }
   }
 }
 
-// 无评论状态
-.no-comments {
-  text-align: center;
-  padding: 48px 20px;
-
-  .no-comments-emoji {
-    font-size: 48px;
-    display: block;
-    margin-bottom: 12px;
-    opacity: 0.5;
-  }
-
-  p {
-    font-size: 14px;
-    color: #b0a7c0;
-    margin: 0;
-  }
-}
-
-//爱心
-// 爱心图标通用样式
-.like-icon {
-  width: 16px;
-  height: 16px;
-  transition: all 0.2s ease;
-}
-
-.liked-icon {
-  color: #c5a3ff;
-  animation: heartBeat 0.4s ease;
-}
-
-// 笔记卡片点赞按钮样式增强
-.xhs-like {
-  .like-icon {
-    width: 14px;
-    height: 14px;
-  }
-
-  &.liked {
-    .liked-icon {
-      color: #c5a3ff;
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    100% {
+      transform: scale(1);
     }
   }
-}
 
-// 弹窗点赞统计样式增强
-.stat-badge.like-badge {
-  .like-icon {
-    width: 14px;
-    height: 14px;
-    margin-right: 4px;
+  .detail-body {
+    font-size: 15px;
+    line-height: 1.8;
+    color: #4a4a6a;
+    animation: fadeInUp 0.4s ease-out 0.2s both;
+    transition: all 0.3s ease;
+
+    :deep(img) {
+      max-width: 100%;
+      border-radius: 12px;
+      margin: 12px 0;
+      transition: transform 0.3s ease;
+
+      &:hover {
+        transform: scale(1.02);
+      }
+    }
+
+    :deep(p) {
+      margin-bottom: 12px;
+    }
   }
 
-  &.liked {
-    .liked-icon {
+  // 评论区样式优化
+  .comment-section {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(197, 163, 255, 0.15);
+    animation: fadeInUp 0.4s ease-out 0.25s both;
+  }
+
+
+  // 在 UserHome.vue 样式末尾添加以下代码
+
+  // 评论区样式增强（保留原有渐变文字效果）
+
+
+  // 保留原有的渐变文字样式，只添加子标题样式
+  .comment-title {
+    font-size: 18px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin: 0 0 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    .comment-subtitle {
+      font-size: 13px;
+      font-weight: normal;
+      background: none;
+      -webkit-background-clip: unset;
+      background-clip: unset;
+      color: #a09abf;
+    }
+  }
+
+
+  // 评论列表容器
+  .comment-list {
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 8px;
+
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f0e5ff;
+      border-radius: 2px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #c5a3ff;
+      border-radius: 2px;
+    }
+  }
+
+  // 顶部评论输入框样式
+  .top-comment-input-wrapper {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 28px;
+    padding: 16px;
+    background: rgba(197, 163, 255, 0.03);
+    border-radius: 20px;
+    transition: all 0.3s ease;
+
+    .input-avatar {
+      flex-shrink: 0;
+    }
+
+    .input-avatar-img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #c5a3ff;
+    }
+
+    .input-avatar-placeholder {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 600;
       color: white;
     }
-  }
-}
 
-// 心跳动画
-@keyframes heartBeat {
-  0% {
-    transform: scale(1);
+    .input-content {
+      flex: 1;
+    }
+
+    .comment-textarea {
+      :deep(.el-textarea__inner) {
+        border-radius: 16px;
+        background: #faf7ff;
+        border: 1px solid #f0e5ff;
+        transition: all 0.3s ease;
+
+        &:focus {
+          border-color: #c5a3ff;
+          box-shadow: 0 0 0 3px rgba(197, 163, 255, 0.1);
+        }
+      }
+    }
+
+    .comment-actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+
+      .comment-tip {
+        font-size: 11px;
+        color: #b0a7c0;
+      }
+
+      .submit-comment-btn {
+        background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+        border: none;
+        border-radius: 48px;
+        padding: 8px 24px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+        }
+      }
+    }
   }
-  30% {
-    transform: scale(1.3);
+
+  // 无评论状态
+  .no-comments {
+    text-align: center;
+    padding: 48px 20px;
+
+    .no-comments-emoji {
+      font-size: 48px;
+      display: block;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    p {
+      font-size: 14px;
+      color: #b0a7c0;
+      margin: 0;
+    }
   }
-  60% {
-    transform: scale(1.1);
+
+  //爱心
+  // 爱心图标通用样式
+  .like-icon {
+    width: 16px;
+    height: 16px;
+    transition: all 0.2s ease;
   }
-  100% {
-    transform: scale(1);
+
+  .liked-icon {
+    color: #c5a3ff;
+    animation: heartBeat 0.4s ease;
   }
+
+  // 笔记卡片点赞按钮样式增强
+  .xhs-like {
+    .like-icon {
+      width: 14px;
+      height: 14px;
+    }
+
+    &.liked {
+      .liked-icon {
+        color: #c5a3ff;
+      }
+    }
+  }
+
+  // 弹窗点赞统计样式增强
+  .stat-badge.like-badge {
+    .like-icon {
+      width: 14px;
+      height: 14px;
+      margin-right: 4px;
+    }
+
+    &.liked {
+      .liked-icon {
+        color: white;
+      }
+    }
+  }
+
+  // 心跳动画
+  @keyframes heartBeat {
+    0% {
+      transform: scale(1);
+    }
+    30% {
+      transform: scale(1.3);
+    }
+    60% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+    }
 }
 </style>

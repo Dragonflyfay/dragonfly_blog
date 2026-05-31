@@ -152,3 +152,7 @@ export const unfavoriteNoteService = (noteId) => {
 export const checkFavoriteNoteService = (noteId) => {
   return request.get(`/favorite/note/${noteId}/check`)
 }
+// 批量检查笔记收藏状态
+export const batchCheckNoteFavoritedService = (noteIds) => {
+  return request.post('/favorite/notes/batch-check', noteIds)
+}
