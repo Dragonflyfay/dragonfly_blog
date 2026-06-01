@@ -41,4 +41,20 @@ public interface UserMapper {
     // 查询所有用户
     @Select("SELECT * FROM user")
     java.util.List<User> list();
+
+    // 增加粉丝数
+    @Update("UPDATE user SET followers_count = followers_count + 1 WHERE id = #{userId}")
+    void incrementFollowersCount(Integer userId);
+
+    // 减少粉丝数
+    @Update("UPDATE user SET followers_count = GREATEST(followers_count - 1, 0) WHERE id = #{userId}")
+    void decrementFollowersCount(Integer userId);
+
+    // 增加关注数
+    @Update("UPDATE user SET following_count = following_count + 1 WHERE id = #{userId}")
+    void incrementFollowingCount(Integer userId);
+
+    // 减少关注数
+    @Update("UPDATE user SET following_count = GREATEST(following_count - 1, 0) WHERE id = #{userId}")
+    void decrementFollowingCount(Integer userId);
 }

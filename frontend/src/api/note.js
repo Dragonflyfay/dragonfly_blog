@@ -156,3 +156,28 @@ export const checkFavoriteNoteService = (noteId) => {
 export const batchCheckNoteFavoritedService = (noteIds) => {
   return request.post('/favorite/notes/batch-check', noteIds)
 }
+
+// 关注相关API
+export const followUserService = (userId) => {
+  return request.post(`/follow/${userId}`)
+}
+
+export const unfollowUserService = (userId) => {
+  return request.delete(`/follow/${userId}`)
+}
+
+export const checkFollowService = (userId) => {
+  return request.get(`/follow/${userId}/check`)
+}
+
+export const batchCheckFollowService = (userIds) => {
+  return request.post('/follow/batch-check', userIds)
+}
+
+export const getFollowersService = (userId) => {
+  return request.get(`/follow/${userId}/followers`)
+}
+
+export const getFollowingService = (userId) => {
+  return request.get(`/follow/${userId}/following`)
+}

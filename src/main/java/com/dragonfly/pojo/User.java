@@ -33,7 +33,6 @@ public class User {
     private String location;
     private Integer followersCount;
     private Integer followingCount;
-    private Integer articlesCount;
     private Integer level;
     private Integer status;
     private String lastLoginIp;

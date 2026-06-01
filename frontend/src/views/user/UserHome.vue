@@ -35,6 +35,7 @@ import {
   batchCheckCommentLikedService,
   noteDetailService,
   batchCheckNoteFavoritedService,
+  batchCheckFollowService,
 } from '@/api/note'
 import { userInfoService, userListService } from '@/api/user.js'
 import useUserInfoStore from '@/stores/userInfo.js'
@@ -449,6 +450,11 @@ const loadNotes = async () => {
         } catch (error) {
           console.warn('批量检查收藏状态失败:', error)
         }
+      }
+      // 收集作者ID并检查关注状态
+      const authorIds = [...new Set(newNotes.map(note => note.createUser).filter(id => id && id !== userInfoStore.info.id))]
+      if (authorIds.length > 0) {
+        await checkFollowingStatus(authorIds)
       }
 
       // 异步加载缺失的用户信息（不阻塞主流程）
@@ -1222,6 +1228,44 @@ const buildCommentTree = (commentsList) => {
 
   return rootComments
 }
+
+
+// 关注状态
+const followingStatus = reactive({})
+
+// 切换关注
+const toggleFollow = async (userId) => {
+  try {
+    if (followingStatus[userId]) {
+      await unfollowUserService(userId)
+      followingStatus[userId] = false
+      if (currentNote.value && currentNote.value.createUser === userId) {
+        currentNote.value.followersCount = Math.max(0, (currentNote.value.followersCount || 0) - 1)
+      }
+      ElMessage.success('已取消关注')
+    } else {
+      await followUserService(userId)
+      followingStatus[userId] = true
+      if (currentNote.value && currentNote.value.createUser === userId) {
+        currentNote.value.followersCount = (currentNote.value.followersCount || 0) + 1
+      }
+      ElMessage.success('关注成功')
+    }
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '操作失败')
+  }
+}
+
+// 批量检查关注状态
+const checkFollowingStatus = async (userIds) => {
+  if (!userIds || userIds.length === 0) return
+  try {
+    const res = await batchCheckFollowService(userIds)
+    Object.assign(followingStatus, res.data)
+  } catch (error) {
+    console.warn('批量检查关注状态失败:', error)
+  }
+}
 // 生命周期
 onMounted(async () => {
   // 先加载用户信息和话题列表
@@ -1510,17 +1554,25 @@ onUnmounted(() => {
             <div class="detail-right">
               <h2 class="detail-title">{{ currentNote.title }}</h2>
               <div class="detail-author-section">
-                <img
-                    v-if="currentNote.userPic"
-                    :src="currentNote.userPic"
-                    class="author-avatar-detail"
-                    alt="author avatar"
-                    @error="(e) => (e.target.style.display = 'none')"
-                />
+                <img v-if="currentNote.userPic" :src="currentNote.userPic" class="author-avatar-detail" />
                 <div v-else class="author-avatar-placeholder">
                   {{ (currentNote.userName || '匿名用户').charAt(0).toUpperCase() }}
                 </div>
-                <span class="author-name-detail">{{ currentNote.userName || '匿名用户' }}</span>
+                <div class="author-info">
+                  <span class="author-name-detail">{{ currentNote.userName || '匿名用户' }}</span>
+                  <div class="author-stats">
+                    <span>粉丝 {{ currentNote.followersCount || 0 }}</span>
+                    <span>关注 {{ currentNote.followingCount || 0 }}</span>
+                  </div>
+                </div>
+                <button
+                    v-if="currentNote.createUser !== userInfoStore.info.id"
+                    class="follow-btn"
+                    :class="{ following: followingStatus[currentNote.createUser] }"
+                    @click="toggleFollow(currentNote.createUser)"
+                >
+                  {{ followingStatus[currentNote.createUser] ? '已关注' : '关注' }}
+                </button>
               </div>
               <div class="detail-meta">
                 <span class="meta-item">📍 {{ currentNote.location || '未知地点' }}</span>
@@ -3211,5 +3263,49 @@ onUnmounted(() => {
     100% {
       transform: scale(1);
     }
+}
+.follow-btn {
+  padding: 6px 20px;
+  border-radius: 48px;
+  border: none;
+  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-left: auto;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+  }
+
+  &.following {
+    background: transparent;
+    border: 1px solid #c5a3ff;
+    color: #c5a3ff;
+
+    &:hover {
+      background: rgba(197, 163, 255, 0.1);
+    }
+  }
+}
+
+.author-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.author-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #a09abf;
+
+  span {
+    cursor: default;
+  }
 }
 </style>

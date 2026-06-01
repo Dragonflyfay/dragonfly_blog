@@ -49,3 +49,4 @@ export const userListService = () => {
 export const userUpdateRoleService = (data) => {
   return request.put('/user/updateRole', data)
 }
+
