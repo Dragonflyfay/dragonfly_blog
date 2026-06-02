@@ -9,6 +9,7 @@ import {
   Document,
   Promotion,
   Check,
+  Loading,
 } from '@element-plus/icons-vue'
 import '@wangeditor/editor/dist/css/style.css'
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
@@ -47,6 +48,9 @@ const isUploadingVideo = ref(false)
 // 话题列表
 const topics = ref([])
 
+// 高德地图配置
+const AMAP_KEY = 'e3f7571c00541bf321f9a8707323fe78'
+const gettingLocation = ref(false)
 // 表单数据
 const noteForm = reactive({
   title: '',
@@ -472,6 +476,149 @@ const submitNote = async (state) => {
     submitting.value = false
   }
 }
+// 获取地理位置
+const getCurrentLocation = () => {
+  if (!navigator.geolocation) {
+    ElMessage.warning('您的浏览器不支持地理位置功能')
+    return
+  }
+
+  gettingLocation.value = true
+  ElMessage.info('正在获取您的位置...')
+
+  navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+        console.log('获取到坐标:', latitude, longitude)
+
+        // 通过高德API获取详细地址
+        const address = await reverseGeocodeByAmap(latitude, longitude)
+
+        if (address) {
+          noteForm.location = address
+          ElMessage.success(`定位成功：${address}`)
+        } else {
+          // 降级方案：只显示坐标
+          noteForm.location = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+          ElMessage.info(`已获取坐标：${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+        }
+
+        gettingLocation.value = false
+      },
+      (error) => {
+        gettingLocation.value = false
+        console.error('获取位置失败:', error)
+
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            ElMessage.warning('您拒绝了位置权限，可以手动输入位置')
+            break
+          case error.POSITION_UNAVAILABLE:
+            ElMessage.warning('无法获取您的位置信息')
+            break
+          case error.TIMEOUT:
+            ElMessage.warning('获取位置超时，请稍后重试')
+            break
+          default:
+            ElMessage.warning('获取位置失败，请手动输入')
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000
+      }
+  )
+}
+/*
+* // 高德地图逆地理编码：坐标转地址（简洁版）
+const reverseGeocodeByAmap = async (lat, lng) => {
+  try {
+    const url = `https://restapi.amap.com/v3/geocode/regeo?output=json&location=${lng},${lat}&key=${AMAP_KEY}&radius=500&extensions=all`
+    const response = await fetch(url)
+    const data = await response.json()
+
+    console.log('高德API返回:', data)
+
+    if (data.status === '1' && data.regeocode) {
+      const addr = data.regeocode.addressComponent
+
+      // 构建地址：城市 + 区县 + 街道（过滤空值）
+      const parts = [
+        addr.city,
+        addr.district,
+        addr.township
+      ].filter(part => part && part !== '[]' && part.trim() !== '')
+
+      if (parts.length > 0) {
+        return parts.join('')
+      }
+
+      // 备选：使用格式化地址
+      const formatted = data.regeocode.formatted_address
+      if (formatted && formatted !== '[]') {
+        return formatted.replace(/^中国/, '').trim()
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.error('高德API调用失败:', error)
+    return null
+  }
+}*/
+// 高德地图逆地理编码：坐标转地址
+
+const reverseGeocodeByAmap = async (lat, lng) => {
+  try {
+    const url = `https://restapi.amap.com/v3/geocode/regeo?output=json&location=${lng},${lat}&key=${AMAP_KEY}&radius=500&extensions=all`
+    const response = await fetch(url)
+    const data = await response.json()
+
+    console.log('高德API返回:', data)
+
+    if (data.status === '1' && data.regeocode) {
+      const addressComponent = data.regeocode.addressComponent
+
+      // 构建简洁的中文地址
+      const parts = []
+
+      // 城市（优先使用城市，如果没有则使用省份）
+      // 修复：不要直接比较对象
+      if (addressComponent.city && addressComponent.city !== '[]' && addressComponent.city.trim() !== '') {
+        parts.push(addressComponent.city)
+      } else if (addressComponent.province && addressComponent.province !== '[]' && addressComponent.province.trim() !== '') {
+        parts.push(addressComponent.province)
+      }
+
+      // 区/县
+      if (addressComponent.district && addressComponent.district !== '[]' && addressComponent.district.trim() !== '') {
+        parts.push(addressComponent.district)
+      }
+
+      // 街道/镇
+      if (addressComponent.township && addressComponent.township !== '[]' && addressComponent.township.trim() !== '') {
+        parts.push(addressComponent.township)
+      }
+
+      // 如果获取到了具体位置
+      if (parts.length > 0) {
+        return parts.join('')
+      }
+
+      // 备选：使用格式化地址（去掉"中国"前缀）
+      const formatted = data.regeocode.formatted_address
+      if (formatted && formatted !== '[]') {
+        return formatted.replace(/^中国/, '').trim()
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.error('高德API调用失败:', error)
+    return null
+  }
+}
 
 // 编辑器创建回调
 const handleCreated = (editor) => {
@@ -706,11 +853,25 @@ onMounted(() => {
             </el-form-item>
 
             <el-form-item class="half-item">
-              <el-input v-model="noteForm.location" placeholder="添加地点">
-                <template #prefix>
+              <div class="location-wrapper">
+                <el-input
+                    v-model="noteForm.location"
+                    placeholder="添加地点"
+                    class="location-input"
+                >
+                  <template #prefix>
+                    <el-icon><LocationFilled /></el-icon>
+                  </template>
+                </el-input>
+                <el-button
+                    class="location-btn"
+                    :loading="gettingLocation"
+                    @click="getCurrentLocation"
+                >
                   <el-icon><LocationFilled /></el-icon>
-                </template>
-              </el-input>
+                  定位
+                </el-button>
+              </div>
             </el-form-item>
           </div>
         </el-form>
@@ -1228,6 +1389,51 @@ onMounted(() => {
   }
   50% {
     transform: translateY(-8px);
+  }
+}
+.location-wrapper {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+
+  .location-input {
+    flex: 1;
+
+    :deep(.el-input__wrapper) {
+      border-radius: 48px;
+      background: #faf7ff;
+      border-color: #f0e5ff;
+      padding: 12px 20px;
+
+      &:hover {
+        border-color: #d9b8ff;
+      }
+
+      &.is-focus {
+        border-color: #c5a3ff;
+        box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.12);
+      }
+    }
+  }
+
+  .location-btn {
+    border-radius: 48px;
+    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+    border: none;
+    color: white;
+    padding: 12px 24px;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
   }
 }
 </style>

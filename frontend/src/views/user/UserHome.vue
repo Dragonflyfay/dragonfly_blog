@@ -36,6 +36,8 @@ import {
   noteDetailService,
   batchCheckNoteFavoritedService,
   batchCheckFollowService,
+  followUserService,
+  unfollowUserService,
 } from '@/api/note'
 import { userInfoService, userListService } from '@/api/user.js'
 import useUserInfoStore from '@/stores/userInfo.js'
@@ -1253,6 +1255,7 @@ const toggleFollow = async (userId) => {
     }
   } catch (error) {
     ElMessage.error(error.response?.data?.message || '操作失败')
+    console.log(error)
   }
 }
 
@@ -1582,11 +1585,11 @@ onUnmounted(() => {
               </div>
               <div class="detail-stats">
                 <!-- 浏览量 -->
-                <div class="stat-item">
-                  <el-icon><View /></el-icon>
-                  <span>{{ currentNote.viewsCount || 0 }}</span>
-                  <span class="stat-label">浏览</span>
-                </div>
+<!--                <div class="stat-item">-->
+<!--                  <el-icon><View /></el-icon>-->
+<!--                  <span>{{ currentNote.viewsCount || 0 }}</span>-->
+<!--                  <span class="stat-label">浏览</span>-->
+<!--                </div>-->
 
                 <!-- 评论数 -->
                 <div class="stat-item">

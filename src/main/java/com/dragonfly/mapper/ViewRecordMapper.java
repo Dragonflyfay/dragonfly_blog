@@ -12,15 +12,15 @@ import org.apache.ibatis.annotations.*;
  */
 @Mapper
 public interface ViewRecordMapper {
-    @Insert("INSERT INTO view_record (note_id, user_id, view_time) " +
+    @Insert("INSERT INTO note_view (note_id, user_id, view_time) " +
             "VALUES (#{noteId}, #{userId}, #{viewTime})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     void add(ViewRecord viewRecord);
 
-    @Select("SELECT * FROM view_record WHERE note_id = #{noteId} AND user_id = #{userId} ORDER BY view_time DESC LIMIT 1")
+    @Select("SELECT * FROM note_view WHERE note_id = #{noteId} AND user_id = #{userId} ORDER BY view_time DESC LIMIT 1")
     ViewRecord findLatestByNoteAndUser(@Param("noteId") Integer noteId,
                                        @Param("userId") Integer userId);
 
-    @Select("SELECT COUNT(DISTINCT user_id) FROM view_record WHERE note_id = #{noteId}")
+    @Select("SELECT COUNT(DISTINCT user_id) FROM note_view WHERE note_id = #{noteId}")
     int countUniqueViewsByNoteId(Integer noteId);
 }
