@@ -8,10 +8,15 @@ spring:
     redis:
       host: localhost
       port: 6379
+      timeout: 5s
   servlet:
     multipart:
       max-file-size: 500MB
       max-request-size: 500MB
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 5s
+    socket-timeout: 30s
 #    level:
 #          # 开发环境：只打印 SQL，不打印参数和结果
 #          com.yourpackage.mapper: DEBUG
@@ -44,5 +49,10 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-
+# 搜索配置
+search:
+  hot-keywords:
+    ttl: 86400  # 热门搜索缓存时间（秒）
+  search-history:
+    max-size: 10  # 每个用户最多保存的搜索历史数量
 
