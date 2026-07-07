@@ -17,8 +17,10 @@ public interface NoteMapper {
     @Options(useGeneratedKeys = true, keyProperty = "id")
     void add(Note note);
 
-    // 查询所有笔记（按用户）
-    @Select("SELECT * FROM note WHERE create_user = #{userId}")
+    // 查询所有笔记（按用户），JOIN用户表获取发布者昵称和头像
+    @Select("SELECT n.*, u.nickname AS create_user_name, u.user_pic AS create_user_avatar " +
+            "FROM note n LEFT JOIN user u ON n.create_user = u.id " +
+            "WHERE n.create_user = #{userId}")
     List<Note> list(Integer userId);
 
     // 根据id查询笔记（在XML中定义，使用resultMap处理images字段）
@@ -36,11 +38,12 @@ public interface NoteMapper {
 
     // 分页查询笔记（可选话题、状态、用户筛选，按更新时间倒序）
     @Select("<script>" +
-            "SELECT * FROM note WHERE 1=1 " +
-            "<if test='userId != null'> AND create_user = #{userId} </if>" +
-            "<if test='topicId != null'> AND topic_id = #{topicId} </if>" +
-            "<if test='state != null and state != \"\"'> AND state = #{state} </if>" +
-            "ORDER BY COALESCE(update_time, create_time) DESC " +
+            "SELECT n.*, u.nickname AS create_user_name, u.user_pic AS create_user_avatar " +
+            "FROM note n LEFT JOIN user u ON n.create_user = u.id WHERE 1=1 " +
+            "<if test='userId != null'> AND n.create_user = #{userId} </if>" +
+            "<if test='topicId != null'> AND n.topic_id = #{topicId} </if>" +
+            "<if test='state != null and state != \"\"'> AND n.state = #{state} </if>" +
+            "ORDER BY COALESCE(n.update_time, n.create_time) DESC " +
             "LIMIT #{offset}, #{pageSize}" +
             "</script>")
     List<Note> listByPage(@Param("userId") Integer userId,

@@ -480,11 +480,14 @@ const restoreUserCache = () => {
   }
 }
 
-// 加载所有用户信息到缓存（仅在缓存为空时加载）
+// 是否已从服务端加载过完整用户列表
+let fullUserListLoaded = false
+
+// 加载所有用户信息到缓存
 const loadAllUsers = async () => {
   // 尝试从 sessionStorage 恢复
   restoreUserCache()
-  
+
   // 优先缓存当前登录用户的信息（从 store 中获取）
   if (userInfoStore.info && userInfoStore.info.id) {
     const currentUser = {
@@ -497,14 +500,15 @@ const loadAllUsers = async () => {
     userInfoCache.set(currentUser.id, currentUser)
     console.log('已缓存当前用户信息:', currentUser)
   }
-  
-  // 如果缓存中已有数据，不再请求用户列表
-  if (userInfoCache.size > 0) return
+
+  // 始终从服务端加载完整用户列表（首次加载后使用标记避免重复请求）
+  if (fullUserListLoaded) return
 
   try {
     const res = await userListService()
     if (res.data && Array.isArray(res.data)) {
       setUsersToCache(res.data)
+      fullUserListLoaded = true
     }
   } catch (error) {
     console.error('加载用户列表失败:', error)

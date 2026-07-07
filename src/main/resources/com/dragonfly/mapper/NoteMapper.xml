@@ -4,21 +4,23 @@
 
     <!-- 用户首页分页查询 -->
     <select id="listUserPage" resultType="com.dragonfly.pojo.Note">
-        SELECT 
-            id, title, content, note_category,
-            images, video, cover_img,
-            topic_id, location, state,
-            views_count, likes_count, comments_count, favorites_count,
-            create_user, publish_time, create_time, update_time
-        FROM note
-        WHERE state = '已发布'
+        SELECT
+            n.id, n.title, n.content, n.note_category,
+            n.images, n.video, n.cover_img,
+            n.topic_id, n.location, n.state,
+            n.views_count, n.likes_count, n.comments_count, n.favorites_count,
+            n.create_user, n.publish_time, n.create_time, n.update_time,
+            u.nickname AS create_user_name, u.user_pic AS create_user_avatar
+        FROM note n
+        LEFT JOIN user u ON n.create_user = u.id
+        WHERE n.state = '已发布'
         <if test="topicId != null and topicId != 0">
-            AND topic_id = #{topicId}
+            AND n.topic_id = #{topicId}
         </if>
         <if test="keyword != null and keyword != ''">
-            AND (title LIKE CONCAT('%', #{keyword}, '%') OR content LIKE CONCAT('%', #{keyword}, '%'))
+            AND (n.title LIKE CONCAT('%', #{keyword}, '%') OR n.content LIKE CONCAT('%', #{keyword}, '%'))
         </if>
-        ORDER BY COALESCE(publish_time, create_time) DESC
+        ORDER BY COALESCE(n.publish_time, n.create_time) DESC
         LIMIT #{offset}, #{pageSize}
     </select>
 
@@ -54,10 +56,15 @@
         <result property="publishTime" column="publish_time"/>
         <result property="createTime" column="create_time"/>
         <result property="updateTime" column="update_time"/>
+        <result property="createUserName" column="create_user_name"/>
+        <result property="createUserAvatar" column="create_user_avatar"/>
     </resultMap>
 
     <select id="findById" resultMap="NoteResultMap">
-        SELECT * FROM note WHERE id = #{id}
+        SELECT n.*, u.nickname AS create_user_name, u.user_pic AS create_user_avatar
+        FROM note n
+        LEFT JOIN user u ON n.create_user = u.id
+        WHERE n.id = #{id}
     </select>
 
 </mapper>

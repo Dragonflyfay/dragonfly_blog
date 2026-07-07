@@ -50,4 +50,10 @@ public class Note {
     private LocalDateTime publishTime;//
     private LocalDateTime createTime;//
     private LocalDateTime updateTime;//
+
+    // 以下字段不映射数据库列，仅用于返回给前端展示
+    @TableField(exist = false)
+    private String createUserName;    // 发布者昵称
+    @TableField(exist = false)
+    private String createUserAvatar;  // 发布者头像
 }
