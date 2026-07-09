@@ -76,4 +76,11 @@ public class LikeController {
         boolean isLiked = likeService.isLikedComment(commentId);
         return Result.success(isLiked);
     }
+
+    // 获取当前用户点赞的笔记ID列表
+    @GetMapping("/notes")
+    public Result<List<Integer>> getLikedNoteIds() {
+        List<Integer> noteIds = likeService.getLikedNoteIds();
+        return Result.success(noteIds);
+    }
 }

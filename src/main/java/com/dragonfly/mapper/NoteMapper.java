@@ -86,4 +86,14 @@ public interface NoteMapper {
     // 减少笔记收藏数
     @Update("UPDATE note SET favorites_count = favorites_count - 1 WHERE id = #{id} AND favorites_count > 0")
     void decrementFavoritesCount(Integer id);
+
+    // 根据ID列表查询笔记（带用户信息）
+    @Select("<script>" +
+            "SELECT n.*, u.nickname AS create_user_name, u.user_pic AS create_user_avatar " +
+            "FROM note n LEFT JOIN user u ON n.create_user = u.id " +
+            "WHERE n.id IN " +
+            "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>" +
+            "ORDER BY n.create_time DESC" +
+            "</script>")
+    List<Note> findByIds(@Param("ids") List<Integer> ids);
 }

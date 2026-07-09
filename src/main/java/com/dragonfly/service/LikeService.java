@@ -20,7 +20,10 @@ public interface LikeService {
     
     // 批量检查是否点赞笔记
     Map<Integer, Boolean> batchCheckLikedNotes(List<Integer> noteIds);
-    
+
     // 批量检查是否点赞评论
     Map<Integer, Boolean> batchCheckLikedComments(List<Integer> commentIds);
+
+    // 获取当前用户点赞的笔记ID列表
+    List<Integer> getLikedNoteIds();
 }

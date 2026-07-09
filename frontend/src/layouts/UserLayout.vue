@@ -13,20 +13,20 @@ import {
 import avatar from '@/assets/default.png'
 import { ref } from 'vue'
 import router from '@/router/index.js'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useTokenStore } from '@/stores/token.js'
 import useUserInfoStore from '@/stores/userInfo.js'
 import { userInfoService } from '@/api/user.js'
 
-const route = useRouter()
+const currentRoute = useRoute()
 const isDark = ref(false)
 const tokenStore = useTokenStore()
 const userInfoStore = useUserInfoStore()
 
 const toggleTheme = () => {
   isDark.value = !isDark.value
-}
+} // toggleTheme 切换
 
 const handleCommand = (command) => {
   if (command === 'logout') {
@@ -78,7 +78,7 @@ getUserInfo()
         <div class="logo-slogan">记录生活 · 分享美好</div>
       </div>
       <el-menu
-        :default-active="route.path"
+        :default-active="currentRoute.path"
         active-text-color="#c5a3ff"
         background-color="transparent"
         text-color="rgba(255,255,255,0.75)"
@@ -97,28 +97,14 @@ getUserInfo()
           <el-icon><Bell /></el-icon>
           <span>通知</span>
         </el-menu-item>
-        <el-sub-menu index="/profile">
-          <template #title>
-            <el-avatar
-              :src="userInfoStore.info.userPic ? userInfoStore.info.userPic : avatar"
-              :size="40"
-              class="profile-avatar"
-            ></el-avatar>
-            <span class="profile-text">我</span>
-          </template>
-          <el-menu-item index="/user/info">
-            <el-icon><User /></el-icon>
-            <span>基本资料</span>
-          </el-menu-item>
-          <el-menu-item index="/user/avatar">
-            <el-icon><EditPen /></el-icon>
-            <span>更换头像</span>
-          </el-menu-item>
-          <el-menu-item index="/user/resetPassword">
-            <el-icon><EditPen /></el-icon>
-            <span>重置密码</span>
-          </el-menu-item>
-        </el-sub-menu>
+        <el-menu-item index="/me">
+          <el-avatar
+            :src="userInfoStore.info.userPic || avatar"
+            :size="36"
+            class="me-menu-avatar"
+          />
+          <span>我</span>
+        </el-menu-item>
       </el-menu>
       <div class="aside-footer">
         <div class="floating-emoji-mini"></div>
@@ -277,6 +263,11 @@ getUserInfo()
       border-right: none;
       background: transparent;
       --el-menu-active-color: #c5a3ff;
+
+      .me-menu-avatar {
+        border: 2px solid rgba(197, 163, 255, 0.3);
+        transition: border-color 0.3s ease;
+      }
 
       :deep(.el-menu-item) {
         margin: 8px 12px;

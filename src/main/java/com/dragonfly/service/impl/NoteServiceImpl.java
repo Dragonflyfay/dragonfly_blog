@@ -214,6 +214,14 @@ public class NoteServiceImpl implements NoteService {
     }
 
     @Override
+    public List<Note> getByIds(List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return noteMapper.findByIds(ids);
+    }
+
+    @Override
     public PageBean<Note> userPageList(Integer pageNum, Integer pageSize, Integer topicId,String keyword, Integer userId) {
         Integer offset = (pageNum - 1) * pageSize;
 

@@ -209,6 +209,15 @@ public class LikeServiceImpl implements LikeService {
     }
 
     @Override
+    public List<Integer> getLikedNoteIds() {
+        Integer userId = getCurrentUserId();
+        if (userId == null) {
+            return List.of();
+        }
+        return likeRecordMapper.findLikedNoteIdsByUserId(userId);
+    }
+
+    @Override
     public Map<Integer, Boolean> batchCheckLikedComments(List<Integer> commentIds) {
         Map<Integer, Boolean> result = new HashMap<>();
         

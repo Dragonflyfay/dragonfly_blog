@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import {
   VideoPlay,
   Top,
@@ -13,7 +13,8 @@ import {
   Clock,
   Collection,
   ArrowLeft,
-  ArrowRight, Search,
+  ArrowRight,
+  Search,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -41,6 +42,7 @@ import {
 } from '@/api/note'
 import { userInfoService, userListService } from '@/api/user.js'
 import useUserInfoStore from '@/stores/userInfo.js'
+import logoImg from '@/assets/logo.png'
 // 导入评论子组件
 import CommentItem from '@/components/CommentItem.vue'
 // 添加评论提交状态
@@ -51,6 +53,7 @@ const userInfoStore = useUserInfoStore()
 //用户信息缓存 - 使用 Map 提高查找效率
 const userInfoCache = new Map()
 const router = useRouter()
+const route = useRoute()
 
 // 搜索表单
 const searchForm = reactive({
@@ -70,7 +73,7 @@ const showSearchHistory = ref(false)
 // 热门搜索（基于话题）
 const hotSearches = computed(() => {
   // 取前5个话题作为热门搜索
-  return topics.value.slice(1, 6).map(topic => topic.topicName)
+  return topics.value.slice(1, 6).map((topic) => topic.topicName)
 })
 
 // 搜索建议（基于输入的关键字匹配话题）
@@ -78,11 +81,9 @@ const searchSuggestions = computed(() => {
   if (!searchForm.keyword || !searchForm.keyword.trim()) {
     return []
   }
-  
+
   const keyword = searchForm.keyword.trim().toLowerCase()
-  return topics.value
-    .filter(topic => topic.topicName.toLowerCase().includes(keyword))
-    .slice(0, 5) // 最多显示5个建议
+  return topics.value.filter((topic) => topic.topicName.toLowerCase().includes(keyword)).slice(0, 5) // 最多显示5个建议
 })
 
 // 从 localStorage 加载搜索历史
@@ -100,23 +101,23 @@ const loadSearchHistory = () => {
 // 保存搜索历史
 const saveSearchHistory = (keyword) => {
   if (!keyword || !keyword.trim()) return
-  
+
   const trimmedKeyword = keyword.trim()
-  
+
   // 避免重复
   const index = searchHistory.value.indexOf(trimmedKeyword)
   if (index > -1) {
     searchHistory.value.splice(index, 1)
   }
-  
+
   // 添加到开头
   searchHistory.value.unshift(trimmedKeyword)
-  
+
   // 最多保留10条
   if (searchHistory.value.length > 10) {
     searchHistory.value = searchHistory.value.slice(0, 10)
   }
-  
+
   // 保存到 localStorage
   try {
     localStorage.setItem('search_history', JSON.stringify(searchHistory.value))
@@ -174,7 +175,10 @@ const highlightKeyword = (text) => {
   const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const regex = new RegExp(`(${escapedKeyword})`, 'gi')
 
-  return textStr.replace(regex, '<mark style="background: linear-gradient(135deg, #ffe4f0, #ffe0f5); color: #c5a3ff; padding: 2px 8px; border-radius: 12px; font-weight: 600;">$1</mark>')
+  return textStr.replace(
+    regex,
+    '<mark style="background: linear-gradient(135deg, #ffe4f0, #ffe0f5); color: #c5a3ff; padding: 2px 8px; border-radius: 12px; font-weight: 600;">$1</mark>',
+  )
 }
 
 // 防抖定时器
@@ -185,7 +189,7 @@ const debounceSearch = () => {
   if (searchDebounceTimer) {
     clearTimeout(searchDebounceTimer)
   }
-  
+
   searchDebounceTimer = setTimeout(() => {
     if (searchForm.keyword && searchForm.keyword.trim()) {
       handleSearch()
@@ -218,9 +222,9 @@ const dialogVideoPlayer = ref(null)
 const detailDialogRef = ref(null)
 
 // 点赞状态管理
-const likedNotes = reactive({})//笔记点赞状态
-const likedComments = reactive({})//评论点赞状态
-const favoritedNotes = reactive({})//收藏状态
+const likedNotes = reactive({}) //笔记点赞状态
+const likedComments = reactive({}) //评论点赞状态
+const favoritedNotes = reactive({}) //收藏状态
 
 // 评论相关
 const comments = ref([])
@@ -238,7 +242,7 @@ const countAllComments = (list) => {
   return count
 }
 // ========== 回复评论相关状态 ==========
-const replyingCommentId = ref(null)  // 当前正在回复的评论ID
+const replyingCommentId = ref(null) // 当前正在回复的评论ID
 // 使用 Map 存储每个评论的回复内容，而不是单一变量
 const replyInputContentMap = ref(new Map())
 
@@ -256,13 +260,18 @@ const handleReplyComment = (comment) => {
 
   // 如果该评论还没有回复内容，初始化一个
   if (!replyInputContentMap.value.has(comment.id)) {
-    replyInputContentMap.value.set(comment.id, `@${comment.nickname || comment.username || '匿名用户'} `)
+    replyInputContentMap.value.set(
+      comment.id,
+      `@${comment.nickname || comment.username || '匿名用户'} `,
+    )
   }
 
   // 聚焦到回复输入框
   nextTick(() => {
     // 使用更精确的选择器，找到对应评论的回复输入框
-    const replyInput = document.querySelector(`.comment-item-wrapper[data-comment-id="${comment.id}"] .reply-input-container .el-textarea__inner`)
+    const replyInput = document.querySelector(
+      `.comment-item-wrapper[data-comment-id="${comment.id}"] .reply-input-container .el-textarea__inner`,
+    )
     if (replyInput) {
       replyInput.focus()
     }
@@ -276,8 +285,6 @@ const cancelReplyInline = (commentId) => {
     // 不清空内容，保留以便再次回复时使用
   }
 }
-
-
 
 // 更新回复内容
 // 更新回复内容
@@ -321,7 +328,7 @@ const submitReply = async (parentCommentId) => {
       noteId: currentNote.value.id,
       content: replyContent,
       parentId: parentCommentId,
-      replyToUserId: parentComment.userId
+      replyToUserId: parentComment.userId,
     }
 
     await addCommentService(commentData)
@@ -360,15 +367,6 @@ const flatComments = computed(() => {
   return result
 })
 
-
-
-// 占位图
-const PLACEHOLDER_IMG =
-    'data:image/svg+xml,' +
-    encodeURIComponent(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="533" viewBox="0 0 400 533"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffeef8"/><stop offset="100%" stop-color="#e8f4ff"/></linearGradient></defs><rect width="400" height="533" fill="url(#g)"/><text x="200" y="270" text-anchor="middle" fill="#b8b0c8" font-family="system-ui" font-size="14">暂无封面</text></svg>`,
-    )
-
 // 弹窗动画状态
 const dialogAnimation = ref('')
 const isDialogVisible = ref(false)
@@ -386,10 +384,10 @@ const handleSearch = () => {
     ElMessage.warning('请输入搜索关键词')
     return
   }
-  
+
   // 保存搜索历史
   saveSearchHistory(searchForm.keyword)
-  
+
   resetAndLoad()
   showSearchHistory.value = false
 }
@@ -606,7 +604,7 @@ const loadNotes = async () => {
       })
 
       // 批量检查点赞状态（一次性请求）
-      const noteIds = newNotes.map(note => note.id).filter(id => id)
+      const noteIds = newNotes.map((note) => note.id).filter((id) => id)
       if (noteIds.length > 0) {
         try {
           const res = await batchCheckNoteLikedService(noteIds)
@@ -626,21 +624,29 @@ const loadNotes = async () => {
         }
       }
       // 收集作者ID并检查关注状态
-      const authorIds = [...new Set(newNotes.map(note => note.createUser).filter(id => id && id !== userInfoStore.info.id))]
+      const authorIds = [
+        ...new Set(
+          newNotes
+            .map((note) => note.createUser)
+            .filter((id) => id && id !== userInfoStore.info.id),
+        ),
+      ]
       if (authorIds.length > 0) {
         await checkFollowingStatus(authorIds)
       }
 
       // 异步加载缺失的用户信息（不阻塞主流程）
-      const missingUserIds = [...new Set(
+      const missingUserIds = [
+        ...new Set(
           notes.value
-              .filter(note => note.createUser && !userInfoCache.has(note.createUser))
-              .map(note => note.createUser)
-      )]
+            .filter((note) => note.createUser && !userInfoCache.has(note.createUser))
+            .map((note) => note.createUser),
+        ),
+      ]
 
       if (missingUserIds.length > 0) {
         // 使用 Promise.all 并行加载，而不是串行
-        Promise.all(missingUserIds.map(userId => fetchUserInfo(userId))).catch(err => {
+        Promise.all(missingUserIds.map((userId) => fetchUserInfo(userId))).catch((err) => {
           console.warn('加载用户信息失败:', err)
         })
       }
@@ -657,8 +663,8 @@ const loadNotes = async () => {
 // 图片加载错误处理
 const onImgError = (e) => {
   const el = e.target
-  if (el && el.src !== PLACEHOLDER_IMG) {
-    el.src = PLACEHOLDER_IMG
+  if (el && el.src !== logoImg) {
+    el.src = logoImg
   }
 }
 
@@ -675,17 +681,22 @@ const onCardImageLoad = (e) => {
 
 // 获取封面图
 const getCoverImage = (note) => {
-  // 优先使用封面图
-  if (note.coverImg) return note.coverImg
-  // 如果是图文笔记，使用第一张图片作为封面
+  if (note.coverImg) return { url: note.coverImg, isPlaceholder: false }
   if (note.noteCategory === 'image' && Array.isArray(note.images) && note.images.length > 0) {
-    return note.images[0]
+    return { url: note.images[0], isPlaceholder: false }
   }
-  // 如果是视频笔记，使用视频URL作为封面（浏览器会自动生成第一帧）
   if (note.noteCategory === 'video' && note.video) {
-    return note.video
+    return { url: note.video, isPlaceholder: false }
   }
-  return PLACEHOLDER_IMG
+  return { url: '', isPlaceholder: true }
+}
+
+const hasRealCover = (note) => {
+  if (note.coverImg) return true
+  if (note.noteCategory === 'image' && Array.isArray(note.images) && note.images.length > 0)
+    return true
+  if (note.noteCategory === 'video' && note.video) return true
+  return false
 }
 
 // 生成视频缩略图（使用视频第一帧）
@@ -731,8 +742,8 @@ const prevImage = () => {
     galleryImageLoading.value = true
     imageLoaded.value = false
     currentImageIndex.value =
-        (currentImageIndex.value - 1 + currentNote.value.images.length) %
-        currentNote.value.images.length
+      (currentImageIndex.value - 1 + currentNote.value.images.length) %
+      currentNote.value.images.length
   }
 }
 
@@ -829,55 +840,30 @@ const viewDetail = async (note) => {
 
 // 视频错误处理
 const handleVideoError = (e) => {
-  console.error('视频加载失败:', e)
   const video = e.target
+  const errorCode = video.error?.code || 'unknown'
+  const retryCount = parseInt(video.dataset.retryCount) || 0
 
-  // 安全的错误诊断信息
-  const errorDetails = {
-    errorCode: video.error?.code || 'unknown',
-    errorMessage: video.error?.message || '无错误信息',
-    networkState: video.networkState,
-    readyState: video.readyState,
-    src: video.src,
-  }
+  console.warn('视频加载出错:', { errorCode, retryCount, src: video.src?.substring(0, 100) })
 
-  console.error('视频错误详情:', errorDetails)
-
-  // 根据错误类型提供具体建议
-  let errorMsg = '视频加载失败'
-
-  if (video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
-    errorMsg =
-        '视频资源无法访问\n可能原因：\n1. OSS Bucket未设置为公共读\n2. CORS配置不正确\n3. 视频文件不存在或链接失效'
-  } else if (video.networkState === HTMLMediaElement.NETWORK_EMPTY) {
-    errorMsg = '视频源未设置'
-  } else if (video.networkState === HTMLMediaElement.NETWORK_LOADING) {
-    errorMsg = '视频加载中，请检查网络连接'
-  } else if (video.networkState === HTMLMediaElement.NETWORK_IDLE) {
-    errorMsg = '视频加载已停止，可能是网络问题'
-  }
-
-  // 如果是CORS错误，给出明确提示
-  if (video.error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-    errorMsg = '视频格式不支持或CORS跨域限制\n请在阿里云OSS控制台配置CORS规则'
-  }
-
-  // 对于缓存相关错误，尝试重新加载（添加时间戳参数）
-  if (video.error?.code === MediaError.MEDIA_ERR_NETWORK && 
-      (video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE || 
-       video.networkState === HTMLMediaElement.NETWORK_IDLE)) {
-    console.warn('检测到网络/缓存错误，尝试添加时间戳参数重新加载...')
+  // 网络错误和格式/CORS错误先重试，避免误报
+  if (
+    (errorCode === MediaError.MEDIA_ERR_NETWORK ||
+     errorCode === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) &&
+    retryCount < 2
+  ) {
+    console.warn(`视频错误(code=${errorCode})，第${retryCount + 1}次重试...`)
+    video.dataset.retryCount = String(retryCount + 1)
     const originalSrc = video.src.split('?')[0]
     video.src = `${originalSrc}?t=${Date.now()}`
     video.load()
-    return // 不显示错误消息，等待重试结果
+    return
   }
 
-  ElMessage.error({
-    message: errorMsg,
-    duration: 5000,
-    showClose: true,
-  })
+  // 重试耗尽才显示错误
+  if (retryCount >= 2) {
+    ElMessage.error({ message: '视频加载失败，已自动重试仍无法播放', duration: 4000 })
+  }
 }
 
 // 弹窗视频元数据加载完成
@@ -986,8 +972,6 @@ const onVideoEnded = (noteId) => {
   videoPlayers[noteId].progress = 0
 }
 
-
-
 // 关闭弹窗 - 带动画
 const closeDialog = () => {
   dialogAnimation.value = 'dialog-leave-active'
@@ -1016,9 +1000,7 @@ const toggleLike = async (note, event) => {
 
   // 乐观更新UI
   likedNotes[note.id] = !currentLiked
-  note.likesCount = currentLiked
-      ? Math.max(0, originalLikesCount - 1)
-      : originalLikesCount + 1
+  note.likesCount = currentLiked ? Math.max(0, originalLikesCount - 1) : originalLikesCount + 1
 
   try {
     if (currentLiked) {
@@ -1077,7 +1059,7 @@ const checkFavorited = async (noteId) => {
   try {
     const res = await checkFavoriteNoteService(noteId)
     favoritedNotes[noteId] = res.data
-    console.log('收藏状态检查结果:', noteId, res.data)  // 添加日志调试
+    console.log('收藏状态检查结果:', noteId, res.data) // 添加日志调试
   } catch (error) {
     // 静默失败，不影响用户体验
     console.warn('检查收藏状态失败:', error.message || error)
@@ -1100,7 +1082,7 @@ const loadComments = async (noteId) => {
     const res = await getCommentsByNoteIdService(noteId)
     // 后端已经返回树形结构，直接使用，不要再调用 buildCommentTree
     comments.value = res.data || []
-    
+
     // 收集所有评论ID
     const allCommentIds = []
     const collectCommentIds = (commentList) => {
@@ -1113,7 +1095,7 @@ const loadComments = async (noteId) => {
       }
     }
     collectCommentIds(comments.value)
-    
+
     // 批量检查所有评论的点赞状态（一次性请求）
     if (allCommentIds.length > 0) {
       try {
@@ -1145,7 +1127,7 @@ const submitComment = async () => {
       noteId: currentNote.value.id,
       content: commentContent.value,
       parentId: replyToComment.value ? replyToComment.value.id : 0,
-      replyToUserId: replyToComment.value ? replyToComment.value.userId : null
+      replyToUserId: replyToComment.value ? replyToComment.value.userId : null,
     }
 
     await addCommentService(commentData)
@@ -1197,9 +1179,7 @@ const toggleCommentLike = async (comment, event) => {
 
   // 乐观更新 UI
   likedComments[commentId] = !currentLiked
-  comment.likesCount = currentLiked
-      ? Math.max(0, originalLikesCount - 1)
-      : originalLikesCount + 1
+  comment.likesCount = currentLiked ? Math.max(0, originalLikesCount - 1) : originalLikesCount + 1
 
   try {
     if (currentLiked) {
@@ -1232,10 +1212,6 @@ const totalCommentCount = computed(() => {
   }
   return countRecursive(comments.value)
 })
-
-
-
-
 
 // 检查评论是否已点赞
 const checkCommentLiked = async (commentId) => {
@@ -1331,7 +1307,7 @@ const handleUserInfoUpdate = (event) => {
   const updatedUser = event.detail
   if (updatedUser && updatedUser.id) {
     console.log('收到用户信息更新事件:', updatedUser)
-    
+
     // 更新缓存中的用户信息
     if (userInfoCache.has(updatedUser.id)) {
       const cachedUser = userInfoCache.get(updatedUser.id)
@@ -1345,7 +1321,7 @@ const handleUserInfoUpdate = (event) => {
 
     // 更新当前页面中所有该用户的笔记显示
     let updatedCount = 0
-    notes.value.forEach(note => {
+    notes.value.forEach((note) => {
       if (note.createUser === updatedUser.id) {
         note.userName = updatedUser.nickname || updatedUser.username || '匿名用户'
         note.userPic = updatedUser.userPic || updatedUser.avatar || ''
@@ -1360,7 +1336,7 @@ const handleUserInfoUpdate = (event) => {
       currentNote.value.userPic = updatedUser.userPic || updatedUser.avatar || ''
       console.log('已更新笔记详情中的用户信息')
     }
-    
+
     // 强制触发响应式更新
     notes.value = [...notes.value]
   }
@@ -1373,13 +1349,13 @@ const buildCommentTree = (commentsList) => {
   const rootComments = []
 
   // 先建立所有评论的映射
-  commentsList.forEach(comment => {
+  commentsList.forEach((comment) => {
     comment.children = []
     commentMap.set(comment.id, comment)
   })
 
   // 构建树形结构
-  commentsList.forEach(comment => {
+  commentsList.forEach((comment) => {
     if (comment.parentId && comment.parentId !== 0 && commentMap.has(comment.parentId)) {
       const parent = commentMap.get(comment.parentId)
       parent.children = parent.children || []
@@ -1392,7 +1368,7 @@ const buildCommentTree = (commentsList) => {
   // 对每一层按时间排序
   const sortByTime = (items) => {
     items.sort((a, b) => new Date(a.createTime) - new Date(b.createTime))
-    items.forEach(item => {
+    items.forEach((item) => {
       if (item.children && item.children.length) {
         sortByTime(item.children)
       }
@@ -1402,7 +1378,6 @@ const buildCommentTree = (commentsList) => {
 
   return rootComments
 }
-
 
 // 关注状态
 const followingStatus = reactive({})
@@ -1447,13 +1422,21 @@ onMounted(async () => {
   await Promise.all([loadTopics(), loadAllUsers()])
   // 然后加载笔记（此时用户缓存已有数据）
   await loadNotes()
+  // 如果从"我"页面跳转过来，自动打开对应笔记详情
+  const noteId = route.query.noteId
+  if (noteId) {
+    const targetNote = notes.value.find(n => n.id === Number(noteId))
+    if (targetNote) {
+      nextTick(() => viewDetail(targetNote))
+    }
+  }
   updateColumnCount()
   window.addEventListener('scroll', handleScroll)
   window.addEventListener('resize', updateColumnCount)
 
   // 监听用户信息更新事件
   window.addEventListener('userInfoUpdated', handleUserInfoUpdate)
-  
+
   // 加载搜索历史
   loadSearchHistory()
 })
@@ -1472,31 +1455,31 @@ onUnmounted(() => {
     <div class="top-navbar">
       <div class="navbar-content">
         <div class="logo-section">
-          <span class="logo-text"> dragonfly  笔记</span>
+          <span class="logo-text"> dragonfly 笔记</span>
         </div>
 
         <div class="search-section">
           <el-input
-              v-model="searchForm.keyword"
-              placeholder="搜索感兴趣的内容..."
-              prefix-icon="Search"
-              clearable
-              class="search-input"
-              @keyup.enter="handleSearch"
-              @clear="clearSearch"
-              @focus="focusSearchInput"
-              @blur="blurSearchInput"
-              @input="debounceSearch"
+            v-model="searchForm.keyword"
+            placeholder="搜索感兴趣的内容..."
+            prefix-icon="Search"
+            clearable
+            class="search-input"
+            @keyup.enter="handleSearch"
+            @clear="clearSearch"
+            @focus="focusSearchInput"
+            @blur="blurSearchInput"
+            @input="debounceSearch"
           >
             <template #append>
-              <el-button 
+              <el-button
                 :icon="Search"
                 @click="handleSearch"
                 :class="{ 'is-searching': isSearching }"
               />
             </template>
           </el-input>
-          
+
           <!-- 搜索历史下拉框 -->
           <transition name="slide-down">
             <div v-if="showSearchHistory" class="search-history-dropdown">
@@ -1507,8 +1490,8 @@ onUnmounted(() => {
                   <span class="section-title">搜索建议</span>
                 </div>
                 <div class="suggestions-list">
-                  <div 
-                    v-for="suggestion in searchSuggestions" 
+                  <div
+                    v-for="suggestion in searchSuggestions"
                     :key="'suggestion-' + suggestion"
                     class="suggestion-item"
                     @click="useSearchSuggestion(suggestion)"
@@ -1518,7 +1501,7 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-              
+
               <!-- 热门搜索 -->
               <div v-else-if="hotSearches.length > 0" class="hot-search-section">
                 <div class="section-header">
@@ -1526,8 +1509,8 @@ onUnmounted(() => {
                   <span class="section-title">热门搜索</span>
                 </div>
                 <div class="hot-search-list">
-                  <div 
-                    v-for="(keyword, index) in hotSearches" 
+                  <div
+                    v-for="(keyword, index) in hotSearches"
                     :key="'hot-' + index"
                     class="hot-search-item"
                     @click="useSearchHistory(keyword)"
@@ -1537,7 +1520,7 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-              
+
               <!-- 搜索历史 -->
               <div v-if="searchHistory.length > 0" class="history-section">
                 <div class="section-header">
@@ -1545,10 +1528,10 @@ onUnmounted(() => {
                     <el-icon><Clock /></el-icon>
                     <span class="section-title">搜索历史</span>
                   </div>
-                  <el-button 
-                    type="primary" 
-                    link 
-                    size="small" 
+                  <el-button
+                    type="primary"
+                    link
+                    size="small"
                     @click="clearSearchHistory"
                     class="clear-history-btn"
                   >
@@ -1556,8 +1539,8 @@ onUnmounted(() => {
                   </el-button>
                 </div>
                 <div class="history-list">
-                  <div 
-                    v-for="(keyword, index) in searchHistory" 
+                  <div
+                    v-for="(keyword, index) in searchHistory"
                     :key="index"
                     class="history-item"
                     @click="useSearchHistory(keyword)"
@@ -1567,9 +1550,16 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-              
+
               <!-- 空状态 -->
-              <div v-if="searchHistory.length === 0 && hotSearches.length === 0 && searchSuggestions.length === 0" class="empty-history">
+              <div
+                v-if="
+                  searchHistory.length === 0 &&
+                  hotSearches.length === 0 &&
+                  searchSuggestions.length === 0
+                "
+                class="empty-history"
+              >
                 <el-icon><Search /></el-icon>
                 <p>暂无搜索记录</p>
               </div>
@@ -1590,27 +1580,21 @@ onUnmounted(() => {
     <div class="topic-bar">
       <div class="topic-scroll-wrapper">
         <div
-            v-for="topic in topics"
-            :key="topic.id"
-            class="topic-tag"
-            :class="{ active: searchForm.topicId === topic.id }"
-            @click="changeTopicId(topic.id)"
+          v-for="topic in topics"
+          :key="topic.id"
+          class="topic-tag"
+          :class="{ active: searchForm.topicId === topic.id }"
+          @click="changeTopicId(topic.id)"
         >
           {{ topic.topicName }}
         </div>
       </div>
-      
+
       <!-- 搜索结果提示 -->
       <div v-if="isSearching" class="search-result-info">
         <span class="search-keyword">"{{ searchForm.keyword }}"</span>
         <span class="search-count">共找到 {{ total }} 条结果</span>
-        <el-button 
-          type="primary" 
-          link 
-          size="small" 
-          @click="clearSearch"
-          class="clear-search-btn"
-        >
+        <el-button type="primary" link size="small" @click="clearSearch" class="clear-search-btn">
           清除搜索
         </el-button>
       </div>
@@ -1627,19 +1611,23 @@ onUnmounted(() => {
 
       <!-- 使用 JS 瀑布流，按最短列优先放置 -->
       <div v-else class="waterfall-masonry">
-        <div v-for="(column, colIndex) in waterfallColumns" :key="colIndex" class="waterfall-column">
         <div
+          v-for="(column, colIndex) in waterfallColumns"
+          :key="colIndex"
+          class="waterfall-column"
+        >
+          <div
             v-for="note in column"
             :key="note.id"
             class="waterfall-item"
             @click="viewDetail(note)"
-        >
-          <article class="note-card xhs-note-card">
-            <!-- 媒体区域 -->
-            <div class="card-media" :class="getMediaAspectClass(note)">
-              <!-- 视频内容 -->
-              <div v-if="note.noteCategory === 'video'" class="video-container">
-                <video
+          >
+            <article class="note-card xhs-note-card">
+              <!-- 媒体区域 -->
+              <div class="card-media" :class="getMediaAspectClass(note)">
+                <!-- 视频内容 -->
+                <div v-if="note.noteCategory === 'video'" class="video-container">
+                  <video
                     :key="note.video"
                     :src="note.video"
                     :poster="note.coverImg || ''"
@@ -1652,95 +1640,144 @@ onUnmounted(() => {
                     @loadedmetadata="(e) => onVideoLoaded(note.id, e)"
                     @timeupdate="(e) => onVideoTimeUpdate(note.id, e)"
                     @ended="() => onVideoEnded(note.id)"
-                ></video>
+                  ></video>
 
-                <!-- 视频播放遮罩 -->
-                <div class="video-overlay" @click.stop="toggleVideoPlay(note.id, $event)">
-                  <el-icon v-if="!videoPlayers[note.id]?.isPlaying" class="play-icon">
-                    <VideoPlay />
-                  </el-icon>
-                </div>
+                  <!-- 视频播放遮罩 -->
+                  <div class="video-overlay" @click.stop="toggleVideoPlay(note.id, $event)">
+                    <el-icon v-if="!videoPlayers[note.id]?.isPlaying" class="play-icon">
+                      <VideoPlay />
+                    </el-icon>
+                  </div>
 
-                <!-- 视频进度条 -->
-                <div class="video-progress" @click.stop="onVideoSeek(note.id, $event)">
-                  <div class="progress-bar">
-                    <div
+                  <!-- 视频进度条 -->
+                  <div class="video-progress" @click.stop="onVideoSeek(note.id, $event)">
+                    <div class="progress-bar">
+                      <div
                         class="progress-fill"
                         :style="{ width: `${videoPlayers[note.id]?.progress || 0}%` }"
-                    ></div>
+                      ></div>
+                    </div>
+                  </div>
+
+                  <!-- 视频标识 -->
+                  <div class="video-badge">
+                    <el-icon><VideoPlay /></el-icon>
+                    <span>视频</span>
                   </div>
                 </div>
 
-                <!-- 视频标识 -->
-                <div class="video-badge">
-                  <el-icon><VideoPlay /></el-icon>
-                  <span>视频</span>
+                <!-- 图片内容 -->
+                <template v-else>
+                  <!-- 无封面：logo 占位 -->
+                  <div v-if="!hasRealCover(note)" class="card-placeholder">
+                    <img :src="logoImg" class="placeholder-logo" alt="logo" />
+                  </div>
+                  <!-- 有封面：正常图片 -->
+                  <template v-else>
+                    <div class="image-skeleton" v-if="!note.imageLoaded"></div>
+                    <img
+                      :src="getCoverImage(note).url"
+                      :alt="note.title"
+                      loading="lazy"
+                      @error="onImgError"
+                      @load="
+                        (e) => {
+                          onCardImageLoad(e)
+                          note.imageLoaded = true
+                        }
+                      "
+                      class="card-image"
+                      :class="{ 'image-loaded': note.imageLoaded }"
+                    />
+                  </template>
+                </template>
+
+                <!-- 悬停遮罩层 -->
+                <div class="card-hover-overlay">
+                  <div class="hover-actions">
+                    <button class="action-btn view-btn" @click.stop="viewDetail(note)">
+                      <el-icon><View /></el-icon>
+                      <span>查看</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <!-- 图片内容 -->
-              <template v-else>
-                <!-- 图片加载中骨架屏 -->
-                <div class="image-skeleton" v-if="!note.imageLoaded"></div>
-                <img
-                    :src="getCoverImage(note)"
-                    :alt="note.title"
-                    loading="lazy"
-                    @error="onImgError"
-                    @load="(e) => { onCardImageLoad(e); note.imageLoaded = true }"
-                    class="card-image"
-                    :class="{ 'image-loaded': note.imageLoaded }"
-                />
-              </template>
-
-              <!-- 悬停遮罩层 -->
-              <div class="card-hover-overlay">
-                <div class="hover-actions">
-                  <button class="action-btn view-btn" @click.stop="viewDetail(note)">
-                    <el-icon><View /></el-icon>
-                    <span>查看</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- 卡片内容区 -->
-            <div class="xhs-card-body">
-              <h3 class="xhs-title">{{ note.title }}</h3>
-              <div class="xhs-meta-row">
-                <div class="xhs-author">
-                  <img
+              <!-- 卡片内容区 -->
+              <div class="xhs-card-body">
+                <h3 class="xhs-title">{{ note.title }}</h3>
+                <div class="xhs-meta-row">
+                  <div class="xhs-author">
+                    <img
                       v-if="note.userPic"
                       :src="note.userPic"
                       class="author-avatar-img"
                       alt="author"
-                  />
-                  <span class="xhs-name">{{ note.userName }}</span>
-                </div>
-                <button type="button" class="xhs-like" :class="{ liked: likedNotes[note.id] }" @click="toggleLike(note, $event)">
-                  <svg v-if="!likedNotes[note.id]" class="like-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                  </svg>
-                  <svg v-else class="like-icon liked-icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                  </svg>
-                  <span>{{ formatNumber(note.likesCount || 0) }}</span>
-                </button>
+                    />
+                    <span class="xhs-name">{{ note.userName }}</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="xhs-like"
+                    :class="{ liked: likedNotes[note.id] }"
+                    @click="toggleLike(note, $event)"
+                  >
+                    <svg
+                      v-if="!likedNotes[note.id]"
+                      class="like-icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                      />
+                    </svg>
+                    <svg
+                      v-else
+                      class="like-icon liked-icon"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                      />
+                    </svg>
+                    <span>{{ formatNumber(note.likesCount || 0) }}</span>
+                  </button>
 
-                <!-- 收藏按钮 -->
-                <button type="button" class="xhs-favorite" :class="{ favorited: favoritedNotes[note.id] }" @click="toggleFavorite(note, $event)">
-                  <svg v-if="!favoritedNotes[note.id]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                  </svg>
-                  <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                  </svg>
-                  <span>{{ formatNumber(note.favoritesCount || 0) }}</span>
-                </button>
+                  <!-- 收藏按钮 -->
+                  <button
+                    type="button"
+                    class="xhs-favorite"
+                    :class="{ favorited: favoritedNotes[note.id] }"
+                    @click="toggleFavorite(note, $event)"
+                  >
+                    <svg
+                      v-if="!favoritedNotes[note.id]"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                      />
+                    </svg>
+                    <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path
+                        d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                      />
+                    </svg>
+                    <span>{{ formatNumber(note.favoritesCount || 0) }}</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          </article>
-        </div>
+            </article>
+          </div>
         </div>
       </div>
 
@@ -1755,26 +1792,37 @@ onUnmounted(() => {
       </div>
     </div>
     <!-- 回到顶部按钮 -->
-<!--    <transition name="fade-slide">-->
-<!--      <div v-show="showBackToTop" class="back-to-top" @click="backToTop">-->
-<!--        <el-icon><Top /></el-icon>-->
-<!--        <span>顶部</span>-->
-<!--      </div>-->
-<!--    </transition>-->
+    <!--    <transition name="fade-slide">-->
+    <!--      <div v-show="showBackToTop" class="back-to-top" @click="backToTop">-->
+    <!--        <el-icon><Top /></el-icon>-->
+    <!--        <span>顶部</span>-->
+    <!--      </div>-->
+    <!--    </transition>-->
 
     <!-- 详情弹窗 - 带动画效果 -->
     <Teleport to="body">
       <div
-          v-if="showDetailDialog"
-          class="detail-dialog-overlay"
-          :class="dialogAnimation"
-          @click.self="closeDialog"
+        v-if="showDetailDialog"
+        class="detail-dialog-overlay"
+        :class="dialogAnimation"
+        @click.self="closeDialog"
       >
         <div class="detail-dialog-container" :class="dialogAnimation">
           <div class="detail-dialog-header">
             <button class="dialog-close-btn" @click="closeDialog">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M18 6L6 18M6 6L18 18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -1784,16 +1832,16 @@ onUnmounted(() => {
               <!-- 视频详情 -->
               <div v-if="currentNote.noteCategory === 'video'" class="detail-video-wrapper">
                 <video
-                    ref="dialogVideoPlayer"
-                    :key="currentNote.video"
-                    :src="currentNote.video"
-                    controls
-                    autoplay
-                    preload="metadata"
-                    crossorigin="anonymous"
-                    class="detail-video"
-                    @error="handleVideoError"
-                    @loadedmetadata="handleDialogVideoLoaded"
+                  ref="dialogVideoPlayer"
+                  :key="currentNote.video"
+                  :src="currentNote.video"
+                  controls
+                  autoplay
+                  preload="metadata"
+                  crossorigin="anonymous"
+                  class="detail-video"
+                  @error="handleVideoError"
+                  @loadedmetadata="handleDialogVideoLoaded"
                 ></video>
               </div>
 
@@ -1804,13 +1852,13 @@ onUnmounted(() => {
                     <!-- 图片加载骨架屏 -->
                     <div class="gallery-skeleton" v-if="galleryImageLoading"></div>
                     <img
-                        :src="currentNote.images[currentImageIndex] || currentNote.coverImg"
-                        :alt="`图片${currentImageIndex + 1}`"
-                        @error="onImgError"
-                        @load="onImageLoad"
-                        @loadstart="onImageLoadStart"
-                        class="detail-image"
-                        :class="{ 'image-loaded': imageLoaded, 'image-loading': !imageLoaded }"
+                      :src="currentNote.images[currentImageIndex] || currentNote.coverImg"
+                      :alt="`图片${currentImageIndex + 1}`"
+                      @error="onImgError"
+                      @load="onImageLoad"
+                      @loadstart="onImageLoadStart"
+                      class="detail-image"
+                      :class="{ 'image-loaded': imageLoaded, 'image-loading': !imageLoaded }"
                     />
                   </div>
 
@@ -1826,8 +1874,8 @@ onUnmounted(() => {
 
                   <!-- 图片指示器 -->
                   <div
-                      v-if="currentNote.images && currentNote.images.length > 1"
-                      class="image-indicator"
+                    v-if="currentNote.images && currentNote.images.length > 1"
+                    class="image-indicator"
                   >
                     {{ currentImageIndex + 1 }} / {{ currentNote.images.length }}
                   </div>
@@ -1838,7 +1886,11 @@ onUnmounted(() => {
             <div class="detail-right">
               <h2 class="detail-title">{{ currentNote.title }}</h2>
               <div class="detail-author-section">
-                <img v-if="currentNote.userPic" :src="currentNote.userPic" class="author-avatar-detail" />
+                <img
+                  v-if="currentNote.userPic"
+                  :src="currentNote.userPic"
+                  class="author-avatar-detail"
+                />
                 <div v-else class="author-avatar-placeholder">
                   {{ (currentNote.userName || '匿名用户').charAt(0).toUpperCase() }}
                 </div>
@@ -1850,10 +1902,10 @@ onUnmounted(() => {
                   </div>
                 </div>
                 <button
-                    v-if="currentNote.createUser !== userInfoStore.info.id"
-                    class="follow-btn"
-                    :class="{ following: followingStatus[currentNote.createUser] }"
-                    @click="toggleFollow(currentNote.createUser)"
+                  v-if="currentNote.createUser !== userInfoStore.info.id"
+                  class="follow-btn"
+                  :class="{ following: followingStatus[currentNote.createUser] }"
+                  @click="toggleFollow(currentNote.createUser)"
                 >
                   {{ followingStatus[currentNote.createUser] ? '已关注' : '关注' }}
                 </button>
@@ -1861,16 +1913,16 @@ onUnmounted(() => {
               <div class="detail-meta">
                 <span class="meta-item">📍 {{ currentNote.location || '未知地点' }}</span>
                 <span class="meta-item"
-                >🕒 {{ formatTimeAgo(currentNote.publishTime || currentNote.createTime) }}</span
+                  >🕒 {{ formatTimeAgo(currentNote.publishTime || currentNote.createTime) }}</span
                 >
               </div>
               <div class="detail-stats">
                 <!-- 浏览量 -->
-<!--                <div class="stat-item">-->
-<!--                  <el-icon><View /></el-icon>-->
-<!--                  <span>{{ currentNote.viewsCount || 0 }}</span>-->
-<!--                  <span class="stat-label">浏览</span>-->
-<!--                </div>-->
+                <!--                <div class="stat-item">-->
+                <!--                  <el-icon><View /></el-icon>-->
+                <!--                  <span>{{ currentNote.viewsCount || 0 }}</span>-->
+                <!--                  <span class="stat-label">浏览</span>-->
+                <!--                </div>-->
 
                 <!-- 评论数 -->
                 <div class="stat-item">
@@ -1881,15 +1933,26 @@ onUnmounted(() => {
 
                 <!-- 点赞 -->
                 <div
-                    class="stat-item like-item"
-                    :class="{ liked: likedNotes[currentNote.id] }"
-                    @click="toggleLike(currentNote, $event)"
+                  class="stat-item like-item"
+                  :class="{ liked: likedNotes[currentNote.id] }"
+                  @click="toggleLike(currentNote, $event)"
                 >
-                  <svg v-if="!likedNotes[currentNote.id]" class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                  <svg
+                    v-if="!likedNotes[currentNote.id]"
+                    class="stat-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path
+                      d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                    />
                   </svg>
                   <svg v-else class="stat-icon liked-icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    <path
+                      d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                    />
                   </svg>
                   <span>{{ currentNote.likesCount || 0 }}</span>
                   <span class="stat-label">点赞</span>
@@ -1897,9 +1960,9 @@ onUnmounted(() => {
 
                 <!-- 收藏 -->
                 <div
-                    class="stat-item favorite-item"
-                    :class="{ favorited: favoritedNotes[currentNote.id] }"
-                    @click="toggleFavorite(currentNote, $event)"
+                  class="stat-item favorite-item"
+                  :class="{ favorited: favoritedNotes[currentNote.id] }"
+                  @click="toggleFavorite(currentNote, $event)"
                 >
                   <el-icon><Collection /></el-icon>
                   <span>{{ currentNote.favoritesCount || 0 }}</span>
@@ -1919,9 +1982,9 @@ onUnmounted(() => {
                 <div class="top-comment-input-wrapper">
                   <div class="input-avatar">
                     <img
-                        v-if="userInfoStore.info.userPic"
-                        :src="userInfoStore.info.userPic"
-                        class="input-avatar-img"
+                      v-if="userInfoStore.info.userPic"
+                      :src="userInfoStore.info.userPic"
+                      class="input-avatar-img"
                     />
                     <div v-else class="input-avatar-placeholder">
                       {{ (userInfoStore.info.nickname || '我').charAt(0).toUpperCase() }}
@@ -1929,22 +1992,22 @@ onUnmounted(() => {
                   </div>
                   <div class="input-content">
                     <el-input
-                        v-model="commentContent"
-                        type="textarea"
-                        :rows="3"
-                        placeholder="写下你的评论..."
-                        maxlength="500"
-                        show-word-limit
-                        class="comment-textarea"
+                      v-model="commentContent"
+                      type="textarea"
+                      :rows="3"
+                      placeholder="写下你的评论..."
+                      maxlength="500"
+                      show-word-limit
+                      class="comment-textarea"
                     />
                     <div class="comment-actions-bar">
                       <span class="comment-tip">✨ 友善发言，分享美好</span>
                       <el-button
-                          type="primary"
-                          round
-                          class="submit-comment-btn"
-                          @click="submitComment"
-                          :loading="submittingComment"
+                        type="primary"
+                        round
+                        class="submit-comment-btn"
+                        @click="submitComment"
+                        :loading="submittingComment"
                       >
                         发表评论
                       </el-button>
@@ -1956,17 +2019,17 @@ onUnmounted(() => {
                 <div class="comment-list">
                   <template v-for="comment in comments" :key="comment.id">
                     <CommentItem
-                        :comment="comment"
-                        :depth="0"
-                        :liked-comments="likedComments"
-                        :replying-comment-id="replyingCommentId"
-                        :reply-content-map="replyInputContentMap"
-                        :submitting="submittingComment"
-                        @reply="handleReplyComment"
-                        @toggle-like="toggleCommentLike"
-                        @cancel-reply="cancelReplyInline"
-                        @submit-reply="submitReply"
-                        @update-reply-content="updateReplyContent"
+                      :comment="comment"
+                      :depth="0"
+                      :liked-comments="likedComments"
+                      :replying-comment-id="replyingCommentId"
+                      :reply-content-map="replyInputContentMap"
+                      :submitting="submittingComment"
+                      @reply="handleReplyComment"
+                      @toggle-like="toggleCommentLike"
+                      @cancel-reply="cancelReplyInline"
+                      @submit-reply="submitReply"
+                      @update-reply-content="updateReplyContent"
                     />
                   </template>
 
@@ -2099,7 +2162,9 @@ onUnmounted(() => {
       background: rgba(255, 255, 255, 0.98);
       backdrop-filter: blur(10px);
       border-radius: 20px;
-      box-shadow: 0 20px 40px rgba(197, 163, 255, 0.15), 0 4px 12px rgba(0, 0, 0, 0.05);
+      box-shadow:
+        0 20px 40px rgba(197, 163, 255, 0.15),
+        0 4px 12px rgba(0, 0, 0, 0.05);
       z-index: 1000;
       overflow: hidden;
       animation: slideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2187,7 +2252,11 @@ onUnmounted(() => {
           font-weight: 500;
 
           &:hover {
-            background: linear-gradient(135deg, rgba(197, 163, 255, 0.18), rgba(248, 180, 217, 0.18));
+            background: linear-gradient(
+              135deg,
+              rgba(197, 163, 255, 0.18),
+              rgba(248, 180, 217, 0.18)
+            );
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(197, 163, 255, 0.15);
             color: #c5a3ff;
@@ -2470,28 +2539,27 @@ onUnmounted(() => {
 }
 
 .publish-btn {
-    background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
-    border: none;
-    border-radius: 48px;
-    padding: 12px 28px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 500;
-    color: white;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(197, 163, 255, 0.2);
+  background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
+  border: none;
+  border-radius: 48px;
+  padding: 12px 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: white;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(197, 163, 255, 0.2);
 
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
-    }
-
-    .el-icon {
-      font-size: 16px;
-    }
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
   }
 
+  .el-icon {
+    font-size: 16px;
+  }
+}
 
 // 话题标签栏
 .topic-bar {
@@ -2546,7 +2614,7 @@ onUnmounted(() => {
       border-color: transparent;
     }
   }
-  
+
   .search-result-info {
     display: flex;
     align-items: center;
@@ -2557,7 +2625,7 @@ onUnmounted(() => {
     border-radius: 12px;
     font-size: 14px;
     animation: slideDown 0.3s ease-out;
-    
+
     .search-keyword {
       color: #6a4a9c;
       font-weight: 600;
@@ -2565,15 +2633,15 @@ onUnmounted(() => {
       background: rgba(197, 163, 255, 0.15);
       border-radius: 6px;
     }
-    
+
     .search-count {
       color: #8a6fa8;
     }
-    
+
     .clear-search-btn {
       margin-left: auto;
       color: #c5a3ff;
-      
+
       &:hover {
         color: #f8b4d9;
       }
@@ -2656,13 +2724,16 @@ onUnmounted(() => {
   overflow: hidden;
   background: #f0f0f0;
   // 不设置固定宽高比，让图片自适应
+  aspect-ratio: 3 / 4;
 
   .card-image {
     width: 100%;
-    height: auto;  // 高度自适应，保持原始比例
+    height: auto; // 高度自适应，保持原始比例
     display: block;
     opacity: 0;
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
 
     &.image-loaded {
       opacity: 1;
@@ -2692,12 +2763,33 @@ onUnmounted(() => {
     animation: skeleton-loading 1.5s ease-in-out infinite;
     z-index: 1;
   }
+
+  // logo 占位卡片
+  .card-placeholder {
+    width: 100%;
+    height: 100%;
+    // 宽高比 3:4
+    position: absolute;
+    top: 0;
+    left: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(145deg, #f5f0ff 0%, #e8ddf8 40%, #fce4ec 100%);
+
+    .placeholder-logo {
+      width: 40%;
+      max-width: 80px;
+      min-width: 28px;
+      aspect-ratio: 1;
+      object-fit: contain;
+      opacity: 0.35;
+    }
+  }
 }
 
-
 // .xhs-avatar（如果没有其他地方使用）
-
-
 
 .waterfall-item {
   cursor: pointer;
@@ -2750,7 +2842,9 @@ onUnmounted(() => {
     object-fit: cover;
     display: block;
     opacity: 0;
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
 
     &.image-loaded {
       opacity: 1;
@@ -2874,7 +2968,9 @@ onUnmounted(() => {
   object-fit: cover;
   display: block;
   opacity: 0;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
 
   .card-media:hover & {
     transform: scale(1.05);
@@ -3030,7 +3126,6 @@ onUnmounted(() => {
   }
 }
 
-
 .author-avatar-img {
   width: 22px;
   height: 22px;
@@ -3123,544 +3218,544 @@ onUnmounted(() => {
     background: rgba(245, 166, 35, 0.1);
   }
 }
-  // 加载更多
-  .loading-more,
-  .no-more {
-    text-align: center;
-    padding: 24px;
-    color: #b0a7c0;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+// 加载更多
+.loading-more,
+.no-more {
+  text-align: center;
+  padding: 24px;
+  color: #b0a7c0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+// 回到顶部按钮
+.back-to-top {
+  position: fixed;
+  right: 32px;
+  bottom: 80px;
+  width: 56px;
+  height: 56px;
+  // 使用更醒目的颜色
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s ease;
+  z-index: 9999; // 提高 z-index 确保在最上层
+
+  // 添加脉冲动画吸引注意
+  animation: pulse-ring 2s infinite;
+
+  // 添加一个外发光效果
+  &::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 50%;
+    opacity: 0.3;
+    z-index: -1;
+    transition: opacity 0.3s ease;
   }
 
-  // 回到顶部按钮
-  .back-to-top {
-    position: fixed;
-    right: 32px;
-    bottom: 80px;
-    width: 56px;
-    height: 56px;
-    // 使用更醒目的颜色
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border: 2px solid rgba(255, 255, 255, 0.9);
+  // 内圈光晕
+  &::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    bottom: 2px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
     border-radius: 50%;
+    z-index: -1;
+  }
+
+  &:hover {
+    transform: translateY(-4px) scale(1.1);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+
+    &::before {
+      opacity: 0.6;
+    }
+  }
+
+  &:active {
+    transform: translateY(0px) scale(0.95);
+  }
+
+  .el-icon {
+    font-size: 24px;
+    margin-bottom: 2px;
+  }
+
+  span {
+    font-size: 11px;
+    margin-top: 2px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+}
+
+// 脉冲动画效果
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+  }
+}
+
+git config user.email git config user.name .fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s ease;
+}
+
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+// 详情弹窗 - 现代化动画效果
+.detail-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.dialog-enter-active {
+    animation: overlayFadeIn 0.3s ease-out forwards;
+  }
+
+  &.dialog-leave-active {
+    animation: overlayFadeOut 0.3s ease-in forwards;
+  }
+}
+
+.detail-dialog-container {
+  position: relative;
+  width: 90%;
+  max-width: 1400px;
+  height: 85vh;
+  background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.dialog-enter-active {
+    animation: modalZoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  &.dialog-leave-active {
+    animation: modalZoomOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlayFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modalZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalZoomOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+}
+
+.detail-dialog-header {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+
+  .dialog-close-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
+    border: none;
+    cursor: pointer;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: white;
-    cursor: pointer;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-    transition: all 0.3s ease;
-    z-index: 9999; // 提高 z-index 确保在最上层
-
-    // 添加脉冲动画吸引注意
-    animation: pulse-ring 2s infinite;
-
-    // 添加一个外发光效果
-    &::before {
-      content: '';
-      position: absolute;
-      top: -4px;
-      left: -4px;
-      right: -4px;
-      bottom: -4px;
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      border-radius: 50%;
-      opacity: 0.3;
-      z-index: -1;
-      transition: opacity 0.3s ease;
-    }
-
-    // 内圈光晕
-    &::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      right: 2px;
-      bottom: 2px;
-      background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
-      border-radius: 50%;
-      z-index: -1;
-    }
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    color: #4a4a6a;
 
     &:hover {
-      transform: translateY(-4px) scale(1.1);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
-      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-
-      &::before {
-        opacity: 0.6;
-      }
+      background: white;
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      color: #c5a3ff;
     }
 
     &:active {
-      transform: translateY(0px) scale(0.95);
+      transform: scale(0.95);
     }
 
-    .el-icon {
-      font-size: 24px;
-      margin-bottom: 2px;
-    }
-
-    span {
-      font-size: 11px;
-      margin-top: 2px;
-      font-weight: 600;
-      letter-spacing: 1px;
+    svg {
+      width: 18px;
+      height: 18px;
     }
   }
+}
 
-  // 脉冲动画效果
-  @keyframes pulse-ring {
-    0% {
-      box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
-    }
-    70% {
-      box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
-    }
-    100% {
-      box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
-    }
+// 弹窗内容样式优化
+.detail-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.detail-left {
+  background: linear-gradient(135deg, #f0e5ff, #fce4ec);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.detail-video-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+
+  .detail-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: transparent;
   }
+}
 
-  git config user.email
-  git config user.name
-  .fade-slide-enter-active,
-  .fade-slide-leave-active {
-    transition: all 0.3s ease;
-  }
+.detail-images {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
 
-  .fade-slide-enter-from,
-  .fade-slide-leave-to {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  // 详情弹窗 - 现代化动画效果
-  .detail-dialog-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(8px);
-    z-index: 2000;
+  .image-gallery {
+    position: relative;
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-    &.dialog-enter-active {
-      animation: overlayFadeIn 0.3s ease-out forwards;
-    }
-
-    &.dialog-leave-active {
-      animation: overlayFadeOut 0.3s ease-in forwards;
-    }
   }
 
-  .detail-dialog-container {
+  .gallery-image-container {
     position: relative;
-    width: 90%;
-    max-width: 1400px;
-    height: 85vh;
-    background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
-    border-radius: 32px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-    &.dialog-enter-active {
-      animation: modalZoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-    }
-
-    &.dialog-leave-active {
-      animation: modalZoomOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-    }
   }
 
-  @keyframes overlayFadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
-  @keyframes overlayFadeOut {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0;
-    }
-  }
-
-  @keyframes modalZoomIn {
-    from {
-      opacity: 0;
-      transform: scale(0.95) translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
-  }
-
-  @keyframes modalZoomOut {
-    from {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
-    to {
-      opacity: 0;
-      transform: scale(0.95) translateY(20px);
-    }
-  }
-
-  .detail-dialog-header {
+  .gallery-skeleton {
     position: absolute;
-    top: 20px;
-    right: 20px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    border: 3px solid rgba(197, 163, 255, 0.2);
+    border-top-color: #c5a3ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: translate(-50%, -50%) rotate(360deg);
+    }
+  }
+
+  .detail-image {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
+
+    &.image-loading {
+      opacity: 0;
+    }
+
+    &.image-loaded {
+      opacity: 1;
+      animation: imageFadeIn 0.5s ease-out;
+    }
+  }
+
+  @keyframes imageFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .image-nav {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+    pointer-events: none;
     z-index: 10;
 
-    .dialog-close-btn {
-      width: 40px;
-      height: 40px;
+    .nav-btn {
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(4px);
-      border: none;
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+      border: 2px solid rgba(255, 255, 255, 0.8);
+      color: white;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: all 0.2s ease;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      color: #4a4a6a;
+      pointer-events: auto;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
 
       &:hover {
-        background: white;
+        background: linear-gradient(135deg, #f8b4d9, #c5a3ff);
+        border-color: white;
         transform: scale(1.1);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        color: #c5a3ff;
+        box-shadow: 0 6px 16px rgba(197, 163, 255, 0.4);
       }
 
       &:active {
         transform: scale(0.95);
       }
 
-      svg {
-        width: 18px;
-        height: 18px;
+      .el-icon {
+        font-size: 20px;
       }
     }
   }
 
-  // 弹窗内容样式优化
-  .detail-content {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0;
-    height: 100%;
-    overflow: hidden;
-  }
-
-  .detail-left {
-    background: linear-gradient(135deg, #f0e5ff, #fce4ec);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    transition: all 0.3s ease;
-  }
-
-  .detail-video-wrapper {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-
-    .detail-video {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: transparent;
-    }
-  }
-
-  .detail-images {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-
-    .image-gallery {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .gallery-image-container {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-
-    .gallery-skeleton {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 60px;
-      height: 60px;
-      border: 3px solid rgba(197, 163, 255, 0.2);
-      border-top-color: #c5a3ff;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to {
-        transform: translate(-50%, -50%) rotate(360deg);
-      }
-    }
-
-    .detail-image {
-      max-width: 100%;
-      max-height: 100%;
-      width: auto;
-      height: auto;
-      object-fit: contain;
-      transition: opacity 0.3s ease, transform 0.3s ease;
-
-      &.image-loading {
-        opacity: 0;
-      }
-
-      &.image-loaded {
-        opacity: 1;
-        animation: imageFadeIn 0.5s ease-out;
-      }
-    }
-
-    @keyframes imageFadeIn {
-      from {
-        opacity: 0;
-        transform: scale(0.98);
-      }
-      to {
-        opacity: 1;
-        transform: scale(1);
-      }
-    }
-
-    .image-nav {
-      position: absolute;
-      top: 50%;
-      left: 0;
-      right: 0;
-      transform: translateY(-50%);
-      display: flex;
-      justify-content: space-between;
-      padding: 0 20px;
-      pointer-events: none;
-      z-index: 10;
-
-      .nav-btn {
-        width: 44px;
-        height: 44px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-        border: 2px solid rgba(255, 255, 255, 0.8);
-        color: white;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s ease;
-        pointer-events: auto;
-        backdrop-filter: blur(4px);
-        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
-
-        &:hover {
-          background: linear-gradient(135deg, #f8b4d9, #c5a3ff);
-          border-color: white;
-          transform: scale(1.1);
-          box-shadow: 0 6px 16px rgba(197, 163, 255, 0.4);
-        }
-
-        &:active {
-          transform: scale(0.95);
-        }
-
-        .el-icon {
-          font-size: 20px;
-        }
-      }
-    }
-
-    .image-indicator {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-      color: white;
-      padding: 6px 16px;
-      border-radius: 48px;
-      font-size: 13px;
-      font-weight: 500;
-      backdrop-filter: blur(4px);
-      z-index: 10;
-      box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
-      animation: indicatorFadeIn 0.3s ease;
-    }
-
-    @keyframes indicatorFadeIn {
-      from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-    }
-  }
-
-  .detail-right {
-    padding: 32px;
-    overflow-y: auto;
-    background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
-    scrollbar-width: thin;
-    scrollbar-color: #c5a3ff #f0e5ff;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: #f0e5ff;
-      border-radius: 3px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: #c5a3ff;
-      border-radius: 3px;
-
-      &:hover {
-        background: #f8b4d9;
-      }
-    }
-  }
-
-  .detail-title {
-    font-size: 24px;
-    font-weight: bold;
+  .image-indicator {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    margin: 0 0 16px;
-    line-height: 1.4;
-    animation: slideInFromLeft 0.4s ease-out;
+    color: white;
+    padding: 6px 16px;
+    border-radius: 48px;
+    font-size: 13px;
+    font-weight: 500;
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+    animation: indicatorFadeIn 0.3s ease;
   }
 
-  @keyframes slideInFromLeft {
+  @keyframes indicatorFadeIn {
     from {
       opacity: 0;
-      transform: translateX(-20px);
+      transform: translateX(-50%) translateY(10px);
     }
     to {
       opacity: 1;
-      transform: translateX(0);
+      transform: translateX(-50%) translateY(0);
     }
   }
+}
 
-  .detail-author-section {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-    animation: fadeInUp 0.4s ease-out 0.05s both;
+.detail-right {
+  padding: 32px;
+  overflow-y: auto;
+  background: linear-gradient(145deg, #ffffff 0%, #fef9ff 100%);
+  scrollbar-width: thin;
+  scrollbar-color: #c5a3ff #f0e5ff;
+
+  &::-webkit-scrollbar {
+    width: 6px;
   }
 
-  .author-avatar-detail {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 1px solid #f0f0f0;
-    transition: transform 0.2s ease;
+  &::-webkit-scrollbar-track {
+    background: #f0e5ff;
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #c5a3ff;
+    border-radius: 3px;
 
     &:hover {
-      transform: scale(1.1);
+      background: #f8b4d9;
     }
   }
+}
 
-  .author-avatar-placeholder {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #e0c3ff, #c5a3ff);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 18px;
-    flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(197, 163, 255, 0.3);
-    transition: transform 0.2s ease;
+.detail-title {
+  font-size: 24px;
+  font-weight: bold;
+  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0 0 16px;
+  line-height: 1.4;
+  animation: slideInFromLeft 0.4s ease-out;
+}
 
-    &:hover {
-      transform: scale(1.1);
-    }
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
   }
-
-  .author-name-detail {
-    font-size: 16px;
-    font-weight: 500;
-    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
+}
 
-  .detail-meta {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    animation: fadeInUp 0.4s ease-out 0.1s both;
+.detail-author-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  animation: fadeInUp 0.4s ease-out 0.05s both;
+}
 
-    .meta-item {
-      font-size: 14px;
-      color: #8a7a9a;
-    }
+.author-avatar-detail {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #f0f0f0;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
   }
+}
 
- .detail-stats {
+.author-avatar-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e0c3ff, #c5a3ff);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(197, 163, 255, 0.3);
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+}
+
+.author-name-detail {
+  font-size: 16px;
+  font-weight: 500;
+  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.detail-meta {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  animation: fadeInUp 0.4s ease-out 0.1s both;
+
+  .meta-item {
+    font-size: 14px;
+    color: #8a7a9a;
+  }
+}
+
+.detail-stats {
   display: flex;
   gap: 20px;
   margin-bottom: 24px;
@@ -3682,7 +3777,8 @@ onUnmounted(() => {
     transition: all 0.3s ease;
     cursor: default;
 
-    .el-icon, .stat-icon {
+    .el-icon,
+    .stat-icon {
       font-size: 18px;
       width: 18px;
       height: 18px;
@@ -3757,256 +3853,253 @@ onUnmounted(() => {
   }
 }
 
-  @keyframes pulse {
-    0% {
-      transform: scale(1);
-    }
-    50% {
-      transform: scale(1.05);
-    }
-    100% {
-      transform: scale(1);
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.detail-body {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #4a4a6a;
+  animation: fadeInUp 0.4s ease-out 0.2s both;
+  transition: all 0.3s ease;
+
+  :deep(img) {
+    max-width: 100%;
+    border-radius: 12px;
+    margin: 12px 0;
+    transition: transform 0.3s ease;
+
+    &:hover {
+      transform: scale(1.02);
     }
   }
 
-  .detail-body {
-    font-size: 15px;
-    line-height: 1.8;
-    color: #4a4a6a;
-    animation: fadeInUp 0.4s ease-out 0.2s both;
-    transition: all 0.3s ease;
+  :deep(p) {
+    margin-bottom: 12px;
+  }
+}
 
-    :deep(img) {
-      max-width: 100%;
-      border-radius: 12px;
-      margin: 12px 0;
-      transition: transform 0.3s ease;
+// 评论区样式优化
+.comment-section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(197, 163, 255, 0.15);
+  animation: fadeInUp 0.4s ease-out 0.25s both;
+}
 
-      &:hover {
-        transform: scale(1.02);
-      }
-    }
+// 在 UserHome.vue 样式末尾添加以下代码
 
-    :deep(p) {
-      margin-bottom: 12px;
-    }
+// 评论区样式增强（保留原有渐变文字效果）
+
+// 保留原有的渐变文字样式，只添加子标题样式
+.comment-title {
+  font-size: 18px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0 0 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  .comment-subtitle {
+    font-size: 13px;
+    font-weight: normal;
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+    color: #a09abf;
+  }
+}
+
+// 评论列表容器
+.comment-list {
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 8px;
+
+  &::-webkit-scrollbar {
+    width: 4px;
   }
 
-  // 评论区样式优化
-  .comment-section {
-    margin-top: 32px;
-    padding-top: 24px;
-    border-top: 1px solid rgba(197, 163, 255, 0.15);
-    animation: fadeInUp 0.4s ease-out 0.25s both;
+  &::-webkit-scrollbar-track {
+    background: #f0e5ff;
+    border-radius: 2px;
   }
 
+  &::-webkit-scrollbar-thumb {
+    background: #c5a3ff;
+    border-radius: 2px;
+  }
+}
 
-  // 在 UserHome.vue 样式末尾添加以下代码
+// 顶部评论输入框样式
+.top-comment-input-wrapper {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding: 16px;
+  background: rgba(197, 163, 255, 0.03);
+  border-radius: 20px;
+  transition: all 0.3s ease;
 
-  // 评论区样式增强（保留原有渐变文字效果）
+  .input-avatar {
+    flex-shrink: 0;
+  }
 
+  .input-avatar-img {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #c5a3ff;
+  }
 
-  // 保留原有的渐变文字样式，只添加子标题样式
-  .comment-title {
+  .input-avatar-placeholder {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 18px;
     font-weight: 600;
-    background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    margin: 0 0 20px;
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    flex-wrap: wrap;
+    color: white;
+  }
 
-    .comment-subtitle {
-      font-size: 13px;
-      font-weight: normal;
-      background: none;
-      -webkit-background-clip: unset;
-      background-clip: unset;
-      color: #a09abf;
+  .input-content {
+    flex: 1;
+  }
+
+  .comment-textarea {
+    :deep(.el-textarea__inner) {
+      border-radius: 16px;
+      background: #faf7ff;
+      border: 1px solid #f0e5ff;
+      transition: all 0.3s ease;
+
+      &:focus {
+        border-color: #c5a3ff;
+        box-shadow: 0 0 0 3px rgba(197, 163, 255, 0.1);
+      }
     }
   }
 
-
-  // 评论列表容器
-  .comment-list {
-    max-height: 500px;
-    overflow-y: auto;
-    padding-right: 8px;
-
-    &::-webkit-scrollbar {
-      width: 4px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: #f0e5ff;
-      border-radius: 2px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: #c5a3ff;
-      border-radius: 2px;
-    }
-  }
-
-  // 顶部评论输入框样式
-  .top-comment-input-wrapper {
+  .comment-actions-bar {
     display: flex;
-    gap: 12px;
-    margin-bottom: 28px;
-    padding: 16px;
-    background: rgba(197, 163, 255, 0.03);
-    border-radius: 20px;
-    transition: all 0.3s ease;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
 
-    .input-avatar {
-      flex-shrink: 0;
+    .comment-tip {
+      font-size: 11px;
+      color: #b0a7c0;
     }
 
-    .input-avatar-img {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid #c5a3ff;
-    }
-
-    .input-avatar-placeholder {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
+    .submit-comment-btn {
       background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      font-weight: 600;
+      border: none;
+      border-radius: 48px;
+      padding: 8px 24px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
+      }
+    }
+  }
+}
+
+// 无评论状态
+.no-comments {
+  text-align: center;
+  padding: 48px 20px;
+
+  .no-comments-emoji {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+
+  p {
+    font-size: 14px;
+    color: #b0a7c0;
+    margin: 0;
+  }
+}
+
+//爱心
+// 爱心图标通用样式
+.like-icon {
+  width: 16px;
+  height: 16px;
+  transition: all 0.2s ease;
+}
+
+.liked-icon {
+  color: #c5a3ff;
+  animation: heartBeat 0.4s ease;
+}
+
+// 笔记卡片点赞按钮样式增强
+.xhs-like {
+  .like-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  &.liked {
+    .liked-icon {
+      color: #c5a3ff;
+    }
+  }
+}
+
+// 弹窗点赞统计样式增强
+.stat-badge.like-badge {
+  .like-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+  }
+
+  &.liked {
+    .liked-icon {
       color: white;
     }
-
-    .input-content {
-      flex: 1;
-    }
-
-    .comment-textarea {
-      :deep(.el-textarea__inner) {
-        border-radius: 16px;
-        background: #faf7ff;
-        border: 1px solid #f0e5ff;
-        transition: all 0.3s ease;
-
-        &:focus {
-          border-color: #c5a3ff;
-          box-shadow: 0 0 0 3px rgba(197, 163, 255, 0.1);
-        }
-      }
-    }
-
-    .comment-actions-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 12px;
-
-      .comment-tip {
-        font-size: 11px;
-        color: #b0a7c0;
-      }
-
-      .submit-comment-btn {
-        background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-        border: none;
-        border-radius: 48px;
-        padding: 8px 24px;
-        font-weight: 500;
-        transition: all 0.3s ease;
-
-        &:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
-        }
-      }
-    }
   }
+}
 
-  // 无评论状态
-  .no-comments {
-    text-align: center;
-    padding: 48px 20px;
-
-    .no-comments-emoji {
-      font-size: 48px;
-      display: block;
-      margin-bottom: 12px;
-      opacity: 0.5;
-    }
-
-    p {
-      font-size: 14px;
-      color: #b0a7c0;
-      margin: 0;
-    }
+// 心跳动画
+@keyframes heartBeat {
+  0% {
+    transform: scale(1);
   }
-
-  //爱心
-  // 爱心图标通用样式
-  .like-icon {
-    width: 16px;
-    height: 16px;
-    transition: all 0.2s ease;
+  30% {
+    transform: scale(1.3);
   }
-
-  .liked-icon {
-    color: #c5a3ff;
-    animation: heartBeat 0.4s ease;
+  60% {
+    transform: scale(1.1);
   }
-
-  // 笔记卡片点赞按钮样式增强
-  .xhs-like {
-    .like-icon {
-      width: 14px;
-      height: 14px;
-    }
-
-    &.liked {
-      .liked-icon {
-        color: #c5a3ff;
-      }
-    }
+  100% {
+    transform: scale(1);
   }
-
-  // 弹窗点赞统计样式增强
-  .stat-badge.like-badge {
-    .like-icon {
-      width: 14px;
-      height: 14px;
-      margin-right: 4px;
-    }
-
-    &.liked {
-      .liked-icon {
-        color: white;
-      }
-    }
-  }
-
-  // 心跳动画
-  @keyframes heartBeat {
-    0% {
-      transform: scale(1);
-    }
-    30% {
-      transform: scale(1.3);
-    }
-    60% {
-      transform: scale(1.1);
-    }
-    100% {
-      transform: scale(1);
-    }
 }
 .follow-btn {
   padding: 6px 20px;

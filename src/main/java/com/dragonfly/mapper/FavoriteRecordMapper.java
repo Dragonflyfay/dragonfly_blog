@@ -41,4 +41,8 @@ public interface FavoriteRecordMapper {
     List<FavoriteRecord> batchFindByUserAndTarget(@Param("userId") Integer userId,
                                                   @Param("targetType") Integer targetType,
                                                   @Param("targetIds") List<Integer> targetIds);
+
+    // 查询用户收藏的所有笔记ID列表
+    @Select("SELECT target_id FROM favorite_record WHERE user_id = #{userId} AND target_type = 1 ORDER BY create_time DESC")
+    List<Integer> findFavoriteNoteIdsByUserId(Integer userId);
 }

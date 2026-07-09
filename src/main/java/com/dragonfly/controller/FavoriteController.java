@@ -47,4 +47,11 @@ public class FavoriteController {
         Map<Integer, Boolean> result = favoriteService.batchCheckFavoritedNotes(noteIds);
         return Result.success(result);
     }
+
+    // 获取当前用户收藏的笔记ID列表
+    @GetMapping("/notes")
+    public Result<List<Integer>> getFavoriteNoteIds() {
+        List<Integer> noteIds = favoriteService.getFavoriteNoteIds();
+        return Result.success(noteIds);
+    }
 }

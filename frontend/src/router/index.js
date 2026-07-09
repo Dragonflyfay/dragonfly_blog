@@ -10,12 +10,12 @@ import LoginVue from '@/views/Login.vue'
 
 // Admin布局和页面
 import AdminLayoutVue from '@/layouts/AdminLayout.vue'
-import AdminHomeVue from '@/views/admin/AdminHome.vue' // 新建：后台首页仪表盘
-import NoteCategoryVue from '@/views/admin/NoteCategory.vue' // 移入admin目录
+import AdminHomeVue from '@/views/admin/AdminHome.vue' //后台首页仪表盘
+import NoteCategoryVue from '@/views/admin/NoteCategory.vue' //
 import NoteManageVue from '@/views/admin/NoteManage.vue' // 移入admin目录
 import UserRoleManageVue from '@/views/admin/UserRoleManage.vue' // 普通角色管理
 import AdminRoleManageVue from '@/views/admin/AdminRoleManage.vue' //管理员角色管理
-import CommentManage from "@/views/admin/CommentManage.vue";
+import CommentManage from '@/views/admin/CommentManage.vue'
 // User个人中心（Admin和User共用）
 import UserAvatarVue from '@/views/user/UserAvatar.vue'
 import UserInfo from '@/views/user/UserInfo.vue'
@@ -26,6 +26,8 @@ import UserLayoutVue from '@/layouts/UserLayout.vue'
 import UserHomeVue from '@/views/user/UserHome.vue' // 新建：发现页瀑布流
 import PublishVue from '@/views/user/Publish.vue' // 新建：发布页
 import NotificationVue from '@/views/user/Notification.vue' // 新建：通知页
+import MeVue from '@/views/user/Me.vue' // 个人中心
+//@：模块路径  .. :上级目录
 
 const routes = [
   { path: '/login', component: LoginVue },
@@ -45,7 +47,7 @@ const routes = [
       { path: 'user/info', component: UserInfo, meta: { title: '基本资料' } },
       { path: 'user/avatar', component: UserAvatarVue, meta: { title: '更换头像' } },
       { path: 'user/resetPassword', component: UserResetPasswordVue, meta: { title: '重置密码' } },
-      {path: 'comment', component: CommentManage, meta: { title: '评论管理' }}
+      { path: 'comment', component: CommentManage, meta: { title: '评论管理' } },
     ],
   },
 
@@ -59,6 +61,7 @@ const routes = [
       { path: 'home', component: UserHomeVue, meta: { title: '发现' } },
       { path: 'publish', component: PublishVue, meta: { title: '发布' } },
       { path: 'notification', component: NotificationVue, meta: { title: '通知' } },
+      { path: 'me', component: MeVue, meta: { title: '我' } },
       { path: 'user/info', component: UserInfo, meta: { title: '基本资料' } },
       { path: 'user/avatar', component: UserAvatarVue, meta: { title: '更换头像' } },
       { path: 'user/resetPassword', component: UserResetPasswordVue, meta: { title: '重置密码' } },

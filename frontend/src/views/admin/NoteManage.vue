@@ -11,6 +11,7 @@ import {
   VideoPlay,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import logoImg from '@/assets/logo.png'
 
 import {
   noteDeleteService,
@@ -37,11 +38,7 @@ const previewNote = ref(null)
 const currentImageIndex = ref(0)
 const videoPlayerRef = ref(null)
 
-const PLACEHOLDER_IMG =
-  'data:image/svg+xml,' +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="533" viewBox="0 0 400 533"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffeef8"/><stop offset="100%" stop-color="#e8f4ff"/></linearGradient></defs><rect width="400" height="533" fill="url(#g)"/><text x="200" y="270" text-anchor="middle" fill="#b8b0c8" font-family="system-ui" font-size="14">暂无封面</text></svg>`,
-  )
+const PLACEHOLDER_IMG = logoImg
 
 const cardCover = (row) => {
   if (row.coverImg) return row.coverImg

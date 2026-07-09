@@ -17,11 +17,11 @@ import {
 import avatar from '@/assets/default.png'
 import { ref } from 'vue'
 import router from '@/router/index.js'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-const route = useRouter()
+const currentRoute = useRoute()
 const isDark = ref(false)
 
 const toggleTheme = () => {
@@ -94,7 +94,7 @@ getUserInfo()
         <div class="logo-slogan">记录生活 · 分享美好</div>
       </div>
       <el-menu
-        :default-active="route.path"
+        :default-active="currentRoute.path"
         active-text-color="#c5a3ff"
         background-color="transparent"
         text-color="rgba(255,255,255,0.75)"

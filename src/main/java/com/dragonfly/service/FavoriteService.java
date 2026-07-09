@@ -16,4 +16,7 @@ public interface FavoriteService {
     boolean isFavoritedNote(Integer noteId); // 判断用户是否收藏笔记
 
     Map<Integer, Boolean> batchCheckFavoritedNotes(List<Integer> noteIds);
+
+    // 获取当前用户收藏的笔记ID列表
+    List<Integer> getFavoriteNoteIds();
 }

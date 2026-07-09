@@ -118,5 +118,12 @@ public class FavoriteServiceImpl implements FavoriteService {
         return result;
     }
 
+    @Override
+    public List<Integer> getFavoriteNoteIds() {
+        Map<String, Object> map = ThreadLocalUtil.get();
+        Integer userId = (Integer) map.get("id");
+        return favoriteRecordMapper.findFavoriteNoteIdsByUserId(userId);
+    }
+
 
 }

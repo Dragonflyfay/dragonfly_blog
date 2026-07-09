@@ -80,4 +80,11 @@ public class NoteController {
         PageBean<Note> pageBean = noteService.userPageList(pageNum, pageSize, topicId, keyword,null);
         return Result.success(pageBean);
     }
+
+    // 根据ID列表批量查询笔记
+    @GetMapping("/byIds")
+    public Result<List<Note>> getByIds(@RequestParam List<Integer> ids) {
+        List<Note> notes = noteService.getByIds(ids);
+        return Result.success(notes);
+    }
 }

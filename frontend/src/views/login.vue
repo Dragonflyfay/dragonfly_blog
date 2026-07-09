@@ -1,23 +1,23 @@
 <script setup>
-import {User, Lock, View, Hide} from '@element-plus/icons-vue'
+import { User, Lock, View, Hide } from '@element-plus/icons-vue' //element-plus图标
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { userRegisterService, userLoginService, userInfoService } from '@/api/user'
-import { useTokenStore } from '@/stores/token.js'
-import useUserInfoStore from '@/stores/userInfo.js'
-import { useRouter } from 'vue-router'
-import { canEnterAdmin, normalizeRole } from '@/utils/roles'
+import { userRegisterService, userLoginService, userInfoService } from '@/api/user' //用户登陆注册服务
+import { useTokenStore } from '@/stores/token.js' //token存储
+import useUserInfoStore from '@/stores/userInfo.js' //用户信息存储
+import { useRouter } from 'vue-router' //路由
+import { canEnterAdmin, normalizeRole } from '@/utils/roles' //权限
 
-const isRegister = ref(false)
-const rememberMe = ref(false)
-const formRef = ref()
-const showPassword = ref(false)
-const showConfirmPassword = ref(false)
+const isRegister = ref(false) //判断是注册还是登录
+const rememberMe = ref(false) //记住我功能
+const formRef = ref() ///表单
+const showPassword = ref(false) //密码可见
+const showConfirmPassword = ref(false) //确认密码可见
 const registerData = ref({
   username: '',
   password: '',
   rePassword: '',
-})
+}) //注册数据模型
 
 const checkrePassword = (rule, value, callback) => {
   if (value === '') {
@@ -40,7 +40,6 @@ const rules = {
   ],
   rePassword: [{ validator: checkrePassword, trigger: 'blur' }],
 }
-
 
 // 登录页无「确认密码」表单项，不应校验 rePassword
 const loginRules = {
@@ -142,18 +141,18 @@ const clearRegisterData = () => {
 
           <el-form-item prop="password">
             <el-input
-                name="password"
-                :prefix-icon="Lock"
-                v-model="registerData.password"
-                :type="showPassword ? 'text' : 'password'"
-                placeholder="请输入密码"
-                class="custom-input"
+              name="password"
+              :prefix-icon="Lock"
+              v-model="registerData.password"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="请输入密码"
+              class="custom-input"
             >
               <template #suffix>
                 <el-icon
-                    class="password-toggle"
-                    @click="showPassword = !showPassword"
-                    style="cursor: pointer;"
+                  class="password-toggle"
+                  @click="showPassword = !showPassword"
+                  style="cursor: pointer"
                 >
                   <View v-if="!showPassword" />
                   <Hide v-else />
@@ -162,21 +161,19 @@ const clearRegisterData = () => {
             </el-input>
           </el-form-item>
 
-
-
-
           <el-form-item prop="rePassword">
             <el-input
-                :prefix-icon="Lock"
-                :type="showConfirmPassword ? 'text' : 'password'"
-                placeholder="请再次输入密码"
-                v-model="registerData.rePassword"
-                class="custom-input"
+              :prefix-icon="Lock"
+              :type="showConfirmPassword ? 'text' : 'password'"
+              placeholder="请再次输入密码"
+              v-model="registerData.rePassword"
+              class="custom-input"
             >
               <template #suffix>
                 <el-icon
-                    class="password-toggle"
-                    @click="showConfirmPassword = !showConfirmPassword"                  style="cursor: pointer;"
+                  class="password-toggle"
+                  @click="showConfirmPassword = !showConfirmPassword"
+                  style="cursor: pointer"
                 >
                   <View v-if="!showConfirmPassword" />
                   <Hide v-else />
