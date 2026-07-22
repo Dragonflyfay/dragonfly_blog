@@ -222,11 +222,11 @@ const onTabChange = (tab) => {
   if (tab === 'mynotes' && !tabLoaded.value.mynotes) {
     tabLoaded.value.mynotes = true
     loadMyNotes()
-  } else if (tab === 'favorites' && !tabLoaded.value.favorites) {
-    tabLoaded.value.favorites = true
+  } else if (tab === 'favorites') {
+    // 每次都重新加载，保证收藏列表与最新操作同步
     loadFavoriteNotes()
-  } else if (tab === 'likes' && !tabLoaded.value.likes) {
-    tabLoaded.value.likes = true
+  } else if (tab === 'likes') {
+    // 每次都重新加载，保证喜欢列表与最新操作同步
     loadLikedNotes()
   }
 }
