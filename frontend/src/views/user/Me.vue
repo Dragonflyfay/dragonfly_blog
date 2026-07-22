@@ -240,11 +240,9 @@ const toggleLike = async (note) => {
       await unlikeNoteService(note.id)
       likedNoteIds.value.delete(note.id)
       note.likesCount = Math.max(0, (note.likesCount || 1) - 1)
-      // 如果在喜欢标签页，从列表中移除
-      if (activeTab.value === 'likes') {
-        likedNotes.value = likedNotes.value.filter((n) => n.id !== note.id)
-        stats.value.likesCount = Math.max(0, stats.value.likesCount - 1)
-      }
+      // 从喜欢列表中移除（无论当前在哪个tab，保持数据一致性）
+      likedNotes.value = likedNotes.value.filter((n) => n.id !== note.id)
+      stats.value.likesCount = Math.max(0, stats.value.likesCount - 1)
       ElMessage.success('已取消点赞')
     } else {
       await likeNoteService(note.id)
@@ -264,11 +262,9 @@ const toggleFavorite = async (note) => {
       await unfavoriteNoteService(note.id)
       favoritedNoteIds.value.delete(note.id)
       note.favoritesCount = Math.max(0, (note.favoritesCount || 1) - 1)
-      // 如果在收藏标签页，从列表中移除
-      if (activeTab.value === 'favorites') {
-        favoriteNotes.value = favoriteNotes.value.filter((n) => n.id !== note.id)
-        stats.value.favoritesCount = Math.max(0, stats.value.favoritesCount - 1)
-      }
+      // 从收藏列表中移除（无论当前在哪个tab，保持数据一致性）
+      favoriteNotes.value = favoriteNotes.value.filter((n) => n.id !== note.id)
+      stats.value.favoritesCount = Math.max(0, stats.value.favoritesCount - 1)
       ElMessage.success('已取消收藏')
     } else {
       await favoriteNoteService(note.id)
