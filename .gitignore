@@ -35,5 +35,12 @@ build/
 ### VS Code ###
 .vscode/
 
+### Frontend ###
+frontend/dist/
+frontend/node_modules/
+frontend/vite-dev.err.log
+frontend/vite-dev.out.log
+*.log
+
 ### Mac OS ###
 .DS_Store
