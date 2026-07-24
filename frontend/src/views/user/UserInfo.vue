@@ -1,8 +1,9 @@
 <!-- UserInfo.vue -->
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Check, Lock, Message, Plus, Refresh, Upload, User } from '@element-plus/icons-vue'
+import { ArrowLeft, Check, Lock, Message, Plus, Refresh, Upload, User } from '@element-plus/icons-vue'
 import avatar from '@/assets/default.png'
 import { useTokenStore } from '@/stores/token'
 import useUserInfoStore from '@/stores/userInfo.js'
@@ -13,8 +14,11 @@ import {
   userUpdateService,
 } from '@/api/user.js'
 
+const router = useRouter()
 const tokenStore = useTokenStore()
 const userInfoStore = useUserInfoStore()
+
+const goBack = () => router.back()
 
 const profileFormRef = ref()
 const passwordFormRef = ref()
@@ -212,6 +216,12 @@ const resetPasswordForm = () => {
 
 <template>
   <div class="edit-container">
+    <!-- 返回按钮 -->
+    <button class="back-btn" @click="goBack">
+      <el-icon><ArrowLeft /></el-icon>
+      <span>返回</span>
+    </button>
+
     <!-- ===== 头像卡片 ===== -->
     <div class="info-card avatar-card">
       <div class="card-bg"></div>
@@ -220,7 +230,7 @@ const resetPasswordForm = () => {
           <el-icon><User /></el-icon>
           <span>头像</span>
         </div>
-        <p class="section-desc">选择一个能代表你的图片作为头像</p>
+        <p class="section-desc">选择一个你喜欢的的图片作为头像</p>
 
         <div class="avatar-area">
           <el-upload
@@ -266,7 +276,9 @@ const resetPasswordForm = () => {
             <el-icon><Message /></el-icon>
             <span>基本资料</span>
           </div>
-          <el-button class="btn-outline btn-sm" :icon="Refresh" @click="refreshUserInfo">刷新</el-button>
+          <el-button class="btn-outline btn-sm" :icon="Refresh" @click="refreshUserInfo"
+            >刷新</el-button
+          >
         </div>
         <p class="section-desc">设置你的昵称和邮箱，让朋友们更好地认识你</p>
 
@@ -396,6 +408,32 @@ $gradient-bg: linear-gradient(135deg, $purple 0%, $pink 50%, $mint 100%);
   gap: 20px;
 }
 
+// ==================== 返回按钮 ====================
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 8px 18px;
+  border: 1px solid $border-input;
+  border-radius: 24px;
+  background: #fff;
+  color: #7a5a9e;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease;
+
+  .el-icon { font-size: 16px; }
+
+  &:hover {
+    color: $purple;
+    border-color: $purple;
+    background: rgba(197, 163, 255, 0.05);
+    transform: translateX(-2px);
+  }
+}
+
 // ==================== 通用卡片 ====================
 .info-card {
   position: relative;
@@ -489,11 +527,18 @@ $gradient-bg: linear-gradient(135deg, $purple 0%, $pink 50%, $mint 100%);
   opacity: 0;
   transition: opacity 0.25s ease;
 
-  .el-icon { font-size: 26px; }
-  span { font-size: 13px; font-weight: 600; }
+  .el-icon {
+    font-size: 26px;
+  }
+  span {
+    font-size: 13px;
+    font-weight: 600;
+  }
 }
 
-.avatar-uploader:hover .avatar-mask { opacity: 1; }
+.avatar-uploader:hover .avatar-mask {
+  opacity: 1;
+}
 
 .avatar-btns {
   display: flex;
