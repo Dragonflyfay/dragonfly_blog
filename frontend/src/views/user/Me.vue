@@ -37,20 +37,14 @@ const favoriteNotesLoading = ref(false)
 const likedNotes = ref([])
 const likedNotesLoading = ref(false)
 
-// 用户统计 — 各字段独立维护，stats 为 computed 聚合（单一数据源）
-const notesCount = ref(0)
-const favoritesCount = ref(0)
-const likesCount = ref(0)
-const followersCount = ref(0)
-const followingCount = ref(0)
-
-const stats = computed(() => ({
-  notesCount: notesCount.value,
-  favoritesCount: favoritesCount.value,
-  likesCount: likesCount.value,
-  followersCount: followersCount.value,
-  followingCount: followingCount.value,
-}))
+// 用户统计
+const stats = ref({
+  notesCount: 0,
+  favoritesCount: 0,
+  likesCount: 0,
+  followersCount: 0,
+  followingCount: 0,
+})
 
 // 点赞/收藏状态
 const likedNoteIds = ref(new Set())
@@ -105,7 +99,7 @@ const loadMyNotes = async (reset = true) => {
     }
 
     myNotesPage.value.total = res.data?.total || 0
-    notesCount.value = myNotesPage.value.total
+    stats.value.notesCount = myNotesPage.value.total
 
     // 异步加载状态（不阻塞渲染）
     refreshLikeAndFavStatus(items)
@@ -130,7 +124,7 @@ const loadFavoriteNotes = async () => {
   try {
     const favRes = await request.get('/favorite/notes')
     const noteIds = favRes.data || []
-    favoritesCount.value = noteIds.length
+    stats.value.favoritesCount = noteIds.length
 
     if (noteIds.length === 0) {
       favoriteNotes.value = []
@@ -158,7 +152,7 @@ const loadLikedNotes = async () => {
   try {
     const likeRes = await request.get('/like/notes')
     const noteIds = likeRes.data || []
-    likesCount.value = noteIds.length
+    stats.value.likesCount = noteIds.length
 
     if (noteIds.length === 0) {
       likedNotes.value = []
@@ -216,8 +210,8 @@ const loadStats = async () => {
       getFollowersService(userId),
       getFollowingService(userId),
     ])
-    followersCount.value = (followersRes.data || []).length
-    followingCount.value = (followingRes.data || []).length
+    stats.value.followersCount = (followersRes.data || []).length
+    stats.value.followingCount = (followingRes.data || []).length
   } catch (e) {
     // 静默失败
   }
@@ -248,7 +242,7 @@ const toggleLike = async (note) => {
       note.likesCount = Math.max(0, (note.likesCount || 1) - 1)
       // 从喜欢列表中移除（无论当前在哪个tab，保持数据一致性）
       likedNotes.value = likedNotes.value.filter((n) => n.id !== note.id)
-      likesCount.value = Math.max(0, likesCount.value - 1)
+      stats.value.likesCount = Math.max(0, stats.value.likesCount - 1)
       ElMessage.success('已取消点赞')
     } else {
       await likeNoteService(note.id)
@@ -270,7 +264,7 @@ const toggleFavorite = async (note) => {
       note.favoritesCount = Math.max(0, (note.favoritesCount || 1) - 1)
       // 从收藏列表中移除（无论当前在哪个tab，保持数据一致性）
       favoriteNotes.value = favoriteNotes.value.filter((n) => n.id !== note.id)
-      favoritesCount.value = Math.max(0, favoritesCount.value - 1)
+      stats.value.favoritesCount = Math.max(0, stats.value.favoritesCount - 1)
       ElMessage.success('已取消收藏')
     } else {
       await favoriteNoteService(note.id)
@@ -310,8 +304,8 @@ const preloadCounts = async () => {
       request.get('/favorite/notes'),
       request.get('/like/notes'),
     ])
-    favoritesCount.value = (favRes.data || []).length
-    likesCount.value = (likeRes.data || []).length
+    stats.value.favoritesCount = (favRes.data || []).length
+    stats.value.likesCount = (likeRes.data || []).length
   } catch (e) {
     // 静默失败
   }
