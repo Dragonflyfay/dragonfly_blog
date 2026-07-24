@@ -211,23 +211,18 @@ const resetPasswordForm = () => {
 </script>
 
 <template>
-  <div class="userinfo-container">
-    <div class="userinfo-card">
-      <div class="userinfo-header">
-        <div>
-          <h1 class="userinfo-title">编辑资料</h1>
-          <p class="userinfo-subtitle">头像、昵称、邮箱和密码都可以在这里修改</p>
+  <div class="edit-container">
+    <!-- ===== 头像卡片 ===== -->
+    <div class="info-card avatar-card">
+      <div class="card-bg"></div>
+      <div class="card-body">
+        <div class="section-label">
+          <el-icon><User /></el-icon>
+          <span>头像</span>
         </div>
-        <el-button :icon="Refresh" class="refresh-btn" @click="refreshUserInfo">刷新</el-button>
-      </div>
+        <p class="section-desc">选择一个能代表你的图片作为头像</p>
 
-      <div class="userinfo-content">
-        <section class="avatar-section">
-          <div class="section-title">
-            <el-icon><User /></el-icon>
-            <span>头像</span>
-          </div>
-
+        <div class="avatar-area">
           <el-upload
             ref="uploadRef"
             class="avatar-uploader"
@@ -247,217 +242,226 @@ const resetPasswordForm = () => {
             </div>
           </el-upload>
 
-          <div class="avatar-actions">
-            <el-button :icon="Plus" class="secondary-btn" @click="chooseAvatar">选择图片</el-button>
+          <div class="avatar-btns">
+            <el-button class="btn-outline" :icon="Plus" @click="chooseAvatar">选择图片</el-button>
             <el-button
-              type="primary"
+              class="btn-gradient"
               :icon="Upload"
-              class="primary-btn"
               :loading="avatarSaving"
               @click="updateAvatar"
             >
               保存头像
             </el-button>
           </div>
-        </section>
+        </div>
+      </div>
+    </div>
 
-        <section class="profile-section">
-          <div class="section-title">
+    <!-- ===== 基本资料卡片 ===== -->
+    <div class="info-card profile-card">
+      <div class="card-bg"></div>
+      <div class="card-body">
+        <div class="card-header-row">
+          <div class="section-label">
             <el-icon><Message /></el-icon>
             <span>基本资料</span>
           </div>
+          <el-button class="btn-outline btn-sm" :icon="Refresh" @click="refreshUserInfo">刷新</el-button>
+        </div>
+        <p class="section-desc">设置你的昵称和邮箱，让朋友们更好地认识你</p>
 
-          <el-form
-            ref="profileFormRef"
-            :model="profileForm"
-            :rules="profileRules"
-            label-width="88px"
-            size="large"
-            class="edit-form"
-          >
-            <el-form-item label="登录名称">
-              <el-input v-model="profileForm.username" disabled class="disabled-input" />
-            </el-form-item>
+        <el-form
+          ref="profileFormRef"
+          :model="profileForm"
+          :rules="profileRules"
+          label-width="88px"
+          size="large"
+          class="info-form"
+        >
+          <el-form-item label="登录名称">
+            <el-input v-model="profileForm.username" disabled class="input-disabled" />
+          </el-form-item>
 
-            <el-form-item label="用户昵称" prop="nickname">
-              <el-input
-                v-model="profileForm.nickname"
-                placeholder="请输入昵称"
-                class="custom-input"
-                maxlength="10"
-                show-word-limit
-              />
-            </el-form-item>
+          <el-form-item label="用户昵称" prop="nickname">
+            <el-input
+              v-model="profileForm.nickname"
+              placeholder="请输入昵称"
+              maxlength="10"
+              show-word-limit
+            />
+          </el-form-item>
 
-            <el-form-item label="用户邮箱" prop="email">
-              <el-input v-model="profileForm.email" placeholder="请输入邮箱" class="custom-input" />
-            </el-form-item>
+          <el-form-item label="用户邮箱" prop="email">
+            <el-input v-model="profileForm.email" placeholder="请输入邮箱" />
+          </el-form-item>
 
-            <el-form-item>
+          <el-form-item>
+            <el-button
+              class="btn-gradient"
+              :icon="Check"
+              :loading="profileSaving"
+              @click="updateProfile"
+            >
+              保存资料
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+    </div>
+
+    <!-- ===== 修改密码卡片 ===== -->
+    <div class="info-card password-card">
+      <div class="card-bg"></div>
+      <div class="card-body">
+        <div class="section-label">
+          <el-icon><Lock /></el-icon>
+          <span>修改密码</span>
+        </div>
+        <p class="section-desc">建议定期更换密码以保护账号安全</p>
+
+        <el-form
+          ref="passwordFormRef"
+          :model="passwordForm"
+          :rules="passwordRules"
+          label-width="88px"
+          size="large"
+          class="info-form"
+        >
+          <el-form-item label="原密码" prop="old_pwd">
+            <el-input
+              v-model="passwordForm.old_pwd"
+              type="password"
+              placeholder="请输入原密码"
+              show-password
+            />
+          </el-form-item>
+
+          <el-form-item label="新密码" prop="new_pwd">
+            <el-input
+              v-model="passwordForm.new_pwd"
+              type="password"
+              placeholder="请输入新密码"
+              show-password
+            />
+          </el-form-item>
+
+          <el-form-item label="确认密码" prop="re_pwd">
+            <el-input
+              v-model="passwordForm.re_pwd"
+              type="password"
+              placeholder="请再次输入新密码"
+              show-password
+            />
+          </el-form-item>
+
+          <el-form-item>
+            <div class="btn-row">
               <el-button
-                type="primary"
+                class="btn-gradient"
                 :icon="Check"
-                class="primary-btn"
-                :loading="profileSaving"
-                @click="updateProfile"
+                :loading="passwordSaving"
+                @click="updatePassword"
               >
-                保存资料
+                修改密码
               </el-button>
-            </el-form-item>
-          </el-form>
-        </section>
-
-        <section class="password-section">
-          <div class="section-title">
-            <el-icon><Lock /></el-icon>
-            <span>修改密码</span>
-          </div>
-
-          <el-form
-            ref="passwordFormRef"
-            :model="passwordForm"
-            :rules="passwordRules"
-            label-width="88px"
-            size="large"
-            class="edit-form"
-          >
-            <el-form-item label="原密码" prop="old_pwd">
-              <el-input
-                v-model="passwordForm.old_pwd"
-                type="password"
-                placeholder="请输入原密码"
-                show-password
-                class="custom-input"
-              />
-            </el-form-item>
-
-            <el-form-item label="新密码" prop="new_pwd">
-              <el-input
-                v-model="passwordForm.new_pwd"
-                type="password"
-                placeholder="请输入新密码"
-                show-password
-                class="custom-input"
-              />
-            </el-form-item>
-
-            <el-form-item label="确认密码" prop="re_pwd">
-              <el-input
-                v-model="passwordForm.re_pwd"
-                type="password"
-                placeholder="请再次输入新密码"
-                show-password
-                class="custom-input"
-              />
-            </el-form-item>
-
-            <el-form-item>
-              <div class="button-group">
-                <el-button
-                  type="primary"
-                  :icon="Check"
-                  class="primary-btn"
-                  :loading="passwordSaving"
-                  @click="updatePassword"
-                >
-                  修改密码
-                </el-button>
-                <el-button class="secondary-btn" @click="resetPasswordForm">清空</el-button>
-              </div>
-            </el-form-item>
-          </el-form>
-        </section>
+              <el-button class="btn-outline" @click="resetPasswordForm">清空</el-button>
+            </div>
+          </el-form-item>
+        </el-form>
       </div>
     </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
-.userinfo-container {
-  min-height: calc(100vh - 60px);
-  padding: 20px;
-  background: linear-gradient(145deg, #f7f4ff 0%, #eef7f4 48%, #fff3f8 100%);
-}
+// ==================== 设计令牌（与 Me.vue 统一） ====================
+$purple: #c5a3ff;
+$pink: #f8b4d9;
+$mint: #a8e6cf;
+$dark: #2d2d44;
+$text-secondary: #999;
+$border-light: #f0e5ff;
+$border-input: #e0d4ff;
+$bg-card: #fff;
+$gradient-primary: linear-gradient(135deg, $purple, $pink);
+$gradient-bg: linear-gradient(135deg, $purple 0%, $pink 50%, $mint 100%);
 
-.userinfo-card {
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: 24px;
-  box-shadow: 0 10px 30px rgba(63, 53, 86, 0.08);
-  overflow: hidden;
-}
-
-.userinfo-header {
+// ==================== 容器 ====================
+.edit-container {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 20px;
-  padding: 30px 40px;
-  background: linear-gradient(135deg, rgba(197, 163, 255, 0.18), rgba(168, 230, 207, 0.22));
-  border-bottom: 1px solid rgba(197, 163, 255, 0.18);
 }
 
-.userinfo-title {
-  margin: 0 0 6px;
-  font-size: 26px;
-  font-weight: 700;
-  color: #2d2d44;
-}
-
-.userinfo-subtitle {
-  margin: 0;
-  font-size: 13px;
-  color: #7d7891;
-}
-
-.refresh-btn,
-.secondary-btn {
+// ==================== 通用卡片 ====================
+.info-card {
+  position: relative;
   border-radius: 20px;
-  border-color: #e3d8f8;
-  color: #6a4a9c;
-  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(197, 163, 255, 0.15);
+  background: $bg-card;
+
+  .card-bg {
+    height: 80px;
+    background: $gradient-bg;
+    opacity: 0.75;
+  }
+
+  .card-body {
+    padding: 0 28px 28px;
+    position: relative;
+
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 17px;
+      font-weight: 700;
+      color: $dark;
+
+      .el-icon {
+        color: $purple;
+        font-size: 18px;
+      }
+    }
+
+    .section-desc {
+      margin: 6px 0 20px;
+      font-size: 13px;
+      color: $text-secondary;
+    }
+  }
+
+  .card-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
 }
 
-.userinfo-content {
-  display: grid;
-  grid-template-columns: minmax(240px, 300px) 1fr;
-  gap: 32px;
-  padding: 36px 40px 42px;
-}
-
-.avatar-section,
-.profile-section,
-.password-section {
-  min-width: 0;
-}
-
-.avatar-section {
-  grid-row: span 2;
-}
-
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 18px;
-  font-size: 16px;
-  font-weight: 700;
-  color: #3b3650;
-
-  .el-icon {
-    color: #8d64d6;
+// ==================== 头像卡片 ====================
+.avatar-card {
+  .avatar-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
   }
 }
 
 .avatar-uploader {
   display: block;
-  width: 220px;
-  height: 220px;
-  margin: 0 auto;
+  width: 180px;
+  height: 180px;
 
   :deep(.el-upload) {
     position: relative;
-    width: 220px;
-    height: 220px;
+    width: 180px;
+    height: 180px;
     border-radius: 50%;
     overflow: hidden;
     cursor: pointer;
@@ -479,144 +483,135 @@ const resetPasswordForm = () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   color: #fff;
   background: rgba(45, 45, 68, 0.48);
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.25s ease;
 
-  .el-icon {
-    font-size: 28px;
-  }
-
-  span {
-    font-size: 14px;
-    font-weight: 600;
-  }
+  .el-icon { font-size: 26px; }
+  span { font-size: 13px; font-weight: 600; }
 }
 
-.avatar-uploader:hover .avatar-mask {
-  opacity: 1;
-}
+.avatar-uploader:hover .avatar-mask { opacity: 1; }
 
-.avatar-actions {
+.avatar-btns {
   display: flex;
-  justify-content: center;
   gap: 12px;
-  margin-top: 24px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
-.edit-form {
-  max-width: 620px;
+// ==================== 表单 ====================
+.info-form {
+  max-width: 520px;
 
   :deep(.el-form-item__label) {
     color: #615974;
     font-weight: 500;
   }
-}
 
-.custom-input,
-.disabled-input {
   :deep(.el-input__wrapper) {
     border-radius: 22px;
     padding: 6px 16px;
     box-shadow: none;
-    border: 1px solid #ede6f8;
+    border: 1px solid $border-input;
     background-color: #fbfaff;
     transition: all 0.2s ease;
 
     &:hover {
-      border-color: #d7c4f3;
+      border-color: $purple;
       background-color: #fff;
     }
 
     &.is-focus {
-      border-color: #a987e2;
+      border-color: $purple;
       background-color: #fff;
-      box-shadow: 0 0 0 4px rgba(169, 135, 226, 0.14);
+      box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.16);
+    }
+  }
+
+  .input-disabled {
+    :deep(.el-input__wrapper) {
+      background-color: #f5f0ff;
+    }
+    :deep(.el-input__inner) {
+      color: #8d879b;
     }
   }
 }
 
-.disabled-input {
-  :deep(.el-input__wrapper) {
-    background-color: #f3effb;
-  }
-
-  :deep(.el-input__inner) {
-    color: #8d879b;
-  }
-}
-
-.primary-btn {
+// ==================== 按钮 ====================
+.btn-gradient {
   min-width: 118px;
   border: none;
-  border-radius: 20px;
+  border-radius: 24px;
+  padding: 10px 24px;
   color: #fff;
-  background: linear-gradient(135deg, #8d64d6, #d97cad);
-  transition: all 0.2s ease;
+  font-weight: 500;
+  background: $gradient-primary;
+  transition: all 0.3s ease;
 
   &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 18px rgba(141, 100, 214, 0.28);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(197, 163, 255, 0.35);
+    color: #fff;
   }
 }
 
-.button-group {
+.btn-outline {
+  border-radius: 24px;
+  padding: 10px 24px;
+  border: 1px solid $border-input;
+  color: #7a5a9e;
+  background: #fff;
+  font-weight: 500;
+  transition: all 0.3s ease;
+
+  &:hover {
+    color: $purple;
+    border-color: $purple;
+    background: rgba(197, 163, 255, 0.04);
+  }
+
+  &.btn-sm {
+    padding: 6px 16px;
+    font-size: 13px;
+  }
+}
+
+.btn-row {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.password-section {
-  padding-top: 26px;
-  border-top: 1px solid #f0e9fb;
-}
-
-@media (max-width: 900px) {
-  .userinfo-header {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 26px 24px;
+// ==================== 响应式 ====================
+@media (max-width: 600px) {
+  .edit-container {
+    padding: 12px 10px 30px;
   }
 
-  .userinfo-content {
-    grid-template-columns: 1fr;
-    padding: 28px 24px 34px;
+  .info-card .card-body {
+    padding: 0 18px 22px;
   }
 
-  .avatar-section {
-    grid-row: auto;
-  }
-}
-
-@media (max-width: 520px) {
-  .userinfo-container {
-    padding: 12px;
-  }
-
-  .userinfo-title {
-    font-size: 22px;
-  }
-
-  .avatar-uploader,
-  .avatar-uploader :deep(.el-upload) {
-    width: 180px;
-    height: 180px;
-  }
-
-  .edit-form {
+  .info-form {
     :deep(.el-form-item) {
       display: block;
     }
-
     :deep(.el-form-item__label) {
       display: block;
       width: 100% !important;
       margin-bottom: 8px;
       text-align: left;
     }
+  }
+
+  .avatar-uploader,
+  .avatar-uploader :deep(.el-upload) {
+    width: 150px;
+    height: 150px;
   }
 }
 </style>
