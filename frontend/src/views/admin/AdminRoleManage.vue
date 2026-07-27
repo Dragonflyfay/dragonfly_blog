@@ -48,6 +48,7 @@ const getUserList = async () => {
     const end = start + pageSize.value
     users.value = filteredUsers.slice(start, end)
   } catch (error) {
+    if (error?.__handled) return
     console.error('获取管理员用户列表失败:', error)
     ElMessage.error('获取管理员用户列表失败')
     users.value = []

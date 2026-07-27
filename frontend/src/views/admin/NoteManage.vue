@@ -133,6 +133,7 @@ const getTopicList = async () => {
     const result = await topicListService()
     topics.value = result.data || []
   } catch (error) {
+    if (error?.__handled) return
     console.error('获取话题列表失败:', error)
     ElMessage.error('获取话题列表失败')
     topics.value = []
@@ -144,6 +145,7 @@ const getUserList = async () => {
     const result = await userListService()
     users.value = result.data || []
   } catch (error) {
+    if (error?.__handled) return
     console.error('获取用户列表失败:', error)
     ElMessage.error('获取用户列表失败')
     users.value = []
@@ -169,6 +171,7 @@ const noteList = async () => {
       userName: userNameOf(note),
     }))
   } catch (error) {
+    if (error?.__handled) return
     console.error('获取笔记列表失败:', error)
     ElMessage.error('获取笔记列表失败')
     notes.value = []

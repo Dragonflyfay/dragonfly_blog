@@ -50,6 +50,7 @@ const getCommentList = async () => {
       hasChildren: false, // 后端可以返回 childCount 字段
     }))
   } catch (error) {
+    if (error?.__handled) return
     console.error('获取评论列表失败:', error)
     ElMessage.error('获取评论列表失败')
     comments.value = []

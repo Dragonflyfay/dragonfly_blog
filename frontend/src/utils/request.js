@@ -67,36 +67,43 @@ import useUserInfoStore from '@/stores/userInfo.js'
 // 防止 token 过期时多个并发请求重复弹窗和跳转
 let isHandling401 = false
 
-//添加响应拦截器
+// 添加响应拦截器
 instance.interceptors.response.use(
   (result) => {
-    //判断业务状态吗
+    // 判断业务状态码
     if (result.data.code === 0) {
       return result.data
     }
-    //操作失败
+    // 401 级联时不再弹出业务错误提示
+    if (isHandling401) {
+      return Promise.reject({ __handled: true })
+    }
+    // 操作失败
     ElMessage.error(result.data.message ? result.data.message : '服务异常')
-    //异步的状态转化成失败的状态
+    // 异步的状态转化成失败的状态
     return Promise.reject(result.data)
   },
   (err) => {
+    // 401 级联处理中，后续所有错误静默吞掉
+    if (isHandling401) {
+      return Promise.reject({ __handled: true })
+    }
+
     const status = err.response?.status
 
     if (status === 401) {
-      if (!isHandling401) {
-        isHandling401 = true
-        ElMessage.error('登录已过期，请重新登录')
-        //清除token和用户信息
-        const tokenStore = useTokenStore()
-        const userInfoStore = useUserInfoStore()
-        tokenStore.removeToken()
-        userInfoStore.removeInfo()
-        router.push('/login')
-        // 路由跳转后重置标记，避免后续登录后再次过期时被拦截
-        setTimeout(() => {
-          isHandling401 = false
-        }, 2000)
-      }
+      isHandling401 = true
+      ElMessage.error('登录已过期，请重新登录')
+      // 清除 token 和用户信息
+      const tokenStore = useTokenStore()
+      const userInfoStore = useUserInfoStore()
+      tokenStore.removeToken()
+      userInfoStore.removeInfo()
+      router.push('/login')
+      // 路由跳转后重置标记
+      setTimeout(() => {
+        isHandling401 = false
+      }, 2000)
     } else if (status === 502 || status === 503 || status === 504) {
       ElMessage.error(
         '无法连接后端服务，请确认 Spring Boot 已在运行（开发环境默认 http://localhost:8080）',
@@ -112,3 +119,6 @@ instance.interceptors.response.use(
 )
 
 export default instance
+
+/** 判断错误是否已被拦截器处理（如 401 级联），调用方可据此跳过自己的错误提示 */
+export const isHandledError = (e) => e?.__handled === true

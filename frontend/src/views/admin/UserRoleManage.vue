@@ -63,6 +63,7 @@ const getUserList = async () => {
 
     console.log('过滤后的普通用户数据:', users.value) // 调试用
   } catch (error) {
+    if (error?.__handled) return
     console.error('获取用户列表失败:', error)
     ElMessage.error('获取用户列表失败')
     users.value = []

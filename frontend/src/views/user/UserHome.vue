@@ -433,6 +433,7 @@ const loadTopics = async () => {
       topicName: '全部',
     })
   } catch (error) {
+    if (error?.__handled) return
     console.error('获取话题列表失败:', error)
     ElMessage.error('获取话题列表失败')
   }
@@ -652,6 +653,7 @@ const loadNotes = async () => {
       }
     }
   } catch (error) {
+    if (error?.__handled) return
     console.error('加载笔记失败:', error)
     ElMessage.error('加载笔记失败')
   } finally {
@@ -833,6 +835,7 @@ const viewDetail = async (note) => {
       initDialogVideoPlayer()
     })
   } catch (error) {
+    if (error?.__handled) return
     console.error('获取笔记详情失败:', error)
     ElMessage.error('获取笔记详情失败')
   }

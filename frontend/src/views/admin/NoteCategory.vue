@@ -32,6 +32,7 @@ const topicList = async () => {
     let result = await topicListService()
     topics.value = result.data || []
   } catch (error) {
+    if (error?.__handled) return
     console.error('获取话题列表失败:', error)
     ElMessage.error('获取话题列表失败')
   } finally {
