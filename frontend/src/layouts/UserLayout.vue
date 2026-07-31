@@ -58,9 +58,12 @@ const handleCommand = (command) => {
 }
 
 const getUserInfo = async () => {
-  let reuslt = await userInfoService()
-  // 保持原有的存储方式
-  userInfoStore.setInfo(reuslt.data, tokenStore.rememberMe)
+  try {
+    const result = await userInfoService()
+    userInfoStore.setInfo(result.data, tokenStore.rememberMe)
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+  }
 }
 getUserInfo()
 </script>
@@ -118,7 +121,7 @@ getUserInfo()
         <div class="header-left">
           <div class="greeting">
             <span class="greeting-text">你好，</span>
-            <strong class="username-display">{{ userInfoStore.info.nickname }}</strong>
+            <strong class="username-display">{{ userInfoStore.info.nickname || userInfoStore.info.username }}</strong>
           </div>
           <div class="theme-toggle" @click="toggleTheme">
             <el-icon v-if="!isDark"><Sunny /></el-icon>

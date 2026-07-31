@@ -44,7 +44,7 @@ public interface NotificationMapper {
                                     @Param("pageSize") Integer pageSize);
 
     @Select("SELECT COUNT(*) FROM notification WHERE user_id=#{userId}")
-    int countByUserId(Integer uerId);
+    int countByUserId(Integer userId);
 
     // 统计未读通知数
     @Select("SELECT COUNT(*) FROM notification WHERE user_id = #{userId} AND is_read = 0")

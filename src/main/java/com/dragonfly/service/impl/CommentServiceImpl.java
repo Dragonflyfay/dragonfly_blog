@@ -8,6 +8,7 @@ import com.dragonfly.pojo.Note;
 import com.dragonfly.pojo.Notification;
 import com.dragonfly.pojo.PageBean;
 import com.dragonfly.service.CommentService;
+import com.dragonfly.service.NotificationService;
 import com.dragonfly.utils.ThreadLocalUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,8 @@ public class CommentServiceImpl implements CommentService {
     private NoteMapper noteMapper;
     @Autowired
     private NotificationMapper notificationMapper;
+    @Autowired
+    private NotificationService notificationService;
 
     @Override
     public void add(Comment comment) {
@@ -60,7 +63,7 @@ public class CommentServiceImpl implements CommentService {
                     notification.setTargetType(2);
                     notification.setTargetId(comment.getParentId());
                     notification.setContent("回复了你的评论：" + comment.getContent());
-                    notificationMapper.insert(notification);
+                    notificationService.sendNotification(notification);
                 }
             }
             // 如果是评论笔记，通知笔记作者
@@ -72,7 +75,7 @@ public class CommentServiceImpl implements CommentService {
                 notification.setTargetType(1);
                 notification.setTargetId(note.getId());
                 notification.setContent("评论了你的笔记《" + note.getTitle() + "》：" + comment.getContent());
-                notificationMapper.insert(notification);
+                notificationService.sendNotification(notification);
             }
         }
     }

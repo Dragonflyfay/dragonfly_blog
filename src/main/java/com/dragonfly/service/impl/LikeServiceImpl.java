@@ -9,6 +9,7 @@ import com.dragonfly.pojo.LikeRecord;
 import com.dragonfly.pojo.Note;
 import com.dragonfly.pojo.Notification;
 import com.dragonfly.service.LikeService;
+import com.dragonfly.service.NotificationService;
 import com.dragonfly.utils.JwtUtil;
 import com.dragonfly.utils.ThreadLocalUtil;
 import org.slf4j.Logger;
@@ -37,6 +38,8 @@ public class LikeServiceImpl implements LikeService {
     private LikeRecordMapper likeRecordMapper;
     @Autowired
     private NotificationMapper notificationMapper;
+    @Autowired
+    private NotificationService notificationService;
 
     /**
      * 获取当前用户ID（优先从ThreadLocal，失败则从Token解析）
@@ -119,7 +122,7 @@ public class LikeServiceImpl implements LikeService {
             notification.setTargetType(1);
             notification.setTargetId(noteId);
             notification.setContent("点赞了你的笔记《" + note.getTitle() + "》");
-            notificationMapper.insert(notification);
+            notificationService.sendNotification(notification);
         }
     }
 

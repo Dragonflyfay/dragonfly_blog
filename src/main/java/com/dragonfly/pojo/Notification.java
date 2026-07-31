@@ -14,7 +14,7 @@ public class Notification {
     private Integer targetType;
     private Integer targetId;//目标ID(评论/笔记)
     private String content;//内容
-    private Integer isRead;//是否已读
+    private Integer isRead = 0;//是否已读，默认未读
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;

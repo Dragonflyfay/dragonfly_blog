@@ -8,6 +8,7 @@ import com.dragonfly.pojo.Follow;
 import com.dragonfly.pojo.Notification;
 import com.dragonfly.pojo.User;
 import com.dragonfly.service.FollowService;
+import com.dragonfly.service.NotificationService;
 import com.dragonfly.utils.JwtUtil;
 import com.dragonfly.utils.ThreadLocalUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,6 +42,8 @@ public class FollowServiceImpl implements FollowService {
     private UserMapper userMapper;
     @Autowired
     private NotificationMapper notificationMapper;
+    @Autowired
+    private NotificationService notificationService;
     private Integer getCurrentUserId() {
         Map<String, Object> map = ThreadLocalUtil.get();
         if (map != null && map.get("id") != null) {
@@ -108,7 +111,7 @@ public class FollowServiceImpl implements FollowService {
         notification.setTargetType(0);
         notification.setTargetId(null);
         notification.setContent("关注了你");
-        notificationMapper.insert(notification);
+        notificationService.sendNotification(notification);
     }
 
     @Override
