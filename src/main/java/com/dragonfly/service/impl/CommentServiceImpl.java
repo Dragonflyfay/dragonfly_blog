@@ -1,8 +1,11 @@
 package com.dragonfly.service.impl;
+import com.dragonfly.enums.NotificationType;
 import com.dragonfly.mapper.CommentMapper;
 import com.dragonfly.mapper.NoteMapper;
+import com.dragonfly.mapper.NotificationMapper;
 import com.dragonfly.pojo.Comment;
 import com.dragonfly.pojo.Note;
+import com.dragonfly.pojo.Notification;
 import com.dragonfly.pojo.PageBean;
 import com.dragonfly.service.CommentService;
 import com.dragonfly.utils.ThreadLocalUtil;
@@ -20,6 +23,8 @@ public class CommentServiceImpl implements CommentService {
     private CommentMapper commentMapper;
     @Autowired
     private NoteMapper noteMapper;
+    @Autowired
+    private NotificationMapper notificationMapper;
 
     @Override
     public void add(Comment comment) {
@@ -43,6 +48,32 @@ public class CommentServiceImpl implements CommentService {
             note.setCommentsCount(note.getCommentsCount() + 1);
             note.setUpdateTime(LocalDateTime.now());
             noteMapper.update(note);
+            // 如果是回复评论，通知被回复的用户
+            if (comment.getParentId() != null && comment.getParentId() > 0) {
+                //获取父评论的创建者ID
+                Comment parentComment = commentMapper.findById(comment.getParentId());
+                if (parentComment != null && !parentComment.getUserId().equals(userId)) {
+                    Notification notification = new Notification();
+                    notification.setUserId(parentComment.getUserId());
+                    notification.setFromUserId(userId);
+                    notification.setType(NotificationType.COMMENT_NOTE.getCode());
+                    notification.setTargetType(2);
+                    notification.setTargetId(comment.getParentId());
+                    notification.setContent("回复了你的评论：" + comment.getContent());
+                    notificationMapper.insert(notification);
+                }
+            }
+            // 如果是评论笔记，通知笔记作者
+            else if (!note.getCreateUser().equals(userId)) {
+                Notification notification = new Notification();
+                notification.setUserId(note.getCreateUser());
+                notification.setFromUserId(userId);
+                notification.setType(NotificationType.COMMENT_NOTE.getCode());
+                notification.setTargetType(1);
+                notification.setTargetId(note.getId());
+                notification.setContent("评论了你的笔记《" + note.getTitle() + "》：" + comment.getContent());
+                notificationMapper.insert(notification);
+            }
         }
     }
 

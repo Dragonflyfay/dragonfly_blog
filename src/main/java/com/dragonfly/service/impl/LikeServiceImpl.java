@@ -1,9 +1,13 @@
 package com.dragonfly.service.impl;
 
+import com.dragonfly.enums.NotificationType;
 import com.dragonfly.mapper.CommentMapper;
 import com.dragonfly.mapper.LikeRecordMapper;
 import com.dragonfly.mapper.NoteMapper;
+import com.dragonfly.mapper.NotificationMapper;
 import com.dragonfly.pojo.LikeRecord;
+import com.dragonfly.pojo.Note;
+import com.dragonfly.pojo.Notification;
 import com.dragonfly.service.LikeService;
 import com.dragonfly.utils.JwtUtil;
 import com.dragonfly.utils.ThreadLocalUtil;
@@ -31,6 +35,8 @@ public class LikeServiceImpl implements LikeService {
     private CommentMapper commentMapper;
     @Autowired
     private LikeRecordMapper likeRecordMapper;
+    @Autowired
+    private NotificationMapper notificationMapper;
 
     /**
      * 获取当前用户ID（优先从ThreadLocal，失败则从Token解析）
@@ -103,6 +109,18 @@ public class LikeServiceImpl implements LikeService {
 
         // 更新笔记的点赞数
         noteMapper.incrementLikesCount(noteId);
+        // ===== 发送通知 =====
+        Note note = noteMapper.findById(noteId);//获取笔记信息
+        if (note != null && !note.getCreateUser().equals(userId)) {
+            Notification notification = new Notification();
+            notification.setUserId(note.getCreateUser());
+            notification.setFromUserId(userId);
+            notification.setType(NotificationType.LIKE_NOTE.getCode());
+            notification.setTargetType(1);
+            notification.setTargetId(noteId);
+            notification.setContent("点赞了你的笔记《" + note.getTitle() + "》");
+            notificationMapper.insert(notification);
+        }
     }
 
     @Override

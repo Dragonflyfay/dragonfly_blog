@@ -32,6 +32,7 @@ public interface LikeRecordMapper {
     int countByTarget(@Param("targetType") Integer targetType,
                       @Param("targetId") Integer targetId);
 
+    //批量查询( 用于查询用户对多个目标的点赞记录)
     @Select("<script>" +
             "SELECT * FROM like_record WHERE user_id = #{userId} AND target_type = #{targetType} AND target_id IN " +
             "<foreach item='id' collection='targetIds' open='(' separator=',' close=')'>" +

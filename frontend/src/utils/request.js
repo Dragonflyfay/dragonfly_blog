@@ -8,8 +8,6 @@ import { ElMessage } from 'element-plus'
 //解决跨域问题
 const baseURL = '/api'
 const instance = axios.create({ baseURL })
-
-// import { useTokenStore } from '@/stores/token.js'
 // //添加请求拦截器
 // instance.interceptors.request.use(
 //   (config) => {

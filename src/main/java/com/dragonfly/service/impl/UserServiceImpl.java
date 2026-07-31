@@ -5,7 +5,6 @@ import com.dragonfly.pojo.User;
 import com.dragonfly.service.UserService;
 import com.dragonfly.utils.Md5Utils;
 import com.dragonfly.utils.ThreadLocalUtil;
-import net.minidev.json.writer.UpdaterMapper;
 import org.apache.ibatis.annotations.Update;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
