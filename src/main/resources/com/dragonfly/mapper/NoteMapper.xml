@@ -10,7 +10,7 @@
             n.topic_id, n.location, n.state,
             n.views_count, n.likes_count, n.comments_count, n.favorites_count,
             n.create_user, n.publish_time, n.create_time, n.update_time,
-            u.nickname AS create_user_name, u.user_pic AS create_user_avatar
+            COALESCE(u.nickname, u.username) AS create_user_name, u.user_pic AS create_user_avatar
         FROM note n
         LEFT JOIN user u ON n.create_user = u.id
         WHERE n.state = '已发布'
@@ -61,7 +61,7 @@
     </resultMap>
 
     <select id="findById" resultMap="NoteResultMap">
-        SELECT n.*, u.nickname AS create_user_name, u.user_pic AS create_user_avatar
+        SELECT n.*, COALESCE(u.nickname, u.username) AS create_user_name, u.user_pic AS create_user_avatar
         FROM note n
         LEFT JOIN user u ON n.create_user = u.id
         WHERE n.id = #{id}

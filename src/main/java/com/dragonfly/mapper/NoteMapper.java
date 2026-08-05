@@ -18,7 +18,7 @@ public interface NoteMapper {
     void add(Note note);
 
     // 查询所有笔记（按用户），JOIN用户表获取发布者昵称和头像
-    @Select("SELECT n.*, u.nickname AS create_user_name, u.user_pic AS create_user_avatar " +
+    @Select("SELECT n.*, COALESCE(u.nickname, u.username) AS create_user_name, u.user_pic AS create_user_avatar " +
             "FROM note n LEFT JOIN user u ON n.create_user = u.id " +
             "WHERE n.create_user = #{userId}")
     List<Note> list(Integer userId);
@@ -38,7 +38,7 @@ public interface NoteMapper {
 
     // 分页查询笔记（可选话题、状态、用户筛选，按更新时间倒序）
     @Select("<script>" +
-            "SELECT n.*, u.nickname AS create_user_name, u.user_pic AS create_user_avatar " +
+            "SELECT n.*, COALESCE(u.nickname, u.username) AS create_user_name, u.user_pic AS create_user_avatar " +
             "FROM note n LEFT JOIN user u ON n.create_user = u.id WHERE 1=1 " +
             "<if test='userId != null'> AND n.create_user = #{userId} </if>" +
             "<if test='topicId != null'> AND n.topic_id = #{topicId} </if>" +
@@ -89,7 +89,7 @@ public interface NoteMapper {
 
     // 根据ID列表查询笔记（带用户信息）
     @Select("<script>" +
-            "SELECT n.*, u.nickname AS create_user_name, u.user_pic AS create_user_avatar " +
+            "SELECT n.*, COALESCE(u.nickname, u.username) AS create_user_name, u.user_pic AS create_user_avatar " +
             "FROM note n LEFT JOIN user u ON n.create_user = u.id " +
             "WHERE n.id IN " +
             "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>" +
