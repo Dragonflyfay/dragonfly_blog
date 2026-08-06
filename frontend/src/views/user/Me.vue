@@ -14,41 +14,42 @@ import {
   ArrowLeft,
   ArrowRight,
 } from '@element-plus/icons-vue'
-import useUserInfoStore from '@/stores/userInfo.js'
+import useUserInfoStore from '@/stores/userInfo.js' //引入用户信息store：获取用户信息
+
 import avatar from '@/assets/default.png'
 import logoImg from '@/assets/logo.png'
 import {
-  notePageListService,
-  batchCheckNoteLikedService,
-  batchCheckNoteFavoritedService,
-  likeNoteService,
-  unlikeNoteService,
-  favoriteNoteService,
-  unfavoriteNoteService,
-  noteDetailService,
-  recordViewService,
-  getCommentsByNoteIdService,
-  addCommentService,
-  likeCommentService,
-  unlikeCommentService,
-  batchCheckCommentLikedService,
-  batchCheckFollowService,
-  followUserService,
-  unfollowUserService,
+  notePageListService, //获取笔记列表
+  batchCheckNoteLikedService, //批量获取笔记是否被当前用户点赞
+  batchCheckNoteFavoritedService, //批量获取笔记是否被当前用户收藏
+  likeNoteService, //点赞笔记
+  unlikeNoteService, //取消点赞笔记
+  favoriteNoteService, //收藏笔记
+  unfavoriteNoteService, //取消收藏笔记
+  noteDetailService, //获取笔记详情
+  recordViewService, //记录笔记浏览量
+  getCommentsByNoteIdService, //获取笔记下的评论
+  addCommentService, //添加评论
+  likeCommentService, //点赞评论
+  unlikeCommentService, //取消点赞评论
+  batchCheckCommentLikedService, //批量获取评论是否被当前用户点赞
+  batchCheckFollowService, //批量获取用户是否关注
+  followUserService, //关注用户
+  unfollowUserService, //取消关注用户
 } from '@/api/note.js'
-import { getFollowersService, getFollowingService } from '@/api/note.js'
-import request from '@/utils/request.js'
-import CommentItem from '@/components/CommentItem.vue'
+import { getFollowersService, getFollowingService } from '@/api/note.js' //获取用户关注/粉丝
+import request from '@/utils/request.js' //请求封装
+import CommentItem from '@/components/CommentItem.vue' //评论组件
 
-const router = useRouter()
-const userInfoStore = useUserInfoStore()
+const router = useRouter() //路由
+const userInfoStore = useUserInfoStore() //用户信息store：获取用户信息
 
-// 当前标签页
-const activeTab = ref('mynotes')
+// 当前选中的标签页
+const activeTab = ref('mynotes') //默认我的笔记
 
 // 我的笔记
-const myNotes = ref([])
-const myNotesLoading = ref(false)
+const myNotes = ref([]) //我的笔记
+const myNotesLoading = ref(false) //是否正在加载笔记
 const myNotesPage = ref({ pageNum: 1, pageSize: 12, total: 0 })
 
 // 我的收藏
@@ -143,6 +144,10 @@ const loadMyNotes = async (reset = true) => {
       pageSize: myNotesPage.value.pageSize,
     })
     const items = (res.data?.items || []).map(formatNoteForList)
+    if (items.length > 0) {
+      console.log('[DEBUG] loadMyNotes 第一条原始数据:', JSON.stringify(res.data?.items[0], null, 2))
+      console.log('[DEBUG] loadMyNotes 第一条格式化后:', JSON.stringify(items[0], null, 2))
+    }
 
     if (reset) {
       myNotes.value = items
@@ -297,17 +302,9 @@ const formatNoteForDetail = (note, fallback = {}) => {
     location: note.location || fallback.location || '',
     publishTime: note.publishTime || fallback.publishTime || '',
     coverImg: note.coverImg || fallback.coverImg || images[0] || '',
-    userName:
-      note.createUserName ||
-      note.userName ||
-      fallback.userName ||
-      '匿名用户',
+    userName: note.createUserName || note.userName || fallback.userName || '匿名用户',
     userPic:
-      note.createUserAvatar ||
-      note.userPic ||
-      note.createUser?.userPic ||
-      fallback.userPic ||
-      '',
+      note.createUserAvatar || note.userPic || note.createUser?.userPic || fallback.userPic || '',
   }
 }
 
@@ -659,7 +656,10 @@ const viewNote = async (note) => {
   detailLoading.value = true
   try {
     const res = await noteDetailService(note.id)
+    console.log('[DEBUG] noteDetailService 返回:', JSON.stringify(res, null, 2))
     if (res.data) {
+      console.log('[DEBUG] res.data.createUserName:', res.data.createUserName)
+      console.log('[DEBUG] res.data.createUser:', res.data.createUser)
       currentNote.value = formatNoteForDetail(res.data, note)
       syncNoteById(note.id, {
         likesCount: currentNote.value.likesCount || 0,
@@ -668,10 +668,7 @@ const viewNote = async (note) => {
         viewsCount: currentNote.value.viewsCount || 0,
       })
       refreshLikeAndFavStatus([currentNote.value])
-      if (
-        currentNote.value.createUser &&
-        currentNote.value.createUser !== userInfoStore.info.id
-      ) {
+      if (currentNote.value.createUser && currentNote.value.createUser !== userInfoStore.info.id) {
         checkFollowingStatus([currentNote.value.createUser])
       }
     }
@@ -1017,6 +1014,7 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    <!-- 详情弹窗 -->
 
     <Teleport to="body">
       <div
@@ -1067,7 +1065,9 @@ onMounted(async () => {
                   <div class="gallery-image-container">
                     <div class="gallery-skeleton" v-if="galleryImageLoading"></div>
                     <img
-                      :src="currentNote.images[currentImageIndex] || currentNote.coverImg || logoImg"
+                      :src="
+                        currentNote.images[currentImageIndex] || currentNote.coverImg || logoImg
+                      "
                       :alt="`图片${currentImageIndex + 1}`"
                       @error="onImgError"
                       @load="onImageLoad"
@@ -1125,7 +1125,9 @@ onMounted(async () => {
               </div>
               <div class="detail-meta">
                 <span class="meta-item">📍 {{ currentNote.location || '未知地点' }}</span>
-                <span class="meta-item">🕒 {{ formatDate(currentNote.publishTime || currentNote.createTime) }}</span>
+                <span class="meta-item"
+                  >🕒 {{ formatDate(currentNote.publishTime || currentNote.createTime) }}</span
+                >
               </div>
               <div class="detail-stats">
                 <div class="stat-item">
@@ -1243,7 +1245,8 @@ onMounted(async () => {
       </div>
     </Teleport>
 
-    <el-dialog v-if="false"
+    <el-dialog
+      v-if="false"
       v-model="showDetailDialog"
       class="me-note-detail-dialog"
       width="86%"
@@ -1270,7 +1273,10 @@ onMounted(async () => {
               <el-button
                 circle
                 size="small"
-                @click="currentImageIndex = (currentImageIndex - 1 + currentNote.images.length) % currentNote.images.length"
+                @click="
+                  currentImageIndex =
+                    (currentImageIndex - 1 + currentNote.images.length) % currentNote.images.length
+                "
               >
                 ‹
               </el-button>
@@ -1302,9 +1308,15 @@ onMounted(async () => {
             <span>{{ currentNote.userName }}</span>
           </div>
           <div class="detail-meta">
-            <span><el-icon><View /></el-icon>{{ currentNote.viewsCount || 0 }}</span>
-            <span><el-icon><ChatDotRound /></el-icon>{{ currentNote.commentsCount || 0 }}</span>
-            <span><el-icon><Clock /></el-icon>{{ formatDate(currentNote.createTime) }}</span>
+            <span
+              ><el-icon><View /></el-icon>{{ currentNote.viewsCount || 0 }}</span
+            >
+            <span
+              ><el-icon><ChatDotRound /></el-icon>{{ currentNote.commentsCount || 0 }}</span
+            >
+            <span
+              ><el-icon><Clock /></el-icon>{{ formatDate(currentNote.createTime) }}</span
+            >
           </div>
           <div class="detail-actions" @click.stop>
             <button
@@ -1321,7 +1333,8 @@ onMounted(async () => {
               type="button"
               @click="toggleFavorite(currentNote)"
             >
-              {{ favoritedNoteIds.has(currentNote.id) ? '★' : '☆' }} {{ currentNote.favoritesCount || 0 }}
+              {{ favoritedNoteIds.has(currentNote.id) ? '★' : '☆' }}
+              {{ currentNote.favoritesCount || 0 }}
             </button>
           </div>
           <div class="detail-content" v-html="currentNote.content || currentNote.excerpt"></div>
