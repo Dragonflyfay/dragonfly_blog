@@ -1,5 +1,8 @@
 package com.dragonfly.service.impl;
 
+import com.dragonfly.mapper.CommentMapper;
+import com.dragonfly.mapper.FavoriteRecordMapper;
+import com.dragonfly.mapper.LikeRecordMapper;
 import com.dragonfly.mapper.NoteMapper;
 import com.dragonfly.mapper.TopicMapper;
 import com.dragonfly.pojo.Note;
@@ -29,6 +32,12 @@ public class NoteServiceImpl implements NoteService {
     private NoteMapper noteMapper;
     @Autowired
     private TopicMapper topicMapper;
+    @Autowired
+    private LikeRecordMapper likeRecordMapper;
+    @Autowired
+    private FavoriteRecordMapper favoriteRecordMapper;
+    @Autowired
+    private CommentMapper commentMapper;
 
     @Transactional
     @Override
@@ -169,6 +178,7 @@ public class NoteServiceImpl implements NoteService {
     }
 
     @Override
+    @Transactional
     public void delete(Integer id) {
         Map<String, Object> map = ThreadLocalUtil.get();
         Integer userId = (Integer) map.get("id");
@@ -193,6 +203,11 @@ public class NoteServiceImpl implements NoteService {
         if ("已发布".equals(note.getState()) && note.getTopicId() != null) {
             topicMapper.decrementNotesCount(note.getTopicId());
         }
+
+        // 级联清理：删除笔记相关的点赞、收藏、评论记录
+        likeRecordMapper.deleteByTarget(1, id);
+        favoriteRecordMapper.deleteByTarget(1, id);
+        commentMapper.deleteByNoteId(id);
 
         noteMapper.delete(id);
     }

@@ -43,7 +43,11 @@ public interface LikeRecordMapper {
                                                @Param("targetType") Integer targetType,
                                                @Param("targetIds") List<Integer> targetIds);
 
-    // 查询用户点赞的所有笔记ID列表
-    @Select("SELECT target_id FROM like_record WHERE user_id = #{userId} AND target_type = 1 ORDER BY create_time DESC")
+    // 查询用户点赞的所有笔记ID列表（过滤已删除的笔记）
+    @Select("SELECT lr.target_id FROM like_record lr INNER JOIN note n ON lr.target_id = n.id WHERE lr.user_id = #{userId} AND lr.target_type = 1 ORDER BY lr.create_time DESC")
     List<Integer> findLikedNoteIdsByUserId(Integer userId);
+
+    // 删除指定目标的所有点赞记录（笔记删除时级联清理）
+    @Delete("DELETE FROM like_record WHERE target_type = #{targetType} AND target_id = #{targetId}")
+    void deleteByTarget(@Param("targetType") Integer targetType, @Param("targetId") Integer targetId);
 }

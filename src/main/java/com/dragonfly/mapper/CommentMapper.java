@@ -80,5 +80,8 @@ public interface CommentMapper {
     @Select("SELECT * FROM comment WHERE parent_id = #{parentId} AND status = 1 ORDER BY create_time ASC")
     List<Comment> findByParentId(Integer parentId);
 
+    // 删除笔记下的所有评论（笔记删除时级联清理）
+    @Delete("DELETE FROM comment WHERE note_id = #{noteId}")
+    void deleteByNoteId(Integer noteId);
 
 }
