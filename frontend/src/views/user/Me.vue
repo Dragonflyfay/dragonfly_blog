@@ -118,7 +118,7 @@ const formatNoteForList = (note) => {
     excerpt: plainText,
     coverImg: note.coverImg,
     noteCategory: note.noteCategory,
-    userName: note.createUserName || note.userName || '匿名用户',
+    userName: note.createUserName?.trim() || note.userName || '匿名用户',
     userPic: note.createUserAvatar || '',
     viewsCount: note.viewsCount || 0,
     commentsCount: note.commentsCount || 0,
@@ -144,10 +144,6 @@ const loadMyNotes = async (reset = true) => {
       pageSize: myNotesPage.value.pageSize,
     })
     const items = (res.data?.items || []).map(formatNoteForList)
-    if (items.length > 0) {
-      console.log('[DEBUG] loadMyNotes 第一条原始数据:', JSON.stringify(res.data?.items[0], null, 2))
-      console.log('[DEBUG] loadMyNotes 第一条格式化后:', JSON.stringify(items[0], null, 2))
-    }
 
     if (reset) {
       myNotes.value = items
@@ -302,7 +298,7 @@ const formatNoteForDetail = (note, fallback = {}) => {
     location: note.location || fallback.location || '',
     publishTime: note.publishTime || fallback.publishTime || '',
     coverImg: note.coverImg || fallback.coverImg || images[0] || '',
-    userName: note.createUserName || note.userName || fallback.userName || '匿名用户',
+    userName: note.createUserName?.trim() || note.userName || fallback.userName || '匿名用户',
     userPic:
       note.createUserAvatar || note.userPic || note.createUser?.userPic || fallback.userPic || '',
   }
@@ -656,10 +652,7 @@ const viewNote = async (note) => {
   detailLoading.value = true
   try {
     const res = await noteDetailService(note.id)
-    console.log('[DEBUG] noteDetailService 返回:', JSON.stringify(res, null, 2))
     if (res.data) {
-      console.log('[DEBUG] res.data.createUserName:', res.data.createUserName)
-      console.log('[DEBUG] res.data.createUser:', res.data.createUser)
       currentNote.value = formatNoteForDetail(res.data, note)
       syncNoteById(note.id, {
         likesCount: currentNote.value.likesCount || 0,
