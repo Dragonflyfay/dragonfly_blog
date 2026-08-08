@@ -22,6 +22,7 @@ public class TopicController {
 
     @Autowired
     private TopicService topicService;
+    // 添加
 
     @PostMapping
     public Result add(@RequestBody @Validated(Topic.Add.class) Topic topic) {
@@ -29,6 +30,7 @@ public class TopicController {
         return Result.success();
     }
 
+//     获取话题列表
     @GetMapping
     public Result<List<Topic>> list() {
         List<Topic> topics = topicService.list();
