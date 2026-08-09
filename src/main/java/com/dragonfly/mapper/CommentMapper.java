@@ -84,4 +84,10 @@ public interface CommentMapper {
     @Delete("DELETE FROM comment WHERE note_id = #{noteId}")
     void deleteByNoteId(Integer noteId);
 
+    /**
+     * 直接更新评论的点赞数（用于Redis同步）
+     */
+    @Update("UPDATE comment SET likes_count = #{likesCount} WHERE id = #{commentId}")
+    void updateLikesCount(@Param("commentId") Integer commentId,
+                          @Param("likesCount") Integer likesCount);
 }

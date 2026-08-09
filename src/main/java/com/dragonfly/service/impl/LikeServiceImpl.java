@@ -11,6 +11,7 @@ import com.dragonfly.pojo.Notification;
 import com.dragonfly.service.LikeService;
 import com.dragonfly.service.NotificationService;
 import com.dragonfly.utils.JwtUtil;
+import com.dragonfly.utils.RedisCache;
 import com.dragonfly.utils.ThreadLocalUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,11 +26,20 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class LikeServiceImpl implements LikeService {
+
     private static final Logger log = LoggerFactory.getLogger(LikeServiceImpl.class);
 
+    // Redis Key前缀
+    private static final String LIKE_NOTE_KEY = "like:note:";
+    private static final String LIKE_COMMENT_KEY = "like:comment:";
+    private static final String LIKE_COUNT_NOTE_KEY = "like:count:note:";
+    private static final String LIKE_COUNT_COMMENT_KEY = "like:count:comment:";
+    private static final String SYNC_NOTE_IDS_KEY = "sync:note:ids";
+    private static final String SYNC_COMMENT_IDS_KEY = "sync:comment:ids";
     @Autowired
     private NoteMapper noteMapper;
     @Autowired
@@ -37,9 +47,10 @@ public class LikeServiceImpl implements LikeService {
     @Autowired
     private LikeRecordMapper likeRecordMapper;
     @Autowired
-    private NotificationMapper notificationMapper;
+    private RedisCache redisCache;
     @Autowired
     private NotificationService notificationService;
+
 
     /**
      * 获取当前用户ID（优先从ThreadLocal，失败则从Token解析）
@@ -79,10 +90,19 @@ public class LikeServiceImpl implements LikeService {
             return false;
         }
 
-        LikeRecord existing = likeRecordMapper.findByUserAndTarget(userId, 1, noteId);
-
-
-        return existing != null;
+        //优先查找Redis
+        String userKey= LIKE_NOTE_KEY + noteId + ":" + userId;
+        if(redisCache.hasKey(userKey)){
+            return true;
+        }
+        //Redis没有，查数据库
+        LikeRecord existing =likeRecordMapper.findByUserAndTarget(userId, 1, noteId);
+        if(existing!=null){
+            //回填Redis
+            redisCache.set(userKey, "1",7,TimeUnit.HOURS);
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -90,19 +110,27 @@ public class LikeServiceImpl implements LikeService {
     public void likeNote(Integer noteId) {
         Integer userId = getCurrentUserId();
 
-
         if (userId == null) {
             throw new RuntimeException("用户未登录");
         }
-
-        // 检查是否已经点过赞
-        LikeRecord existing = likeRecordMapper.findByUserAndTarget(userId, 1, noteId);
-        if (existing != null) {
-
+        // 1. Redis去重：检查是否已经点赞
+        String userKey = LIKE_NOTE_KEY + noteId + ":" + userId;
+        if (redisCache.hasKey(userKey)) {
+            log.info("用户 {} 已经点赞过笔记 {}", userId, noteId);
             return;
         }
+        // 2. 记录点赞状态（7天过期，避免Redis无限膨胀）
+        redisCache.set(userKey, "1", 7, TimeUnit.DAYS);
 
-        // 创建点赞记录
+        // 3. 点赞数 +1（Redis自增，不操作数据库！）
+        String countKey = LIKE_COUNT_NOTE_KEY + noteId;
+        Long count = redisCache.increment(countKey);
+        log.info("笔记 {} 点赞数: {}", noteId, count);
+
+
+
+
+        // 这里先写入点赞记录表，点赞数通过定时任务同步
         LikeRecord likeRecord = new LikeRecord();
         likeRecord.setUserId(userId);
         likeRecord.setTargetType(1);
@@ -110,8 +138,10 @@ public class LikeServiceImpl implements LikeService {
         likeRecord.setCreateTime(LocalDateTime.now());
         likeRecordMapper.add(likeRecord);
 
-        // 更新笔记的点赞数
-        noteMapper.incrementLikesCount(noteId);
+        //  5. 更新 note 表的点赞数（从Redis读取最新值）
+        if (count != null) {
+            noteMapper.updateLikesCount(noteId, count.intValue());
+        }
         // ===== 发送通知 =====
         Note note = noteMapper.findById(noteId);//获取笔记信息
         if (note != null && !note.getCreateUser().equals(userId)) {
@@ -124,21 +154,36 @@ public class LikeServiceImpl implements LikeService {
             notification.setContent("点赞了你的笔记《" + note.getTitle() + "》");
             notificationService.sendNotification(notification);
         }
+        // 6. 添加到 Redis 的同步列表
+        redisCache.addToSet(SYNC_NOTE_IDS_KEY, String.valueOf(noteId));
     }
 
     @Override
     @Transactional
     public void unlikeNote(Integer noteId) {
         Integer userId = getCurrentUserId();
-
-
         if (userId == null) {
             throw new RuntimeException("用户未登录");
         }
 
-        likeRecordMapper.delete(userId, 1, noteId);
-        noteMapper.decrementLikesCount(noteId);
+        // 1. 删除Redis点赞状态
+        String userKey = LIKE_NOTE_KEY + noteId + ":" + userId;
+        redisCache.delete(userKey);
 
+        // 2. 点赞数 -1
+        String countKey = LIKE_COUNT_NOTE_KEY + noteId;
+        Long count=redisCache.decrement(countKey);
+
+        //  3. 删除MySQL点赞记录
+        likeRecordMapper.delete(userId, 1, noteId);
+
+        //  4. 更新 note 表的点赞数（从Redis读取最新值）
+        if (count != null && count >= 0) {
+            noteMapper.updateLikesCount(noteId, count.intValue());
+        } else {
+            // 如果Redis异常，直接减1
+            noteMapper.decrementLikesCount(noteId);
+        }
     }
 
 
@@ -146,29 +191,58 @@ public class LikeServiceImpl implements LikeService {
     @Override
     @Transactional
     public void unlikeComment(Integer commentId) {
-        Map<String,Object> map= ThreadLocalUtil.get();
-        Integer userId=(Integer) map.get("id");
+        Integer userId=getCurrentUserId();
+        if(userId==null){
+            throw new RuntimeException("用户未登录");
 
-        // 删除点赞记录
+        }
+        //1.删除Redis点赞状态
+        String userKey=LIKE_COMMENT_KEY+commentId+":"+userId;
+        redisCache.delete(userKey);
+
+        //2.点赞数-1(Redis自减)
+        String countKey=LIKE_COUNT_COMMENT_KEY+commentId;
+        Long count= redisCache.decrement(countKey);
+
+        //3.删除MySql 点赞记录
+
         likeRecordMapper.delete(userId, 2, commentId);
 
-        // 更新评论的点赞数
-        commentMapper.decrementLikesCount(commentId);
+        //  4. 更新 comment 表的点赞数（从Redis读取最新值）
+        if (count != null && count >= 0) {
+            commentMapper.updateLikesCount(commentId, count.intValue());
+        } else {
+            // 兜底：如果Redis异常，直接减1
+            commentMapper.decrementLikesCount(commentId);
+        }
+        //  标记需要同步的评论ID
+        redisCache.addToSet(SYNC_COMMENT_IDS_KEY, String.valueOf(commentId));
+
     }
+    //点赞评论
 
     @Override
     @Transactional
     public void likeComment(Integer commentId) {
-        Map<String,Object> map= ThreadLocalUtil.get();
-        Integer userId=(Integer) map.get("id");
-
-        // 检查是否已经点过赞
-        LikeRecord existing=likeRecordMapper.findByUserAndTarget(userId,2,commentId);
-        if(existing != null) {
-            return;
+        Integer userId = getCurrentUserId();
+        if (userId == null) {
+            throw new RuntimeException("用户未登录");
         }
 
-        // 创建点赞记录
+        // 1. Redis去重：检查是否已经点赞
+        String userKey = LIKE_COMMENT_KEY + commentId + ":" + userId;
+        if (redisCache.hasKey(userKey)) {
+            log.info("用户 {} 已经点赞过评论 {}", userId, commentId);
+            return;
+        }
+        // 2. 记录点赞状态（7天过期）
+        redisCache.set(userKey, "1", 7, TimeUnit.DAYS);
+
+        // 3. 点赞数 +1（Redis自增）
+        String countKey = LIKE_COUNT_COMMENT_KEY + commentId;
+        Long count = redisCache.increment(countKey);
+        log.info("评论 {} 点赞数: {}", commentId, count);
+        // 4. 写入MySQL点赞记录
         LikeRecord likeRecord = new LikeRecord();
         likeRecord.setUserId(userId);
         likeRecord.setTargetType(2); // 2表示评论
@@ -176,22 +250,48 @@ public class LikeServiceImpl implements LikeService {
         likeRecord.setCreateTime(LocalDateTime.now());
         likeRecordMapper.add(likeRecord);
 
-        // 更新评论的点赞数
-        commentMapper.incrementLikesCount(commentId);
+        //  5. 更新 comment 表的点赞数（从Redis读取最新值）
+        if (count != null) {
+            commentMapper.updateLikesCount(commentId, count.intValue());
+        }
+        // 6. 发送通知
+        var comment = commentMapper.findById(commentId);
+        if (comment != null && !comment.getUserId().equals(userId)) {
+            Notification notification = new Notification();
+            notification.setUserId(comment.getUserId());
+            notification.setFromUserId(userId);
+            notification.setType(NotificationType.LIKE_COMMENT.getCode());
+            notification.setTargetType(2);
+            notification.setTargetId(commentId);
+            notification.setContent("点赞了你的评论：" + comment.getContent());
+            notificationService.sendNotification(notification);
+        }
+        // 7. 添加到 Redis 的同步列表
+        // ✅ 标记需要同步的评论ID
+        redisCache.addToSet(SYNC_COMMENT_IDS_KEY, String.valueOf(commentId));
     }
 
+    // 7. 检查是否已经点赞
     @Override
     public boolean isLikedComment(Integer commentId) {
-        Map<String,Object> map= ThreadLocalUtil.get();
-        if (map == null) {
-            // 未登录用户，返回false
+        Integer userId = getCurrentUserId();
+        if (userId == null) {
             return false;
         }
+        //  优先查找Redis
+        String userKey = LIKE_COMMENT_KEY + commentId + ":" + userId;
+        if (redisCache.hasKey(userKey)) {
+            return true;
+        }
+        // ✅ Redis没有，查数据库（兜底）
+        LikeRecord existing = likeRecordMapper.findByUserAndTarget(userId, 2, commentId);
 
-        Integer userId=(Integer) map.get("id");
-
-        LikeRecord existing=likeRecordMapper.findByUserAndTarget(userId,2,commentId);
-        return existing != null;
+        if (existing != null) {
+            // 回填Redis（7天过期）
+            redisCache.set(userKey, "1", 7, TimeUnit.DAYS);
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -201,29 +301,19 @@ public class LikeServiceImpl implements LikeService {
         if (noteIds == null || noteIds.isEmpty()) {
             return result;
         }
-        
-        Map<String,Object> map = ThreadLocalUtil.get();
-        if (map == null) {
-            // 未登录用户，所有笔记都返回false
+
+        Integer userId = getCurrentUserId();
+        if (userId == null) {
             for (Integer noteId : noteIds) {
                 result.put(noteId, false);
             }
             return result;
         }
-        
-        Integer userId = (Integer) map.get("id");
-        
-        // 批量查询点赞记录
-        List<LikeRecord> likedRecords = likeRecordMapper.batchFindByUserAndTarget(userId, 1, noteIds);
-        
-        // 初始化所有笔记为未点赞
+
+        // ✅ 批量查Redis
         for (Integer noteId : noteIds) {
-            result.put(noteId, false);
-        }
-        
-        // 标记已点赞的笔记
-        for (LikeRecord record : likedRecords) {
-            result.put(record.getTargetId(), true);
+            String userKey = LIKE_NOTE_KEY + noteId + ":" + userId;
+            result.put(noteId, redisCache.hasKey(userKey));
         }
         
         return result;
@@ -245,31 +335,20 @@ public class LikeServiceImpl implements LikeService {
         if (commentIds == null || commentIds.isEmpty()) {
             return result;
         }
-        
-        Map<String,Object> map = ThreadLocalUtil.get();
-        if (map == null) {
-            // 未登录用户，所有评论都返回false
+
+        Integer userId = getCurrentUserId();
+        if (userId == null) {
             for (Integer commentId : commentIds) {
                 result.put(commentId, false);
             }
             return result;
         }
-        
-        Integer userId = (Integer) map.get("id");
-        
-        // 批量查询点赞记录
-        List<LikeRecord> likedRecords = likeRecordMapper.batchFindByUserAndTarget(userId, 2, commentIds);
-        
-        // 初始化所有评论为未点赞
+
+        // ✅ 批量查Redis
         for (Integer commentId : commentIds) {
-            result.put(commentId, false);
+            String userKey = LIKE_COMMENT_KEY + commentId + ":" + userId;
+            result.put(commentId, redisCache.hasKey(userKey));
         }
-        
-        // 标记已点赞的评论
-        for (LikeRecord record : likedRecords) {
-            result.put(record.getTargetId(), true);
-        }
-        
         return result;
     }
 }

@@ -96,4 +96,10 @@ public interface NoteMapper {
             "ORDER BY n.create_time DESC" +
             "</script>")
     List<Note> findByIds(@Param("ids") List<Integer> ids);
+
+    /**
+     * 直接更新笔记的点赞数（用于Redis同步）
+     */
+    @Update("UPDATE note SET likes_count = #{likesCount} WHERE id = #{noteId}")
+    void updateLikesCount(@Param("noteId") Integer noteId, @Param("likesCount") Integer likesCount);
 }
