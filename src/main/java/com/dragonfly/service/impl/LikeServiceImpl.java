@@ -119,18 +119,24 @@ public class LikeServiceImpl implements LikeService {
             log.info("用户 {} 已经点赞过笔记 {}", userId, noteId);
             return;
         }
-        // 2. 记录点赞状态（7天过期，避免Redis无限膨胀）
+        // 2. 获取笔记信息（复用：初始化计数器 + 发通知）
+        Note note = noteMapper.findById(noteId);
+
+        // 3. 记录点赞状态（7天过期，避免Redis无限膨胀）
         redisCache.set(userKey, "1", 7, TimeUnit.DAYS);
 
-        // 3. 点赞数 +1（Redis自增，不操作数据库！）
+        // 4. 初始化Redis计数器（若key不存在，先从DB加载，避免覆盖真实数据）
         String countKey = LIKE_COUNT_NOTE_KEY + noteId;
+        if (!redisCache.hasKey(countKey)) {
+            if (note != null && note.getLikesCount() != null) {
+                redisCache.set(countKey, note.getLikesCount());
+            }
+        }
+        // 5. 点赞数 +1（Redis自增）
         Long count = redisCache.increment(countKey);
         log.info("笔记 {} 点赞数: {}", noteId, count);
 
-
-
-
-        // 这里先写入点赞记录表，点赞数通过定时任务同步
+        // 6. 写入点赞记录表
         LikeRecord likeRecord = new LikeRecord();
         likeRecord.setUserId(userId);
         likeRecord.setTargetType(1);
@@ -138,12 +144,11 @@ public class LikeServiceImpl implements LikeService {
         likeRecord.setCreateTime(LocalDateTime.now());
         likeRecordMapper.add(likeRecord);
 
-        //  5. 更新 note 表的点赞数（从Redis读取最新值）
+        // 7. 更新 note 表的点赞数（从Redis读取最新值）
         if (count != null) {
             noteMapper.updateLikesCount(noteId, count.intValue());
         }
         // ===== 发送通知 =====
-        Note note = noteMapper.findById(noteId);//获取笔记信息
         if (note != null && !note.getCreateUser().equals(userId)) {
             Notification notification = new Notification();
             notification.setUserId(note.getCreateUser());
@@ -154,7 +159,7 @@ public class LikeServiceImpl implements LikeService {
             notification.setContent("点赞了你的笔记《" + note.getTitle() + "》");
             notificationService.sendNotification(notification);
         }
-        // 6. 添加到 Redis 的同步列表
+        // 8. 添加到 Redis 的同步列表
         redisCache.addToSet(SYNC_NOTE_IDS_KEY, String.valueOf(noteId));
     }
 
@@ -170,14 +175,21 @@ public class LikeServiceImpl implements LikeService {
         String userKey = LIKE_NOTE_KEY + noteId + ":" + userId;
         redisCache.delete(userKey);
 
-        // 2. 点赞数 -1
+        // 2. 初始化Redis计数器（若key不存在，先从DB加载，避免减到负数）
         String countKey = LIKE_COUNT_NOTE_KEY + noteId;
-        Long count=redisCache.decrement(countKey);
+        if (!redisCache.hasKey(countKey)) {
+            Note note = noteMapper.findById(noteId);
+            if (note != null && note.getLikesCount() != null) {
+                redisCache.set(countKey, note.getLikesCount());
+            }
+        }
+        // 3. 点赞数 -1
+        Long count = redisCache.decrement(countKey);
 
-        //  3. 删除MySQL点赞记录
+        //  4. 删除MySQL点赞记录
         likeRecordMapper.delete(userId, 1, noteId);
 
-        //  4. 更新 note 表的点赞数（从Redis读取最新值）
+        //  5. 更新 note 表的点赞数（从Redis读取最新值）
         if (count != null && count >= 0) {
             noteMapper.updateLikesCount(noteId, count.intValue());
         } else {
@@ -200,15 +212,22 @@ public class LikeServiceImpl implements LikeService {
         String userKey=LIKE_COMMENT_KEY+commentId+":"+userId;
         redisCache.delete(userKey);
 
-        //2.点赞数-1(Redis自减)
+        //2.初始化Redis计数器（若key不存在，先从DB加载，避免减到负数）
         String countKey=LIKE_COUNT_COMMENT_KEY+commentId;
+        if (!redisCache.hasKey(countKey)) {
+            var comment = commentMapper.findById(commentId);
+            if (comment != null && comment.getLikesCount() != null) {
+                redisCache.set(countKey, comment.getLikesCount());
+            }
+        }
+        //3.点赞数-1(Redis自减)
         Long count= redisCache.decrement(countKey);
 
-        //3.删除MySql 点赞记录
+        //4.删除MySql 点赞记录
 
         likeRecordMapper.delete(userId, 2, commentId);
 
-        //  4. 更新 comment 表的点赞数（从Redis读取最新值）
+        //  5. 更新 comment 表的点赞数（从Redis读取最新值）
         if (count != null && count >= 0) {
             commentMapper.updateLikesCount(commentId, count.intValue());
         } else {
@@ -235,14 +254,23 @@ public class LikeServiceImpl implements LikeService {
             log.info("用户 {} 已经点赞过评论 {}", userId, commentId);
             return;
         }
-        // 2. 记录点赞状态（7天过期）
+        // 2. 获取评论信息（复用：初始化计数器 + 发通知）
+        var comment = commentMapper.findById(commentId);
+
+        // 3. 记录点赞状态（7天过期）
         redisCache.set(userKey, "1", 7, TimeUnit.DAYS);
 
-        // 3. 点赞数 +1（Redis自增）
+        // 4. 初始化Redis计数器（若key不存在，先从DB加载，避免覆盖真实数据）
         String countKey = LIKE_COUNT_COMMENT_KEY + commentId;
+        if (!redisCache.hasKey(countKey)) {
+            if (comment != null && comment.getLikesCount() != null) {
+                redisCache.set(countKey, comment.getLikesCount());
+            }
+        }
+        // 5. 点赞数 +1（Redis自增）
         Long count = redisCache.increment(countKey);
         log.info("评论 {} 点赞数: {}", commentId, count);
-        // 4. 写入MySQL点赞记录
+        // 6. 写入MySQL点赞记录
         LikeRecord likeRecord = new LikeRecord();
         likeRecord.setUserId(userId);
         likeRecord.setTargetType(2); // 2表示评论
@@ -250,12 +278,11 @@ public class LikeServiceImpl implements LikeService {
         likeRecord.setCreateTime(LocalDateTime.now());
         likeRecordMapper.add(likeRecord);
 
-        //  5. 更新 comment 表的点赞数（从Redis读取最新值）
+        // 7. 更新 comment 表的点赞数（从Redis读取最新值）
         if (count != null) {
             commentMapper.updateLikesCount(commentId, count.intValue());
         }
-        // 6. 发送通知
-        var comment = commentMapper.findById(commentId);
+        // 8. 发送通知
         if (comment != null && !comment.getUserId().equals(userId)) {
             Notification notification = new Notification();
             notification.setUserId(comment.getUserId());
