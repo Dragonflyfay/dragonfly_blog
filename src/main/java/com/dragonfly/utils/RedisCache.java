@@ -6,8 +6,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
 @Slf4j
 @Component
 public class RedisCache {
@@ -120,5 +123,18 @@ public class RedisCache {
 
     public void setNullCache(String key) {
         redisTemplate.opsForValue().set(key, NULL_VALUE, 5, TimeUnit.MINUTES);
+    }
+    /**
+     * 获取 Set 中的所有元素（返回 String 集合，类型安全）
+     */
+    @SuppressWarnings("unchecked")
+    public Set<String> getSetMembersAsString(String key) {
+        Set<Object> members = redisTemplate.opsForSet().members(key);
+        if (members == null || members.isEmpty()) {
+            return new HashSet<>();
+        }
+        return members.stream()
+                .map(Object::toString)
+                .collect(Collectors.toSet());
     }
 }

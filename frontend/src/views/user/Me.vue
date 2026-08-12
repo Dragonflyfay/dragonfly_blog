@@ -55,10 +55,14 @@ const myNotesPage = ref({ pageNum: 1, pageSize: 12, total: 0 })
 // 我的收藏
 const favoriteNotes = ref([])
 const favoriteNotesLoading = ref(false)
+const favoriteAllIds = ref([]) // 缓存全部收藏笔记ID
+const favoritePage = ref({ pageNum: 1, pageSize: 12 })
 
 // 我的喜欢
 const likedNotes = ref([])
 const likedNotesLoading = ref(false)
+const likedAllIds = ref([]) // 缓存全部喜欢笔记ID
+const likedPage = ref({ pageNum: 1, pageSize: 12 })
 
 // 用户统计
 const stats = ref({
@@ -170,27 +174,44 @@ const loadMoreMyNotes = () => {
   loadMyNotes(false)
 }
 
-// 加载我的收藏
-const loadFavoriteNotes = async () => {
+// 加载我的收藏（首次加载全部ID，客户端分页）
+const loadFavoriteNotes = async (reset = true) => {
   if (favoriteNotesLoading.value) return
   favoriteNotesLoading.value = true
   try {
-    const favRes = await request.get('/favorite/notes')
-    const noteIds = favRes.data || []
-    stats.value.favoritesCount = noteIds.length
+    if (reset) {
+      favoritePage.value.pageNum = 1
+      // 首次加载时获取全部收藏ID
+      const favRes = await request.get('/favorite/notes')
+      favoriteAllIds.value = favRes.data || []
+      stats.value.favoritesCount = favoriteAllIds.value.length
+    }
 
-    if (noteIds.length === 0) {
+    if (favoriteAllIds.value.length === 0) {
       favoriteNotes.value = []
       return
     }
 
-    // 只取最近12条
-    const recentIds = noteIds.slice(0, 12)
-    const params = recentIds.map((id) => `ids=${id}`).join('&')
-    const notesRes = await request.get(`/note/byIds?${params}`)
-    favoriteNotes.value = (notesRes.data || []).map(formatNoteForList)
+    // 客户端分页切片
+    const start = (favoritePage.value.pageNum - 1) * favoritePage.value.pageSize
+    const end = start + favoritePage.value.pageSize
+    const pageIds = favoriteAllIds.value.slice(start, end)
 
-    refreshLikeAndFavStatus(favoriteNotes.value)
+    if (pageIds.length === 0) {
+      return
+    }
+
+    const params = pageIds.map((id) => `ids=${id}`).join('&')
+    const notesRes = await request.get(`/note/byIds?${params}`)
+    const formatted = (notesRes.data || []).map(formatNoteForList)
+
+    if (reset) {
+      favoriteNotes.value = formatted
+    } else {
+      favoriteNotes.value.push(...formatted)
+    }
+
+    refreshLikeAndFavStatus(formatted)
   } catch (e) {
     console.error('加载收藏笔记失败:', e)
   } finally {
@@ -198,35 +219,68 @@ const loadFavoriteNotes = async () => {
   }
 }
 
-// 加载我的喜欢
-const loadLikedNotes = async () => {
+// 加载更多收藏
+const loadMoreFavoriteNotes = () => {
+  if (favoriteNotes.value.length >= favoriteAllIds.value.length) return
+  favoritePage.value.pageNum++
+  loadFavoriteNotes(false)
+}
+
+// 加载我的喜欢（首次加载全部ID，客户端分页）
+const loadLikedNotes = async (reset = true) => {
   if (likedNotesLoading.value) return
   likedNotesLoading.value = true
   try {
-    const likeRes = await request.get('/like/notes')
-    const noteIds = likeRes.data || []
-    stats.value.likesCount = noteIds.length
+    if (reset) {
+      likedPage.value.pageNum = 1
+      // 首次加载时获取全部喜欢ID
+      const likeRes = await request.get('/like/notes')
+      likedAllIds.value = likeRes.data || []
+      stats.value.likesCount = likedAllIds.value.length
+    }
 
-    if (noteIds.length === 0) {
+    if (likedAllIds.value.length === 0) {
       likedNotes.value = []
       return
     }
 
     // 喜欢的笔记默认已点赞
-    noteIds.forEach((id) => likedNoteIds.value.add(id))
+    if (reset) {
+      likedAllIds.value.forEach((id) => likedNoteIds.value.add(id))
+    }
 
-    // 只取最近12条
-    const recentIds = noteIds.slice(0, 12)
-    const params = recentIds.map((id) => `ids=${id}`).join('&')
+    // 客户端分页切片
+    const start = (likedPage.value.pageNum - 1) * likedPage.value.pageSize
+    const end = start + likedPage.value.pageSize
+    const pageIds = likedAllIds.value.slice(start, end)
+
+    if (pageIds.length === 0) {
+      return
+    }
+
+    const params = pageIds.map((id) => `ids=${id}`).join('&')
     const notesRes = await request.get(`/note/byIds?${params}`)
-    likedNotes.value = (notesRes.data || []).map(formatNoteForList)
+    const formatted = (notesRes.data || []).map(formatNoteForList)
 
-    refreshLikeAndFavStatus(likedNotes.value)
+    if (reset) {
+      likedNotes.value = formatted
+    } else {
+      likedNotes.value.push(...formatted)
+    }
+
+    refreshLikeAndFavStatus(formatted)
   } catch (e) {
     console.error('加载喜欢的笔记失败:', e)
   } finally {
     likedNotesLoading.value = false
   }
+}
+
+// 加载更多喜欢
+const loadMoreLikedNotes = () => {
+  if (likedNotes.value.length >= likedAllIds.value.length) return
+  likedPage.value.pageNum++
+  loadLikedNotes(false)
 }
 
 // 刷新点赞和收藏状态（后台执行，不阻塞）
@@ -574,10 +628,10 @@ const onTabChange = (tab) => {
     loadMyNotes()
   } else if (tab === 'favorites') {
     // 每次都重新加载，保证收藏列表与最新操作同步
-    loadFavoriteNotes()
+    loadFavoriteNotes(true)
   } else if (tab === 'likes') {
     // 每次都重新加载，保证喜欢列表与最新操作同步
-    loadLikedNotes()
+    loadLikedNotes(true)
   }
 }
 
@@ -595,6 +649,7 @@ const toggleLike = async (note, event) => {
       syncNoteById(note.id, { likesCount })
       // 从喜欢列表中移除（无论当前在哪个tab，保持数据一致性）
       likedNotes.value = likedNotes.value.filter((n) => n.id !== note.id)
+      likedAllIds.value = likedAllIds.value.filter((id) => id !== note.id)
       if (wasLiked) stats.value.likesCount = Math.max(0, stats.value.likesCount - 1)
       ElMessage.success('已取消点赞')
     } else {
@@ -622,6 +677,7 @@ const toggleFavorite = async (note, event) => {
       syncNoteById(note.id, { favoritesCount })
       // 从收藏列表中移除（无论当前在哪个tab，保持数据一致性）
       favoriteNotes.value = favoriteNotes.value.filter((n) => n.id !== note.id)
+      favoriteAllIds.value = favoriteAllIds.value.filter((id) => id !== note.id)
       if (wasFavorited) stats.value.favoritesCount = Math.max(0, stats.value.favoritesCount - 1)
       ElMessage.success('已取消收藏')
     } else {
@@ -948,6 +1004,16 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- 收藏加载更多 -->
+      <div
+        v-if="activeTab === 'favorites' && favoriteNotes.length < favoriteAllIds.length"
+        class="load-more-wrap"
+      >
+        <el-button class="load-more-btn" :loading="favoriteNotesLoading" @click="loadMoreFavoriteNotes">
+          加载更多 ({{ favoriteNotes.length }}/{{ favoriteAllIds.length }})
+        </el-button>
+      </div>
+
       <!-- 我的喜欢 -->
       <div v-if="activeTab === 'likes'" v-loading="likedNotesLoading" class="notes-grid">
         <div v-if="likedNotes.length === 0 && !likedNotesLoading" class="empty-state">
@@ -1005,6 +1071,16 @@ onMounted(async () => {
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- 喜欢加载更多 -->
+      <div
+        v-if="activeTab === 'likes' && likedNotes.length < likedAllIds.length"
+        class="load-more-wrap"
+      >
+        <el-button class="load-more-btn" :loading="likedNotesLoading" @click="loadMoreLikedNotes">
+          加载更多 ({{ likedNotes.length }}/{{ likedAllIds.length }})
+        </el-button>
       </div>
     </div>
     <!-- 详情弹窗 -->

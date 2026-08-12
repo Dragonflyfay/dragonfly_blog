@@ -1790,6 +1790,17 @@ onUnmounted(() => {
         <span>加载中...</span>
       </div>
 
+      <!-- 手动加载更多按钮（滚动加载的补充兜底） -->
+      <div v-if="hasMore && notes.length > 0 && !isLoadingMore" class="load-more-wrap">
+        <el-button
+          class="load-more-btn"
+          :loading="isLoadingMore"
+          @click="pageNum++; loadNotes()"
+        >
+          加载更多 ({{ notes.length }}/{{ total }})
+        </el-button>
+      </div>
+
       <div v-if="!hasMore && notes.length > 0" class="no-more">
         <span>没有更多了~</span>
       </div>
@@ -3232,6 +3243,30 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+// 手动加载更多按钮
+.load-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+
+  .load-more-btn {
+    border-radius: 24px;
+    padding: 10px 32px;
+    background: linear-gradient(135deg, #f5f0ff, #fff);
+    border: 1px solid #e0d4ff;
+    color: #7a5a9e;
+    font-size: 14px;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
+      color: #fff;
+      border-color: transparent;
+      transform: translateY(-2px);
+    }
+  }
 }
 
 // 回到顶部按钮
