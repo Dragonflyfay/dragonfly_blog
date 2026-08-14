@@ -41,13 +41,13 @@ public class LikeCountSyncTask {
     /**
      * 每5分钟同步一次笔记点赞数
      */
-    @Scheduled(cron = "0 */5 * * * ?")
+    @Scheduled(cron ="0 */5 * * * ?") //cron 表达式格式:
     @Transactional
     public void syncNoteLikeCounts() {
         log.info("🔄 开始同步笔记点赞数到MySQL...");
 
-        // ✅ 直接获取 Set<String>
-        Set<String> noteIds = redisCache.getSetMembersAsString(SYNC_NOTE_IDS_KEY);
+        // 使用 getSetMembers（返回 Set<Object>）
+        Set<Object> noteIds = redisCache.getSetMembers(SYNC_NOTE_IDS_KEY);
         if (noteIds == null || noteIds.isEmpty()) {
             log.info("📭 没有需要同步的笔记点赞数");
             return;
@@ -57,29 +57,31 @@ public class LikeCountSyncTask {
         int failCount = 0;
 
         // ✅ 直接遍历 String，不需要转 Object
-        for (String idStr : noteIds) {
+        for (Object idObj : noteIds) {
             try {
+                String idStr = idObj.toString();
                 Integer noteId = Integer.parseInt(idStr);
                 String countKey = LIKE_COUNT_NOTE_KEY + noteId;
-                String countStr = redisCache.get(countKey);
+                Number redisCount=redisCache.get(countKey);
 
-                if (countStr != null) {
-                    int redisCount = Integer.parseInt(countStr);
-                    noteMapper.updateLikesCount(noteId, redisCount);
+                if (redisCount != null) {
+                    noteMapper.updateLikesCount(noteId, redisCount.intValue());
                     successCount++;
                     log.debug("✅ 同步笔记 {} 点赞数: {}", noteId, redisCount);
+                }else{
+                    log.warn("⚠️ 笔记 {} 的点赞数在Redis中不存在", noteId);
                 }
 
                 // 从同步集合中移除
-                redisCache.removeFromSet(SYNC_NOTE_IDS_KEY, idStr);
+                redisCache.removeFromSet(SYNC_NOTE_IDS_KEY, idObj);
 
             } catch (NumberFormatException e) {
                 failCount++;
-                log.warn("⚠️ 无效的笔记ID格式: {}", idStr);
-                redisCache.removeFromSet(SYNC_NOTE_IDS_KEY, idStr);
+                log.warn("⚠️ 无效的笔记ID格式: {}", idObj);
+                redisCache.removeFromSet(SYNC_NOTE_IDS_KEY, idObj);
             } catch (Exception e) {
                 failCount++;
-                log.error("❌ 同步笔记 {} 失败: {}", idStr, e.getMessage());
+                log.error("❌ 同步笔记 {} 失败: {}", idObj, e.getMessage());
             }
         }
 
@@ -94,8 +96,8 @@ public class LikeCountSyncTask {
     public void syncCommentLikeCounts() {
         log.info("🔄 开始同步评论点赞数到MySQL...");
 
-        // ✅ 同样使用 getSetMembersAsString，统一返回 Set<String>
-        Set<String> commentIds = redisCache.getSetMembersAsString(SYNC_COMMENT_IDS_KEY);
+        // ✅ 同样使用 getSetMembers
+        Set<Object> commentIds = redisCache.getSetMembers(SYNC_COMMENT_IDS_KEY);
         if (commentIds == null || commentIds.isEmpty()) {
             log.info("📭 没有需要同步的评论点赞数");
             return;
@@ -105,28 +107,29 @@ public class LikeCountSyncTask {
         int failCount = 0;
 
         // ✅ 直接遍历 String
-        for (String idStr : commentIds) {
+        for (Object idObj : commentIds) {
             try {
+                String idStr=idObj.toString();
                 Integer commentId = Integer.parseInt(idStr);
                 String countKey = LIKE_COUNT_COMMENT_KEY + commentId;
-                String countStr = redisCache.get(countKey);
+                Number countNum = redisCache.get(countKey);
 
-                if (countStr != null) {
-                    int redisCount = Integer.parseInt(countStr);
-                    commentMapper.updateLikesCount(commentId, redisCount);
+                if (countNum != null) {
+
+                    commentMapper.updateLikesCount(commentId, countNum.intValue());
                     successCount++;
-                    log.debug("✅ 同步评论 {} 点赞数: {}", commentId, redisCount);
+                    log.debug("✅ 同步评论 {} 点赞数: {}", commentId, countNum);
                 }
 
-                redisCache.removeFromSet(SYNC_COMMENT_IDS_KEY, idStr);
+                redisCache.removeFromSet(SYNC_COMMENT_IDS_KEY, idObj);
 
             } catch (NumberFormatException e) {
                 failCount++;
-                log.warn("⚠️ 无效的评论ID格式: {}", idStr);
-                redisCache.removeFromSet(SYNC_COMMENT_IDS_KEY, idStr);
+                log.warn("⚠️ 无效的评论ID格式: {}", idObj);
+                redisCache.removeFromSet(SYNC_COMMENT_IDS_KEY, idObj);
             } catch (Exception e) {
                 failCount++;
-                log.error("❌ 同步评论 {} 失败: {}", idStr, e.getMessage());
+                log.error("❌ 同步评论 {} 失败: {}", idObj, e.getMessage());
             }
         }
 

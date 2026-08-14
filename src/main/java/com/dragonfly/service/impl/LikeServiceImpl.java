@@ -196,6 +196,9 @@ public class LikeServiceImpl implements LikeService {
             // 如果Redis异常，直接减1
             noteMapper.decrementLikesCount(noteId);
         }
+
+        // 标记需要同步的笔记ID
+        redisCache.addToSet(SYNC_NOTE_IDS_KEY, String.valueOf(noteId));
     }
 
 
@@ -293,8 +296,8 @@ public class LikeServiceImpl implements LikeService {
             notification.setContent("点赞了你的评论：" + comment.getContent());
             notificationService.sendNotification(notification);
         }
-        // 7. 添加到 Redis 的同步列表
-        // ✅ 标记需要同步的评论ID
+        // 9. 添加到 Redis 的同步列表
+        //  标记需要同步的评论ID
         redisCache.addToSet(SYNC_COMMENT_IDS_KEY, String.valueOf(commentId));
     }
 

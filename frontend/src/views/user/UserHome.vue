@@ -659,6 +659,19 @@ const loadNotes = async () => {
   } finally {
     loading.value = false
     isLoadingMore.value = false
+
+    // 延迟执行，确保 DOM 已更新
+    nextTick(() => {
+      if (hasMore.value && !loading.value && !isLoadingMore.value) {
+        const scrollHeight = document.documentElement.scrollHeight
+        const windowHeight = window.innerHeight
+        if (scrollHeight <= windowHeight + 100) {
+          console.log('加载完成后内容仍不足以滚动，继续加载...')
+          pageNum.value++
+          loadNotes()
+        }
+      }
+    })
   }
 }
 
@@ -852,7 +865,7 @@ const handleVideoError = (e) => {
   // 网络错误和格式/CORS错误先重试，避免误报
   if (
     (errorCode === MediaError.MEDIA_ERR_NETWORK ||
-     errorCode === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) &&
+      errorCode === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) &&
     retryCount < 2
   ) {
     console.warn(`视频错误(code=${errorCode})，第${retryCount + 1}次重试...`)
@@ -1246,27 +1259,64 @@ const showBackToTop = ref(false)
 
 const handleScroll = () => {
   // 控制回到顶部按钮显示
-  //showBackToTop.value = window.scrollY > 300
+  showBackToTop.value = window.scrollY > 300
 
   // 无限滚动加载
   const scrollTop = window.scrollY || document.documentElement.scrollTop
   const windowHeight = window.innerHeight
   const documentHeight = document.documentElement.scrollHeight
 
+  console.log('handleScroll:', { scrollTop, windowHeight, documentHeight, hasMore: hasMore.value })
   // 当滚动到距离底部200px时加载更多
-  if (scrollTop + windowHeight >= documentHeight - 200 && hasMore.value && !isLoadingMore.value) {
+  if (
+    scrollTop + windowHeight >= documentHeight - 200 &&
+    hasMore.value &&
+    !isLoadingMore.value &&
+    !loading.value
+  ) {
+    console.log('触发滚动加载更多...')
     pageNum.value++
     loadNotes()
   }
 }
 
-// 回到顶部
-// const backToTop = () => {
-//   window.scrollTo({
-//     top: 0,
-//     behavior: 'smooth'
-//   })
-// }
+// 检查并加载更多（当内容不足以滚动时）
+const checkAndLoadMore = () => {
+  // 如果正在加载或没有更多数据，则跳过
+  if (loading.value || isLoadingMore.value || !hasMore.value) {
+    console.log('跳过加载:', {
+      loading: loading.value,
+      isLoadingMore: isLoadingMore.value,
+      hasMore: hasMore.value,
+    })
+    return
+  }
+
+  const scrollHeight = document.documentElement.scrollHeight
+  const windowHeight = window.innerHeight
+
+  console.log('checkAndLoadMore:', {
+    scrollHeight,
+    windowHeight,
+    notesLength: notes.value.length,
+    total: total.value,
+  })
+
+  // 如果内容高度小于或等于视口高度，说明没有滚动条，需要加载更多
+  if (scrollHeight <= windowHeight + 100) {
+    console.log('内容不足以滚动，自动加载更多...')
+    pageNum.value++
+    loadNotes()
+  }
+}
+
+//回到顶部
+const backToTop = () => {
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth',
+  })
+}
 
 /** 封面区域宽高比  */
 const getMediaAspectClass = (note) => {
@@ -1428,7 +1478,7 @@ onMounted(async () => {
   // 如果从"我"页面跳转过来，自动打开对应笔记详情
   const noteId = route.query.noteId
   if (noteId) {
-    const targetNote = notes.value.find(n => n.id === Number(noteId))
+    const targetNote = notes.value.find((n) => n.id === Number(noteId))
     if (targetNote) {
       nextTick(() => viewDetail(targetNote))
     }
@@ -1442,6 +1492,13 @@ onMounted(async () => {
 
   // 加载搜索历史
   loadSearchHistory()
+
+  // ===== 新增：初始加载检查 =====
+  // 等待 DOM 渲染完成后检查是否需要加载更多
+  await nextTick()
+  setTimeout(() => {
+    checkAndLoadMore()
+  }, 300)
 })
 
 onUnmounted(() => {
@@ -1790,28 +1847,17 @@ onUnmounted(() => {
         <span>加载中...</span>
       </div>
 
-      <!-- 手动加载更多按钮（滚动加载的补充兜底） -->
-      <div v-if="hasMore && notes.length > 0 && !isLoadingMore" class="load-more-wrap">
-        <el-button
-          class="load-more-btn"
-          :loading="isLoadingMore"
-          @click="pageNum++; loadNotes()"
-        >
-          加载更多 ({{ notes.length }}/{{ total }})
-        </el-button>
-      </div>
-
       <div v-if="!hasMore && notes.length > 0" class="no-more">
         <span>没有更多了~</span>
       </div>
     </div>
     <!-- 回到顶部按钮 -->
-    <!--    <transition name="fade-slide">-->
-    <!--      <div v-show="showBackToTop" class="back-to-top" @click="backToTop">-->
-    <!--        <el-icon><Top /></el-icon>-->
-    <!--        <span>顶部</span>-->
-    <!--      </div>-->
-    <!--    </transition>-->
+    <transition name="fade-slide">
+      <div v-show="showBackToTop" class="back-to-top" @click="backToTop">
+        <el-icon><Top /></el-icon>
+        <span>顶部</span>
+      </div>
+    </transition>
 
     <!-- 详情弹窗 - 带动画效果 -->
     <Teleport to="body">
@@ -3232,39 +3278,40 @@ onUnmounted(() => {
     background: rgba(245, 166, 35, 0.1);
   }
 }
-// 加载更多
+// 加载更多和没有更多的样式
 .loading-more,
 .no-more {
   text-align: center;
-  padding: 24px;
+  padding: 32px 24px;
   color: #b0a7c0;
   font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  letter-spacing: 0.5px;
 }
 
-// 手动加载更多按钮
-.load-more-wrap {
-  display: flex;
-  justify-content: center;
-  padding: 24px 0;
+.no-more {
+  color: #c5b8d8;
+  font-size: 13px;
 
-  .load-more-btn {
-    border-radius: 24px;
-    padding: 10px 32px;
-    background: linear-gradient(135deg, #f5f0ff, #fff);
-    border: 1px solid #e0d4ff;
-    color: #7a5a9e;
-    font-size: 14px;
-    transition: all 0.3s ease;
+  span {
+    position: relative;
 
-    &:hover {
-      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-      color: #fff;
-      border-color: transparent;
-      transform: translateY(-2px);
+    &::before,
+    &::after {
+      content: '';
+      display: inline-block;
+      width: 40px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #c5a3ff);
+      margin: 0 12px;
+      vertical-align: middle;
+    }
+
+    &::after {
+      background: linear-gradient(90deg, #c5a3ff, transparent);
     }
   }
 }
