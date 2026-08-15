@@ -45,6 +45,11 @@ import useUserInfoStore from '@/stores/userInfo.js'
 import logoImg from '@/assets/logo.png'
 // 导入评论子组件
 import CommentItem from '@/components/CommentItem.vue'
+
+// ========== 哨兵观察器相关 ==========
+let sentinelObserver = null
+const sentinelRef = ref(null)
+
 // 添加评论提交状态
 const submittingComment = ref(false)
 // 用户信息 store
@@ -420,6 +425,11 @@ const resetAndLoad = () => {
   pageNum.value = 1
   notes.value = []
   hasMore.value = true
+  // 重置观察器
+  if (sentinelObserver) {
+    sentinelObserver.disconnect()
+    sentinelObserver = null
+  }
   loadNotes()
 }
 
@@ -662,16 +672,97 @@ const loadNotes = async () => {
 
     // 延迟执行，确保 DOM 已更新
     nextTick(() => {
-      if (hasMore.value && !loading.value && !isLoadingMore.value) {
-        const scrollHeight = document.documentElement.scrollHeight
-        const windowHeight = window.innerHeight
-        if (scrollHeight <= windowHeight + 100) {
-          console.log('加载完成后内容仍不足以滚动，继续加载...')
-          pageNum.value++
-          loadNotes()
-        }
-      }
+      reconnectSentinelObserver()
     })
+  }
+}
+//哨兵观察器核心逻辑
+const setupSentinelObserver = () => {
+  console.log('🔍 正在设置哨兵观察器...', {
+    hasMore: hasMore.value,
+    isLoadingMore: isLoadingMore.value,
+    loading: loading.value,
+    notesCount: notes.value.length,
+  })
+
+  // 如果没有更多数据，不设置观察器
+  if (!hasMore.value) {
+    console.log('📌 没有更多数据，跳过设置观察器')
+    return
+  }
+  // 清理旧的观察器
+  if (sentinelObserver) {
+    sentinelObserver.disconnect()
+    sentinelObserver = null
+  }
+
+  // 查找哨兵元素
+  const sentinel = document.getElementById('load-more-sentinel')
+  if (!sentinel) {
+    console.warn('哨兵元素未找到，等待重试...')
+    // 如果哨兵元素还未渲染，延迟重试
+    setTimeout(() => setupSentinelObserver(), 500)
+    return
+  }
+  console.log('✅ 哨兵元素已找到，开始观察')
+
+  // 创建观察器
+  sentinelObserver = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[0]
+
+      // 当哨兵进入可视区，且满足加载条件
+      if (entry.isIntersecting && hasMore.value && !isLoadingMore.value && !loading.value) {
+        console.log('📦 哨兵触发加载更多...', {
+          hasMore: hasMore.value,
+          isLoadingMore: isLoadingMore.value,
+          loading: loading.value,
+          currentPage: pageNum.value,
+          total: total.value,
+          notesCount: notes.value.length,
+        })
+
+        // 加载下一页
+        pageNum.value++
+        loadNotes()
+      }
+    },
+    {
+      // 配置：提前 200px 开始加载，让用户无感知
+      rootMargin: '0px 0px 1000px 0px',
+      threshold: 0.1, // 只要 10% 的哨兵可见就触发
+    },
+  )
+
+  // 开始观察
+  sentinelObserver.observe(sentinel)
+  console.log('✅ 哨兵观察器已启动')
+}
+
+// ========== 新增：重新连接观察器 ==========
+const reconnectSentinelObserver = () => {
+  // 如果还有更多数据，重新设置观察器
+  if (hasMore.value) {
+    // 延迟一点确保 DOM 更新完成
+    setTimeout(() => {
+      setupSentinelObserver()
+    }, 100)
+  } else {
+    // 没有更多数据时，断开观察器
+    if (sentinelObserver) {
+      sentinelObserver.disconnect()
+      sentinelObserver = null
+      console.log('📌 没有更多数据，观察器已断开')
+    }
+  }
+}
+
+// ========== ：手动触发加载（用于搜索、切换话题等） ==========
+const triggerLoadMore = () => {
+  if (hasMore.value && !isLoadingMore.value && !loading.value) {
+    console.log('🔄 手动触发加载更多...')
+    pageNum.value++
+    loadNotes()
   }
 }
 
@@ -1493,11 +1584,10 @@ onMounted(async () => {
   // 加载搜索历史
   loadSearchHistory()
 
-  // ===== 新增：初始加载检查 =====
-  // 等待 DOM 渲染完成后检查是否需要加载更多
+  // ===== 初始化哨兵观察器 =====
   await nextTick()
   setTimeout(() => {
-    checkAndLoadMore()
+    setupSentinelObserver()
   }, 300)
 })
 
@@ -1506,6 +1596,17 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateColumnCount)
   // 移除用户信息更新事件监听
   window.removeEventListener('userInfoUpdated', handleUserInfoUpdate)
+  // 清理哨兵观察器
+  if (sentinelObserver) {
+    sentinelObserver.disconnect()
+    sentinelObserver = null
+    console.log('🧹 哨兵观察器已清理')
+  }
+
+  // 清理防抖定时器
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
 })
 </script>
 
@@ -1850,6 +1951,8 @@ onUnmounted(() => {
       <div v-if="!hasMore && notes.length > 0" class="no-more">
         <span>没有更多了~</span>
       </div>
+      <!-- ===== 添加哨兵元素 ===== -->
+      <div id="load-more-sentinel" style="height: 20px; flex-shrink: 0"></div>
     </div>
     <!-- 回到顶部按钮 -->
     <transition name="fade-slide">
