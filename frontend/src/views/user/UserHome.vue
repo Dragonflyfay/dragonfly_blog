@@ -587,32 +587,7 @@ const loadNotes = async () => {
         hasMore.value = false
       }
 
-      // 为每个笔记填充真实的用户信息和确保统计数据有效
-      notes.value.forEach((note) => {
-        // 初始化图片加载状态
-        note.imageLoaded = false
-
-        // 填充用户信息...
-        if (note.createUser) {
-          const userInfo = getUserInfo(note.createUser)
-          if (userInfo) {
-            note.userName = userInfo.nickname || userInfo.username || '匿名用户'
-            note.userPic = userInfo.userPic || ''
-          } else {
-            note.userName = note.createUserName || note.userName || note.authorName || '匿名用户'
-            note.userPic = note.createUserAvatar || note.userPic || note.authorAvatar || ''
-          }
-        } else {
-          note.userName = note.userName || note.authorName || '匿名用户'
-          note.userPic = note.userPic || note.authorAvatar || ''
-        }
-
-        // 确保统计数据有默认值
-        note.likesCount = note.likesCount || 0
-        note.viewsCount = note.viewsCount || 0
-        note.commentsCount = note.commentsCount || 0
-        note.favoritesCount = note.favoritesCount || 0
-      })
+      batchFillUserInfo(notes.value)
 
       // 批量检查点赞状态（一次性请求）
       const noteIds = newNotes.map((note) => note.id).filter((id) => id)
@@ -676,15 +651,48 @@ const loadNotes = async () => {
     })
   }
 }
-//哨兵观察器核心逻辑
-const setupSentinelObserver = () => {
-  console.log('🔍 正在设置哨兵观察器...', {
-    hasMore: hasMore.value,
-    isLoadingMore: isLoadingMore.value,
-    loading: loading.value,
-    notesCount: notes.value.length,
+// ===== 批量填充用户信息（优化版） =====
+const batchFillUserInfo = (noteList) => {
+  // 1. 收集所有需要查询的用户ID
+  const userIds = new Set()
+  noteList.forEach((note) => {
+    if (note.createUser) userIds.add(note.createUser)
   })
 
+  // 2. 批量从缓存获取用户信息
+  const userInfoMap = new Map()
+  userIds.forEach((id) => {
+    const info = getUserInfo(id)
+    if (info) userInfoMap.set(id, info)
+  })
+
+  // 3. 批量填充
+  noteList.forEach((note) => {
+    note.imageLoaded = false
+
+    if (note.createUser) {
+      const userInfo = userInfoMap.get(note.createUser)
+      if (userInfo) {
+        note.userName = userInfo.nickname || userInfo.username || '匿名用户'
+        note.userPic = userInfo.userPic || ''
+      } else {
+        note.userName = note.createUserName || note.userName || '匿名用户'
+        note.userPic = note.createUserAvatar || note.userPic || ''
+      }
+    } else {
+      note.userName = note.userName || '匿名用户'
+      note.userPic = note.userPic || ''
+    }
+
+    // 确保统计数据有默认值
+    note.likesCount = note.likesCount || 0
+    note.viewsCount = note.viewsCount || 0
+    note.commentsCount = note.commentsCount || 0
+    note.favoritesCount = note.favoritesCount || 0
+  })
+}
+//哨兵观察器核心逻辑
+const setupSentinelObserver = () => {
   // 如果没有更多数据，不设置观察器
   if (!hasMore.value) {
     console.log('📌 没有更多数据，跳过设置观察器')
@@ -699,7 +707,6 @@ const setupSentinelObserver = () => {
   // 查找哨兵元素
   const sentinel = document.getElementById('load-more-sentinel')
   if (!sentinel) {
-    console.warn('哨兵元素未找到，等待重试...')
     // 如果哨兵元素还未渲染，延迟重试
     setTimeout(() => setupSentinelObserver(), 500)
     return
@@ -713,15 +720,6 @@ const setupSentinelObserver = () => {
 
       // 当哨兵进入可视区，且满足加载条件
       if (entry.isIntersecting && hasMore.value && !isLoadingMore.value && !loading.value) {
-        console.log('📦 哨兵触发加载更多...', {
-          hasMore: hasMore.value,
-          isLoadingMore: isLoadingMore.value,
-          loading: loading.value,
-          currentPage: pageNum.value,
-          total: total.value,
-          notesCount: notes.value.length,
-        })
-
         // 加载下一页
         pageNum.value++
         loadNotes()
@@ -729,7 +727,7 @@ const setupSentinelObserver = () => {
     },
     {
       // 配置：提前 200px 开始加载，让用户无感知
-      rootMargin: '0px 0px 1000px 0px',
+      rootMargin: '0px 0px 200px 0px',
       threshold: 0.1, // 只要 10% 的哨兵可见就触发
     },
   )
@@ -1349,56 +1347,7 @@ const updateColumnCount = () => {
 const showBackToTop = ref(false)
 
 const handleScroll = () => {
-  // 控制回到顶部按钮显示
   showBackToTop.value = window.scrollY > 300
-
-  // 无限滚动加载
-  const scrollTop = window.scrollY || document.documentElement.scrollTop
-  const windowHeight = window.innerHeight
-  const documentHeight = document.documentElement.scrollHeight
-
-  console.log('handleScroll:', { scrollTop, windowHeight, documentHeight, hasMore: hasMore.value })
-  // 当滚动到距离底部200px时加载更多
-  if (
-    scrollTop + windowHeight >= documentHeight - 200 &&
-    hasMore.value &&
-    !isLoadingMore.value &&
-    !loading.value
-  ) {
-    console.log('触发滚动加载更多...')
-    pageNum.value++
-    loadNotes()
-  }
-}
-
-// 检查并加载更多（当内容不足以滚动时）
-const checkAndLoadMore = () => {
-  // 如果正在加载或没有更多数据，则跳过
-  if (loading.value || isLoadingMore.value || !hasMore.value) {
-    console.log('跳过加载:', {
-      loading: loading.value,
-      isLoadingMore: isLoadingMore.value,
-      hasMore: hasMore.value,
-    })
-    return
-  }
-
-  const scrollHeight = document.documentElement.scrollHeight
-  const windowHeight = window.innerHeight
-
-  console.log('checkAndLoadMore:', {
-    scrollHeight,
-    windowHeight,
-    notesLength: notes.value.length,
-    total: total.value,
-  })
-
-  // 如果内容高度小于或等于视口高度，说明没有滚动条，需要加载更多
-  if (scrollHeight <= windowHeight + 100) {
-    console.log('内容不足以滚动，自动加载更多...')
-    pageNum.value++
-    loadNotes()
-  }
 }
 
 //回到顶部

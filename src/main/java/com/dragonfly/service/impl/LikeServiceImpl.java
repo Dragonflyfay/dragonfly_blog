@@ -1,5 +1,6 @@
 package com.dragonfly.service.impl;
 
+import com.dragonfly.controller.LikeController;
 import com.dragonfly.enums.NotificationType;
 import com.dragonfly.mapper.CommentMapper;
 import com.dragonfly.mapper.LikeRecordMapper;
@@ -23,10 +24,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 public class LikeServiceImpl implements LikeService {
@@ -101,8 +101,12 @@ public class LikeServiceImpl implements LikeService {
             //回填Redis
             redisCache.set(userKey, "1",7,TimeUnit.HOURS);
             return true;
+        }else{
+            //空值缓存
+            redisCache.set(userKey,"null",5,TimeUnit.MINUTES);
+            return false;
         }
-        return false;
+
     }
 
     @Override
@@ -327,12 +331,8 @@ public class LikeServiceImpl implements LikeService {
     @Override
     public Map<Integer, Boolean> batchCheckLikedNotes(List<Integer> noteIds) {
         Map<Integer, Boolean> result = new HashMap<>();
-        
-        if (noteIds == null || noteIds.isEmpty()) {
-            return result;
-        }
-
-        Integer userId = getCurrentUserId();
+        Integer userId=getCurrentUserId();
+        // 1. 如果 noteIds 为空，直接返回空结果
         if (userId == null) {
             for (Integer noteId : noteIds) {
                 result.put(noteId, false);
@@ -341,9 +341,35 @@ public class LikeServiceImpl implements LikeService {
         }
 
         // ✅ 批量查Redis
+        List<Integer> redisMissIds = new ArrayList<>();// 用于存储Redis未命中的笔记ID
         for (Integer noteId : noteIds) {
             String userKey = LIKE_NOTE_KEY + noteId + ":" + userId;
+            if(redisCache.hasKey(userKey)){
+                result.put(noteId,true);
+            }else{
+                redisMissIds.add(noteId);
+            }
             result.put(noteId, redisCache.hasKey(userKey));
+        }
+
+        //redis没有的，批量查数据库
+        if(!redisMissIds.isEmpty()){
+            List<LikeRecord> records= likeRecordMapper.batchFindByUserAndTarget(userId,1,redisMissIds);
+            Set<Integer>likedIds=records.stream()
+                    .map(LikeRecord::getTargetId)
+                    .collect(Collectors.toSet());
+            for (Integer noteId : redisMissIds) {
+                boolean liked = likedIds.contains(noteId);
+                result.put(noteId, liked);
+                // 回填Redis
+                String userKey = LIKE_NOTE_KEY + noteId + ":" + userId;
+                if (liked) {
+                    redisCache.set(userKey, "1", 7, TimeUnit.DAYS);
+                } else {
+                    // 空值缓存，避免频繁查数据库
+                    redisCache.set(userKey, "null", 5, TimeUnit.MINUTES);
+                }
+            }
         }
         
         return result;
