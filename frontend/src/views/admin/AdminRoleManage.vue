@@ -236,7 +236,7 @@ onMounted(() => {
               type="info"
               size="small"
               :icon="Edit"
-              @click="demoteToUser(scope.row)"
+              @click="updateUserRole(scope.row, 'user')"
             >
               降级为用户
             </el-button>

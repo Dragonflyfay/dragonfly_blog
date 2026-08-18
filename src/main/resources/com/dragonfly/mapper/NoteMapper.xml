@@ -61,9 +61,11 @@
     </resultMap>
 
     <select id="findById" resultMap="NoteResultMap">
-        SELECT n.*, COALESCE(NULLIF(u.nickname, ''), u.username) AS create_user_name, u.user_pic AS create_user_avatar
+        SELECT n.*,
+               COALESCE(NULLIF(u.nickname, ''), u.username) AS create_user_name,
+               u.user_pic AS create_user_avatar
         FROM note n
-        LEFT JOIN user u ON n.create_user = u.id
+                 LEFT JOIN user u ON n.create_user = u.id
         WHERE n.id = #{id}
     </select>
 

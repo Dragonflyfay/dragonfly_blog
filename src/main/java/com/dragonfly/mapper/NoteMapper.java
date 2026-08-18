@@ -3,6 +3,7 @@ package com.dragonfly.mapper;
 import com.dragonfly.pojo.Note;
 import org.apache.ibatis.annotations.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -102,4 +103,23 @@ public interface NoteMapper {
      */
     @Update("UPDATE note SET likes_count = #{likesCount} WHERE id = #{noteId}")
     void updateLikesCount(@Param("noteId") Integer noteId, @Param("likesCount") Integer likesCount);
+    // 统计所有笔记数量
+    @Select("SELECT COUNT(*) FROM note")
+    int countAll();
+
+    // 统计浏览量总和
+    @Select("SELECT COALESCE(SUM(views_count), 0) FROM note")
+    int sumViewsCount();
+
+    // 统计点赞总数
+    @Select("SELECT COALESCE(SUM(likes_count), 0) FROM note")
+    int sumLikesCount();
+
+    // 统计收藏总数
+    @Select("SELECT COALESCE(SUM(favorites_count), 0) FROM note")
+    int sumFavoritesCount();
+
+    // 按日期统计笔记数
+    @Select("SELECT COUNT(*) FROM note WHERE DATE(create_time) = #{date}")
+    int countByDate(@Param("date") LocalDate date);
 }

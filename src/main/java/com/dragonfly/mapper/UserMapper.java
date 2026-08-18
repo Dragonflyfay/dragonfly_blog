@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.LocalDate;
+
 /**
  * 描述：
  *
@@ -57,4 +59,16 @@ public interface UserMapper {
     // 减少关注数
     @Update("UPDATE user SET following_count = GREATEST(following_count - 1, 0) WHERE id = #{userId}")
     void decrementFollowingCount(Integer userId);
+
+    // 统计所有用户
+    @Select("SELECT COUNT(*) FROM user")
+    int countAll();
+
+    // 按日期统计注册用户数
+    @Select("SELECT COUNT(*) FROM user WHERE DATE(create_time) = #{date}")
+    int countByDate(@Param("date") LocalDate date);
+
+    // 统计活跃用户（最近N天有操作）
+    @Select("SELECT COUNT(DISTINCT user_id) FROM note_view WHERE view_time > DATE_SUB(NOW(), INTERVAL #{days} DAY)")
+    int countActiveUsers(@Param("days") int days);
 }

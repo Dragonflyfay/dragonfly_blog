@@ -4,6 +4,7 @@ import org.apache.ibatis.annotations.*;
 
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -90,4 +91,8 @@ public interface CommentMapper {
     @Update("UPDATE comment SET likes_count = #{likesCount} WHERE id = #{commentId}")
     void updateLikesCount(@Param("commentId") Integer commentId,
                           @Param("likesCount") Integer likesCount);
+
+    // 按日期统计评论数
+    @Select("SELECT COUNT(*) FROM comment WHERE DATE(create_time) = #{date}")
+    int countByDate(@Param("date") LocalDate date);
 }

@@ -50,4 +50,8 @@ public interface TopicMapper {
     // 减少话题笔记数量
     @Update("UPDATE topic SET notes_count = GREATEST(notes_count - 1, 0), update_time = NOW() WHERE id = #{topicId}")
     void decrementNotesCount(Integer topicId);
+
+    // 统计话题总数
+    @Select("SELECT COUNT(*) FROM topic")
+    int countAll();
 }
