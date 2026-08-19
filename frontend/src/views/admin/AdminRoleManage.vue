@@ -175,11 +175,26 @@ onMounted(() => {
       <el-button :icon="Refresh" @click="handleReset">重置</el-button>
     </div>
 
-    <!-- 操作按钮 -->
-    <div class="action-bar">
-      <el-button type="primary" :icon="Plus">新增</el-button>
-      <el-button type="danger" :icon="Delete" @click="batchDemote">批量降级</el-button>
-    </div>
+    <!-- 将无用的"新增"按钮改为"添加管理员"弹窗 -->
+    <el-button type="primary" :icon="Plus" @click="showAddAdminDialog = true">
+      添加管理员
+    </el-button>
+
+    <!-- 添加管理员弹窗 -->
+    <el-dialog v-model="showAddAdminDialog" title="添加管理员" width="420px">
+      <el-form :model="addAdminForm" :rules="addAdminRules" ref="addAdminFormRef">
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="addAdminForm.username" placeholder="请输入用户名" />
+        </el-form-item>
+        <el-form-item label="初始密码" prop="password">
+          <el-input v-model="addAdminForm.password" type="password" placeholder="请输入初始密码" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddAdminDialog = false">取消</el-button>
+        <el-button type="primary" @click="addAdmin">确认添加</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 管理员用户列表 -->
     <div class="table-card" v-loading="loading">

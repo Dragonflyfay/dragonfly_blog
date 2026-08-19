@@ -132,6 +132,21 @@ getUserInfo()
             <span>用户管理</span>
           </el-menu-item>
         </el-sub-menu>
+        <!-- 在用户管理之后添加 -->
+        <el-sub-menu index="system">
+          <template #title>
+            <el-icon><Setting /></el-icon>
+            <span>系统管理</span>
+          </template>
+          <el-menu-item index="/admin/notification">
+            <el-icon><Bell /></el-icon>
+            <span>系统通知</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/logs">
+            <el-icon><Document /></el-icon>
+            <span>操作日志</span>
+          </el-menu-item>
+        </el-sub-menu>
         <el-sub-menu index="profile">
           <template #title>
             <el-icon><UserFilled /></el-icon>
@@ -163,7 +178,9 @@ getUserInfo()
         <div class="header-left">
           <div class="greeting">
             <span class="greeting-text">你好，</span>
-            <strong class="username-display">{{ userInfoStore.info.nickname || userInfoStore.info.username }}</strong>
+            <strong class="username-display">{{
+              userInfoStore.info.nickname || userInfoStore.info.username
+            }}</strong>
           </div>
           <div class="theme-toggle" @click="toggleTheme">
             <el-icon v-if="!isDark"><Sunny /></el-icon>
