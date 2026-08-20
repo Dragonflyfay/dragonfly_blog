@@ -48,6 +48,16 @@ const routes = [
       { path: 'user/avatar', component: UserAvatarVue, meta: { title: '更换头像' } },
       { path: 'user/resetPassword', component: UserResetPasswordVue, meta: { title: '重置密码' } },
       { path: 'comment', component: CommentManage, meta: { title: '评论管理' } },
+      {
+        path: 'notification',
+        component: () => import('@/views/admin/SystemNotification.vue'),
+        meta: { title: '系统通知' },
+      },
+      {
+        path: 'logs',
+        component: () => import('@/views/admin/OperationLog.vue'),
+        meta: { title: '操作日志' },
+      },
     ],
   },
 
@@ -65,16 +75,6 @@ const routes = [
       { path: 'user/info', component: UserInfo, meta: { title: '基本资料' } },
       { path: 'user/avatar', component: UserAvatarVue, meta: { title: '更换头像' } },
       { path: 'user/resetPassword', component: UserResetPasswordVue, meta: { title: '重置密码' } },
-      {
-        path: 'notification',
-        component: () => import('@/views/admin/SystemNotification.vue'),
-        meta: { title: '系统通知' },
-      },
-      {
-        path: 'logs',
-        component: () => import('@/views/admin/OperationLog.vue'),
-        meta: { title: '操作日志' },
-      },
     ],
   },
 

@@ -5,7 +5,7 @@ import request from '@/utils/request.js'
 
 const logs = ref([])
 const loading = ref(false)
-const filters = ref({ operator: '', module: '', startDate: '', endDate: '' })
+const filters = reactive({ operator: '', module: '', startDate: '', endDate: '' })
 const pageNum = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
@@ -37,6 +37,16 @@ const getActionColor = (action) => {
   }
   return map[action] || ''
 }
+const resetFilters = () => {
+  filters.operator = ''
+  filters.module = ''
+  filters.startDate = ''
+  filters.endDate = ''
+  pageNum.value = 1
+  getLogs()
+}
+
+onMounted(getLogs)
 
 onMounted(getLogs)
 </script>
@@ -65,15 +75,7 @@ onMounted(getLogs)
         "
         >搜索</el-button
       >
-      <el-button
-        :icon="Refresh"
-        @click="
-          filters = {}
-          pageNum = 1
-          getLogs()
-        "
-        >重置</el-button
-      >
+      <el-button :icon="Refresh" @click="resetFilters()">重置</el-button>
     </div>
 
     <!-- 日志列表 -->

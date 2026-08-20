@@ -69,4 +69,24 @@ public interface NotificationMapper {
     // 获取最近的未读通知（用于红点提示）
     @Select("SELECT * FROM notification WHERE user_id = #{userId} AND is_read = 0 ORDER BY create_time DESC LIMIT 5")
     List<Notification> findRecentUnread(Integer userId);
+
+    /**
+     * 查询系统通知（管理员用）
+     */
+    @Select("SELECT * FROM notification WHERE type = 5 ORDER BY create_time DESC")
+    List<Notification> findSystemNotifications();
+
+    /**
+     * 更新通知
+     */
+    @Update("UPDATE notification SET title = #{title}, content = #{content}, target_type = #{targetType}, " +
+            "target_id = #{targetId}, priority = #{priority}, status = #{status}, update_time = NOW() " +
+            "WHERE id = #{id}")
+    int update(Notification notification);
+
+    /**
+     * 更新通知状态
+     */
+    @Update("UPDATE notification SET status = #{status}, update_time = NOW() WHERE id = #{id}")
+    int updateStatus(@Param("id") Integer id, @Param("status") String status);
 }

@@ -1,20 +1,39 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { UserFilled, Search, Refresh } from '@element-plus/icons-vue'
+import { UserFilled, Search, Refresh, InfoFilled } from '@element-plus/icons-vue'
 import { userListService, userUpdateRoleService } from '@/api/user.js'
 import { normalizeRole } from '@/utils/roles.js'
 
+import useUserInfoStore from '@/stores/userInfo.js'
+
+// ==================== 获取当前用户信息 ====================
+const userInfoStore = useUserInfoStore()
+const currentUserRole = computed(() =>
+  normalizeRole(userInfoStore.info?.role || userInfoStore.role),
+)
+
+// ==================== 权限判断 ====================
+// 是否是超级管理员
+const isSuperAdmin = computed(() => currentUserRole.value === 'super_admin')
+// 是否是管理员（包含超级管理员和普通管理员）
+const isAdmin = computed(
+  () => currentUserRole.value === 'admin' || currentUserRole.value === 'super_admin',
+)
+
+// ==================== 数据 ====================
 const users = ref([])
 const loading = ref(false)
 const searchNickname = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+
 // 图片预览相关
 const showImageViewer = ref(false)
 const previewImageUrl = ref('')
-// 打开图片预览
+
+// ==================== 图片预览 ====================
 const openImageViewer = (imageUrl) => {
   if (imageUrl) {
     previewImageUrl.value = imageUrl
@@ -22,18 +41,16 @@ const openImageViewer = (imageUrl) => {
   }
 }
 
-// 关闭图片预览
 const closeImageViewer = () => {
   showImageViewer.value = false
   previewImageUrl.value = ''
 }
 
-// 获取用户列表
+// ==================== 获取用户列表 ====================
 const getUserList = async () => {
   loading.value = true
   try {
     const result = await userListService()
-    console.log('API返回的所有用户数据:', result.data) // 调试用，可以查看实际返回的数据
     const allUsers = result.data || []
 
     // 过滤出普通用户（排除管理员和超级管理员）
@@ -42,7 +59,7 @@ const getUserList = async () => {
       return role === 'user'
     })
 
-    // 搜索过滤 - 对普通用户进行搜索过滤（用户名、昵称、邮箱）
+    // 搜索过滤
     let filteredUsers = normalUsers
     if (searchNickname.value) {
       filteredUsers = normalUsers.filter(
@@ -60,8 +77,6 @@ const getUserList = async () => {
     const start = (currentPage.value - 1) * pageSize.value
     const end = start + pageSize.value
     users.value = filteredUsers.slice(start, end)
-
-    console.log('过滤后的普通用户数据:', users.value) // 调试用
   } catch (error) {
     if (error?.__handled) return
     console.error('获取用户列表失败:', error)
@@ -73,30 +88,19 @@ const getUserList = async () => {
   }
 }
 
-// 计算普通用户统计信息
-const userStats = computed(() => {
-  return {
-    total: users.value.length,
-    users: users.value.length,
-    admins: 0, // 因为只显示普通用户，所以这里始终为0
-    superAdmins: 0,
-  }
-})
-
-// 搜索
+// ==================== 搜索 ====================
 const handleSearch = () => {
   currentPage.value = 1
   getUserList()
 }
 
-// 重置
 const handleReset = () => {
   searchNickname.value = ''
   currentPage.value = 1
   getUserList()
 }
 
-// 分页变化
+// ==================== 分页 ====================
 const handleSizeChange = (size) => {
   pageSize.value = size
   currentPage.value = 1
@@ -108,15 +112,20 @@ const handleCurrentChange = (page) => {
   getUserList()
 }
 
-// 更新用户角色
+// ==================== 更新用户角色（仅超级管理员） ====================
 const updateUserRole = async (user, newRole) => {
+  // 🔒 权限检查：只有超级管理员可以修改角色
+  if (!isSuperAdmin.value) {
+    ElMessage.warning('只有超级管理员可以修改用户角色')
+    return
+  }
+
   try {
     await userUpdateRoleService({
       userId: user.id,
       role: newRole,
     })
     ElMessage.success('角色更新成功')
-    // 重新获取用户列表以刷新数据
     await getUserList()
   } catch (error) {
     console.error('更新角色失败:', error)
@@ -124,32 +133,39 @@ const updateUserRole = async (user, newRole) => {
   }
 }
 
-// 确认更新角色
+// ==================== 确认更新角色 ====================
 const confirmUpdateRole = (user, newRole) => {
+  // 🔒 权限检查：只有超级管理员可以执行此操作
+  if (!isSuperAdmin.value) {
+    ElMessage.warning('只有超级管理员可以更改用户角色')
+    return
+  }
+
   const roleName =
     normalizeRole(newRole) === 'super_admin'
       ? '超级管理员'
       : normalizeRole(newRole) === 'admin'
         ? '管理员'
         : '普通用户'
-  ElMessageBox.confirm(
-    `确定要将用户 "${user.nickname}" 的角色更改为 ${roleName} 吗？`,
-    '确认更改角色',
-    {
-      type: 'warning',
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-    },
-  )
+
+  const confirmMsg =
+    normalizeRole(newRole) === 'super_admin'
+      ? `确定要将用户 "${user.nickname}" 设置为超级管理员吗？此操作授予最高权限！`
+      : `确定要将用户 "${user.nickname}" 的角色更改为 ${roleName} 吗？`
+
+  ElMessageBox.confirm(confirmMsg, '确认更改角色', {
+    type: normalizeRole(newRole) === 'super_admin' ? 'warning' : 'info',
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    distinguishCancelAndClose: true,
+  })
     .then(() => {
       updateUserRole(user, newRole)
     })
-    .catch(() => {
-      // 取消操作
-    })
+    .catch(() => {})
 }
 
-// 在组件挂载时初始化数据
+// ==================== 初始化 ====================
 onMounted(() => {
   getUserList()
 })
@@ -157,6 +173,7 @@ onMounted(() => {
 
 <template>
   <div class="user-role-manage-container">
+    <!-- ===== 页面头部 ===== -->
     <div class="page-header">
       <div class="header-title-section">
         <div class="title-decoration">
@@ -167,9 +184,21 @@ onMounted(() => {
         <h1 class="page-title">普通用户管理</h1>
         <p class="page-subtitle">管理普通用户账户和权限</p>
       </div>
+      <!-- 显示当前角色 -->
+      <div class="header-tag">
+        <el-tag :type="isSuperAdmin ? 'warning' : 'info'" size="large">
+          {{ isSuperAdmin ? '👑 超级管理员' : '🔒 普通管理员' }}
+        </el-tag>
+      </div>
     </div>
 
-    <!-- 搜索栏 -->
+    <!-- ===== 权限提示 ===== -->
+    <div v-if="!isSuperAdmin" class="permission-banner">
+      <el-icon><InfoFilled /></el-icon>
+      <span>你当前为普通管理员，仅有查看权限，无法修改用户角色</span>
+    </div>
+
+    <!-- ===== 搜索栏 ===== -->
     <div class="search-bar">
       <el-input
         v-model="searchNickname"
@@ -183,6 +212,7 @@ onMounted(() => {
       <el-button :icon="Refresh" @click="handleReset">重置</el-button>
     </div>
 
+    <!-- ===== 用户列表 ===== -->
     <div class="user-list-card" v-loading="loading">
       <el-table :data="users" style="width: 100%" stripe>
         <el-table-column prop="id" label="ID" width="80" />
@@ -225,40 +255,69 @@ onMounted(() => {
             {{ new Date(scope.row.createTime).toLocaleString('zh-CN') }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200">
+
+        <!-- ===== 操作列 - 根据权限显示 ===== -->
+        <el-table-column label="操作" width="280">
           <template #default="scope">
-            <el-button
-              v-if="normalizeRole(scope.row.role) !== 'super_admin'"
-              size="small"
-              type="warning"
-              @click="confirmUpdateRole(scope.row, 'super_admin')"
-            >
-              设为超级管理员
-            </el-button>
-            <el-button
-              v-if="
-                normalizeRole(scope.row.role) !== 'admin' &&
-                normalizeRole(scope.row.role) !== 'super_admin'
-              "
-              size="small"
-              type="primary"
-              @click="confirmUpdateRole(scope.row, 'admin')"
-            >
-              设为管理员
-            </el-button>
-            <el-button
-              v-if="normalizeRole(scope.row.role) !== 'user'"
-              size="small"
-              type="info"
-              @click="confirmUpdateRole(scope.row, 'user')"
-            >
-              降为普通用户
-            </el-button>
+            <!-- ✅ 超级管理员：显示所有操作按钮 -->
+            <template v-if="isSuperAdmin">
+              <!-- 设为超级管理员（不能对自己操作） -->
+              <el-button
+                v-if="
+                  normalizeRole(scope.row.role) !== 'super_admin' &&
+                  scope.row.id !== userInfoStore.info.id
+                "
+                size="small"
+                type="warning"
+                @click="confirmUpdateRole(scope.row, 'super_admin')"
+              >
+                👑 设为超级管理员
+              </el-button>
+
+              <!-- 设为管理员（不能对自己操作） -->
+              <el-button
+                v-if="
+                  normalizeRole(scope.row.role) !== 'admin' &&
+                  normalizeRole(scope.row.role) !== 'super_admin' &&
+                  scope.row.id !== userInfoStore.info.id
+                "
+                size="small"
+                type="primary"
+                @click="confirmUpdateRole(scope.row, 'admin')"
+              >
+                设为管理员
+              </el-button>
+
+              <!-- 降为普通用户（不能对自己操作） -->
+              <el-button
+                v-if="
+                  normalizeRole(scope.row.role) !== 'user' && scope.row.id !== userInfoStore.info.id
+                "
+                size="small"
+                type="info"
+                @click="confirmUpdateRole(scope.row, 'user')"
+              >
+                降为普通用户
+              </el-button>
+
+              <!-- 自己不能操作自己 -->
+              <span v-if="scope.row.id === userInfoStore.info.id" class="self-tip">
+                ⚡ 当前账号
+              </span>
+            </template>
+
+            <!-- ❌ 普通管理员：显示无权限提示 -->
+            <template v-else>
+              <span class="no-permission-tip">
+                <el-icon><InfoFilled /></el-icon>
+                无操作权限
+              </span>
+            </template>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
+      <!-- ===== 分页 ===== -->
       <div class="pagination">
         <el-pagination
           v-model:current-page="currentPage"
@@ -277,9 +336,10 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- ===== 底部统计 ===== -->
     <div class="page-footer">
       <span class="footer-emoji">👥</span>
-      <span>共 {{ users.length }} 个普通用户（当前页）</span>
+      <span>共 {{ total }} 个普通用户</span>
       <span class="footer-emoji">✨</span>
     </div>
   </div>
@@ -292,100 +352,12 @@ onMounted(() => {
   background: linear-gradient(145deg, #f5f0ff 0%, #e8ddf8 50%, #fce4ec 100%);
 }
 
-.search-bar {
-  background: rgba(255, 255, 255, 0.96);
-  padding: 16px 20px;
-  border-radius: 30px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-
-  :deep(.el-input__wrapper) {
-    border-radius: 48px;
-    padding: 8px 20px;
-    background-color: #faf7ff;
-    border: 1px solid #f0e5ff;
-    transition: all 0.3s ease;
-    box-shadow: none;
-
-    &:hover {
-      border-color: #d9b8ff;
-      background-color: #fff;
-    }
-
-    &.is-focus {
-      border-color: #c5a3ff;
-      background-color: #fff;
-      box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.12);
-    }
-  }
-
-  :deep(.el-button) {
-    border-radius: 48px;
-    padding: 10px 20px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-
-    &.el-button--primary {
-      background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
-      border: none;
-
-      &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
-      }
-    }
-  }
-}
-
-.stats-info {
-  margin-bottom: 20px;
-  background: rgba(255, 255, 255, 0.96);
-  padding: 16px;
-  border-radius: 30px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(10px);
-
-  .stats-row {
-    display: flex;
-    justify-content: space-around;
-  }
-
-  .stat-item {
-    text-align: center;
-    padding: 10px;
-    border-radius: 20px;
-
-    .stat-number {
-      font-size: 24px;
-      font-weight: bold;
-      margin-bottom: 5px;
-      background: linear-gradient(135deg, #c5a3ff, #f8b4d9);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-
-    .stat-label {
-      font-size: 14px;
-      color: #8a7a9a;
-    }
-
-    &.total-users {
-      background: linear-gradient(135deg, rgba(168, 230, 207, 0.15), rgba(126, 224, 181, 0.15));
-      color: #2c665a;
-    }
-  }
-}
-
+// ===== 页面头部 =====
 .page-header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
   padding: 24px 28px;
   background: rgba(255, 255, 255, 0.96);
   border-radius: 30px;
@@ -439,8 +411,82 @@ onMounted(() => {
       letter-spacing: 0.5px;
     }
   }
+
+  .header-tag {
+    flex-shrink: 0;
+  }
 }
 
+// ===== 权限提示横幅 =====
+.permission-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  margin-bottom: 16px;
+  background: rgba(255, 158, 158, 0.1);
+  border: 1px solid rgba(255, 158, 158, 0.2);
+  border-radius: 16px;
+  color: #d4727a;
+  font-size: 14px;
+
+  .el-icon {
+    font-size: 20px;
+    color: #d4727a;
+  }
+}
+
+// ===== 搜索栏 =====
+.search-bar {
+  background: rgba(255, 255, 255, 0.96);
+  padding: 16px 20px;
+  border-radius: 30px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(10px);
+
+  :deep(.el-input__wrapper) {
+    border-radius: 48px;
+    padding: 8px 20px;
+    background-color: #faf7ff;
+    border: 1px solid #f0e5ff;
+    transition: all 0.3s ease;
+    box-shadow: none;
+
+    &:hover {
+      border-color: #d9b8ff;
+      background-color: #fff;
+    }
+
+    &.is-focus {
+      border-color: #c5a3ff;
+      background-color: #fff;
+      box-shadow: 0 0 0 4px rgba(197, 163, 255, 0.12);
+    }
+  }
+
+  :deep(.el-button) {
+    border-radius: 48px;
+    padding: 10px 20px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+
+    &.el-button--primary {
+      background: linear-gradient(135deg, #c5a3ff 0%, #f8b4d9 100%);
+      border: none;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(197, 163, 255, 0.4);
+      }
+    }
+  }
+}
+
+// ===== 用户列表 =====
 .user-list-card {
   background: rgba(255, 255, 255, 0.96);
   border-radius: 30px;
@@ -483,6 +529,11 @@ onMounted(() => {
     font-weight: 500;
     border: none;
 
+    &.el-tag--primary {
+      background: linear-gradient(135deg, #d4d0e8, #c5c0d8);
+      color: #5a4a7a;
+    }
+
     &.el-tag--success {
       background: linear-gradient(135deg, #a8e6cf, #7ee0b5);
       color: #2c665a;
@@ -501,22 +552,13 @@ onMounted(() => {
 
   :deep(.el-button) {
     border-radius: 48px;
-    padding: 8px 16px;
+    padding: 6px 14px;
     font-weight: 500;
+    font-size: 12px;
     transition: all 0.3s ease;
 
     &:hover {
       transform: translateY(-2px);
-    }
-
-    &.el-button--success {
-      background: linear-gradient(135deg, #a8e6cf, #7ee0b5);
-      border: none;
-      color: #2c665a;
-
-      &:hover {
-        box-shadow: 0 4px 12px rgba(168, 230, 207, 0.3);
-      }
     }
 
     &.el-button--warning {
@@ -529,37 +571,50 @@ onMounted(() => {
       }
     }
 
-    &.el-button--danger {
-      background: linear-gradient(135deg, #ff9e9e, #ffbaba);
+    &.el-button--primary {
+      background: linear-gradient(135deg, #c5a3ff, #b583ff);
       border: none;
       color: white;
 
       &:hover {
-        box-shadow: 0 4px 12px rgba(255, 158, 158, 0.3);
+        box-shadow: 0 4px 12px rgba(197, 163, 255, 0.3);
       }
+    }
+
+    &.el-button--info {
+      background: linear-gradient(135deg, #a8e6cf, #7ee0b5);
+      border: none;
+      color: #2c665a;
+
+      &:hover {
+        box-shadow: 0 4px 12px rgba(168, 230, 207, 0.3);
+      }
+    }
+  }
+
+  .self-tip {
+    font-size: 12px;
+    color: #c5a3ff;
+    font-weight: 500;
+  }
+
+  .no-permission-tip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #b0a7c0;
+    padding: 4px 12px;
+    background: rgba(197, 163, 255, 0.06);
+    border-radius: 48px;
+
+    .el-icon {
+      font-size: 14px;
     }
   }
 }
 
-.page-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 24px;
-  padding: 16px;
-  font-size: 13px;
-  color: #a09abf;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 20px;
-  backdrop-filter: blur(10px);
-
-  .footer-emoji {
-    font-size: 14px;
-    animation: pulse 2s ease-in-out infinite;
-  }
-}
-
+// ===== 分页 =====
 .pagination {
   margin-top: 20px;
   display: flex;
@@ -584,6 +639,26 @@ onMounted(() => {
   }
 }
 
+// ===== 底部 =====
+.page-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding: 16px;
+  font-size: 13px;
+  color: #a09abf;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+
+  .footer-emoji {
+    font-size: 14px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+}
+
 @keyframes pulse {
   0%,
   100% {
@@ -593,6 +668,23 @@ onMounted(() => {
   50% {
     opacity: 0.7;
     transform: scale(1.1);
+  }
+}
+
+// ===== 响应式 =====
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .user-role-manage-container {
+    padding: 12px;
+  }
+
+  .search-bar {
+    flex-wrap: wrap;
   }
 }
 </style>

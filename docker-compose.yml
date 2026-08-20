@@ -1,7 +1,39 @@
 version: '3.8'
 
 services:
-  # Elasticsearch
+  # ========== 数据库 ==========
+  mysql:
+    image: mysql:8.0.33
+    container_name: dragonfly-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: dragonfly_blog
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - dragonfly-network
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # ========== 缓存 ==========
+  redis:
+    image: redis:7.2-alpine
+    container_name: dragonfly-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - dragonfly-network
+    command: redis-server --requirepass ${REDIS_PASSWORD:-}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+
+  # ========== 搜索引擎 ==========
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
     container_name: dragonfly-elasticsearch
@@ -17,7 +49,6 @@ services:
     networks:
       - dragonfly-network
 
-  # Kibana (可选，可视化工具)
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
     container_name: dragonfly-kibana
@@ -30,20 +61,39 @@ services:
     networks:
       - dragonfly-network
 
-  # Redis
-  redis:
-    image: redis:7.2-alpine
-    container_name: dragonfly-redis
+  # ========== 消息队列 ==========
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: dragonfly-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+      - "2181:2181"
+    networks:
+      - dragonfly-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: dragonfly-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
     networks:
       - dragonfly-network
 
 volumes:
-  es_data:
+  mysql_data:
   redis_data:
+  es_data:
 
 networks:
   dragonfly-network:

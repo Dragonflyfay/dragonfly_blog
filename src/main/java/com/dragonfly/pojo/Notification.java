@@ -22,5 +22,8 @@ public class Notification {
     private String fromUserName;     // 触发者昵称
     private String fromUserPic;      // 触发者头像
     private String targetTitle;      // 目标标题（笔记标题）
+    private String title;      // 通知标题（系统通知专用）
+    private String priority;   // 优先级: normal | important | urgent
+    private String status;     // 状态: draft | published
 
 }

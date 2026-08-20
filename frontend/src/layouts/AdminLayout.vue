@@ -13,6 +13,9 @@ import {
   DataLine, // 新增：数据看板图标
   UserFilled as UserIcon, // 新增：用户管理图标
   ChatDotRound,
+  Setting,
+  Bell,
+  Document,
 } from '@element-plus/icons-vue'
 import avatar from '@/assets/default.png'
 import { ref } from 'vue'
@@ -132,7 +135,6 @@ getUserInfo()
             <span>用户管理</span>
           </el-menu-item>
         </el-sub-menu>
-        <!-- 在用户管理之后添加 -->
         <el-sub-menu index="system">
           <template #title>
             <el-icon><Setting /></el-icon>

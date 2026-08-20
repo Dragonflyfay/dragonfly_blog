@@ -8,6 +8,7 @@ const notifications = ref([])
 const loading = ref(false)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
+const formRef = ref(null)
 
 const form = ref({
   id: null,
@@ -29,6 +30,8 @@ const getList = async () => {
   try {
     const res = await request.get('/admin/notifications')
     notifications.value = res.data || []
+  } catch (error) {
+    console.error('获取通知列表失败:', error)
   } finally {
     loading.value = false
   }
@@ -36,20 +39,25 @@ const getList = async () => {
 
 // 发送通知
 const sendNotification = async () => {
-  await formRef.value.validate()
-  try {
-    if (isEdit.value) {
-      await request.put('/admin/notifications', form.value)
-      ElMessage.success('通知已更新')
-    } else {
-      await request.post('/admin/notifications', form.value)
-      ElMessage.success('通知已发送')
+  if (!formRef.value) return
+
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return
+
+    try {
+      if (isEdit.value) {
+        await request.put('/admin/notifications', form.value)
+        ElMessage.success('通知已更新')
+      } else {
+        await request.post('/admin/notifications', form.value)
+        ElMessage.success('通知已发送')
+      }
+      dialogVisible.value = false
+      getList()
+    } catch (error) {
+      ElMessage.error(error.response?.data?.message || '操作失败')
     }
-    dialogVisible.value = false
-    getList()
-  } catch (error) {
-    ElMessage.error('操作失败')
-  }
+  })
 }
 
 // 删除通知

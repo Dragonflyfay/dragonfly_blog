@@ -8,8 +8,9 @@ spring:
       redis:
         host: localhost
         port: 6379
-        password: 123456
+        password: ${REDIS_PASSWORD:}
         database: 0
+        timeout: 5000ms
         lettuce:
           pool:
             max-active: 8
@@ -31,6 +32,20 @@ spring:
 #    group:
 #      "dev": devServer,devDB,devSelf
 #    active: dev
+
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: dragonfly-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.type.mapping: notification:com.dragonfly.pojo.Notification
 
 
 
