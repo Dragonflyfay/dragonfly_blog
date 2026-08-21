@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete, Edit, Promotion } from '@element-plus/icons-vue'
+import { Plus, Delete, Edit } from '@element-plus/icons-vue'
 import request from '@/utils/request.js'
 
 const notifications = ref([])
@@ -14,14 +14,27 @@ const form = ref({
   id: null,
   title: '',
   content: '',
+  priority: 'normal', // normal | important | urgent
   targetType: 'all', // all | user
   targetUserId: null,
-  priority: 'normal', // normal | important | urgent
+  status: 'published', // draft | published
 })
 
 const rules = {
-  title: [{ required: true, message: '请输入标题' }],
-  content: [{ required: true, message: '请输入内容' }],
+  title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
+  content: [{ required: true, message: '请输入内容', trigger: 'blur' }],
+  targetUserId: [
+    {
+      validator: (rule, value, callback) => {
+        if (form.value.targetType === 'user' && !value) {
+          callback(new Error('请输入目标用户ID'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
 }
 
 // 获取通知列表
@@ -37,19 +50,58 @@ const getList = async () => {
   }
 }
 
-// 发送通知
-const sendNotification = async () => {
-  if (!formRef.value) return
+// 打开新建
+const openCreate = () => {
+  isEdit.value = false
+  form.value = {
+    id: null,
+    title: '',
+    content: '',
+    priority: 'normal',
+    targetType: 'all',
+    targetUserId: null,
+    status: 'published',
+  }
+  dialogVisible.value = true
+}
 
+// 打开编辑
+const openEdit = (row) => {
+  isEdit.value = true
+  form.value = {
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    priority: row.priority || 'normal',
+    targetType: row.userId === 0 ? 'all' : 'user',
+    targetUserId: row.userId === 0 ? null : row.userId,
+    status: row.status || 'published',
+  }
+  dialogVisible.value = true
+}
+
+// 提交（发送/更新）
+const submit = async () => {
+  if (!formRef.value) return
   await formRef.value.validate(async (valid) => {
     if (!valid) return
 
+    const payload = {
+      id: form.value.id,
+      title: form.value.title,
+      content: form.value.content,
+      priority: form.value.priority,
+      status: form.value.status,
+      // 全部用户 → 0；指定用户 → 具体用户ID
+      userId: form.value.targetType === 'user' ? form.value.targetUserId : 0,
+    }
+
     try {
       if (isEdit.value) {
-        await request.put('/admin/notifications', form.value)
+        await request.put('/admin/notifications', payload)
         ElMessage.success('通知已更新')
       } else {
-        await request.post('/admin/notifications', form.value)
+        await request.post('/admin/notifications', payload)
         ElMessage.success('通知已发送')
       }
       dialogVisible.value = false
@@ -71,7 +123,7 @@ const deleteNotification = (row) => {
     .catch(() => {})
 }
 
-// 标记通知状态
+// 切换通知状态（发布/撤回）
 const toggleStatus = async (row) => {
   await request.put(`/admin/notifications/${row.id}/status`, {
     status: row.status === 'draft' ? 'published' : 'draft',
@@ -90,17 +142,7 @@ onMounted(getList)
         <h1 class="page-title">📢 系统通知</h1>
         <p class="page-subtitle">向用户发送系统公告和重要消息</p>
       </div>
-      <el-button
-        type="primary"
-        :icon="Plus"
-        @click="
-          dialogVisible = true
-          isEdit = false
-          form = { targetType: 'all', priority: 'normal' }
-        "
-      >
-        发送通知
-      </el-button>
+      <el-button type="primary" :icon="Plus" @click="openCreate">发送通知</el-button>
     </div>
 
     <div class="notification-list" v-loading="loading">
@@ -115,15 +157,10 @@ onMounted(getList)
             {{ item.priority === 'urgent' ? '🔴' : item.priority === 'important' ? '🟡' : '🔵' }}
           </span>
           <div class="noti-content">
-            <h4>{{ item.title }}</h4>
+            <h4>{{ item.title || item.content }}</h4>
             <p>{{ item.content }}</p>
             <div class="noti-meta">
-              <span
-                >📌
-                {{
-                  item.targetType === 'all' ? '全部用户' : `指定用户 ID:${item.targetUserId}`
-                }}</span
-              >
+              <span>📌 {{ item.userId === 0 ? '全部用户' : `指定用户 ID:${item.userId}` }}</span>
               <span>🕐 {{ item.createTime }}</span>
               <el-tag :type="item.status === 'published' ? 'success' : 'info'" size="small">
                 {{ item.status === 'published' ? '已发布' : '草稿' }}
@@ -135,18 +172,91 @@ onMounted(getList)
           <el-button size="small" @click="toggleStatus(item)">
             {{ item.status === 'draft' ? '发布' : '撤回' }}
           </el-button>
+          <el-button size="small" :icon="Edit" @click="openEdit(item)">编辑</el-button>
           <el-button size="small" type="danger" @click="deleteNotification(item)">
             <el-icon><Delete /></el-icon>
           </el-button>
         </div>
       </div>
     </div>
+
+    <!-- 发送/编辑对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑通知' : '发送通知'"
+      width="560px"
+      destroy-on-close
+    >
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+        <el-form-item label="标题" prop="title">
+          <el-input
+            v-model="form.title"
+            placeholder="请输入通知标题"
+            maxlength="100"
+            show-word-limit
+          />
+        </el-form-item>
+        <el-form-item label="内容" prop="content">
+          <el-input
+            v-model="form.content"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入通知内容"
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
+        <el-form-item label="优先级">
+          <el-radio-group v-model="form.priority">
+            <el-radio value="normal">普通</el-radio>
+            <el-radio value="important">重要</el-radio>
+            <el-radio value="urgent">紧急</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="发送对象">
+          <el-radio-group v-model="form.targetType">
+            <el-radio value="all">全部用户</el-radio>
+            <el-radio value="user">指定用户</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="form.targetType === 'user'" label="用户ID" prop="targetUserId">
+          <el-input v-model.number="form.targetUserId" placeholder="请输入目标用户ID" />
+        </el-form-item>
+        <el-form-item v-if="isEdit" label="状态">
+          <el-radio-group v-model="form.status">
+            <el-radio value="published">发布</el-radio>
+            <el-radio value="draft">草稿</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submit">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <style scoped>
 .notification-manage {
   padding: 20px;
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.page-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #2d2d44;
+}
+.page-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #999;
 }
 .notification-item {
   display: flex;
@@ -183,6 +293,7 @@ onMounted(getList)
   gap: 16px;
   font-size: 12px;
   color: #999;
+  align-items: center;
 }
 .noti-actions {
   display: flex;

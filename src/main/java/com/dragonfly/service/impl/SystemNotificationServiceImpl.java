@@ -33,17 +33,27 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
         notification.setType(5); // 系统通知类型
         notification.setIsRead(0);
         notification.setCreateTime(LocalDateTime.now());
-        notification.setTargetType(0);
+        // 系统通知不使用 note/comment 的 target_type/target_id
+        notification.setTargetType(null);
         notification.setTargetId(null);
+        if (notification.getPriority() == null || notification.getPriority().isEmpty()) {
+            notification.setPriority("normal");
+        }
+        if (notification.getStatus() == null || notification.getStatus().isEmpty()) {
+            notification.setStatus("published");
+        }
         notificationMapper.insert(notification);
-
     }
 
     @Override
     @Transactional
     public void updateSystemNotification(Notification notification) {
+        notification.setTargetType(null);
+        notification.setTargetId(null);
+        if (notification.getPriority() == null || notification.getPriority().isEmpty()) {
+            notification.setPriority("normal");
+        }
         notificationMapper.update(notification);
-
     }
 
     @Override

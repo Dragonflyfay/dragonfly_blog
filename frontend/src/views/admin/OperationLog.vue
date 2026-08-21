@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { Search, Refresh, Delete } from '@element-plus/icons-vue'
 import request from '@/utils/request.js'
 
@@ -16,7 +16,7 @@ const getLogs = async () => {
   loading.value = true
   try {
     const res = await request.get('/admin/logs', {
-      params: { ...filters.value, pageNum: pageNum.value, pageSize: pageSize.value },
+      params: { ...filters, pageNum: pageNum.value, pageSize: pageSize.value },
     })
     logs.value = res.data.items || []
     total.value = res.data.total || 0
@@ -47,8 +47,6 @@ const resetFilters = () => {
 }
 
 onMounted(getLogs)
-
-onMounted(getLogs)
 </script>
 
 <template>
@@ -70,8 +68,10 @@ onMounted(getLogs)
         type="primary"
         :icon="Search"
         @click="
-          pageNum = 1
-          getLogs()
+          () => {
+            pageNum = 1
+            getLogs()
+          }
         "
         >搜索</el-button
       >
