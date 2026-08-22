@@ -25,5 +25,7 @@ public class Notification {
     private String title;      // 通知标题（系统通知专用）
     private String priority;   // 优先级: normal | important | urgent
     private String status;     // 状态: draft | published
+    private Integer batchId;    // 广播通知分组ID（同一广播所有用户行共享）
+    private Integer recipientCount; // 广播接收人数（查询用，非数据库字段）
 
 }

@@ -25,8 +25,8 @@ public interface OperationLogMapper {
             "SELECT * FROM operation_log WHERE 1=1 " +
             "<if test='operator != null and operator != \"\"'> AND operator LIKE CONCAT('%', #{operator}, '%') </if>" +
             "<if test='module != null and module != \"\"'> AND module = #{module} </if>" +
-            "<if test='startDate != null and startDate != \"\"'> AND DATE(create_time) >= #{startDate} </if>" +
-            "<if test='endDate != null and endDate != \"\"'> AND DATE(create_time) <= #{endDate} </if>" +
+            "<if test='startDate != null and startDate != \"\"'> AND DATE(create_time) &gt;= #{startDate} </if>" +
+            "<if test='endDate != null and endDate != \"\"'> AND DATE(create_time) &lt;= #{endDate} </if>" +
             "ORDER BY create_time DESC " +
             "LIMIT #{offset}, #{pageSize}" +
             "</script>")
@@ -41,8 +41,8 @@ public interface OperationLogMapper {
             "SELECT COUNT(*) FROM operation_log WHERE 1=1 " +
             "<if test='operator != null and operator != \"\"'> AND operator LIKE CONCAT('%', #{operator}, '%') </if>" +
             "<if test='module != null and module != \"\"'> AND module = #{module} </if>" +
-            "<if test='startDate != null and startDate != \"\"'> AND DATE(create_time) >= #{startDate} </if>" +
-            "<if test='endDate != null and endDate != \"\"'> AND DATE(create_time) <= #{endDate} </if>" +
+            "<if test='startDate != null and startDate != \"\"'> AND DATE(create_time) &gt;= #{startDate} </if>" +
+            "<if test='endDate != null and endDate != \"\"'> AND DATE(create_time) &lt;= #{endDate} </if>" +
             "</script>")
     int count(@Param("operator") String operator,
               @Param("module") String module,

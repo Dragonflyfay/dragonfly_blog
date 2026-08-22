@@ -14,15 +14,15 @@ import java.util.List;
  */
 @Mapper
 public interface NotificationMapper {
-    @Insert("INSERT INTO notification (user_id, from_user_id, type, target_type, target_id, content, title, priority, status, is_read, create_time) " +
-            "VALUES (#{userId}, #{fromUserId}, #{type}, #{targetType}, #{targetId}, #{content}, #{title}, #{priority}, #{status}, #{isRead}, #{createTime})")
+    @Insert("INSERT INTO notification (user_id, from_user_id, type, target_type, target_id, content, title, priority, status, batch_id, is_read, create_time) " +
+            "VALUES (#{userId}, #{fromUserId}, #{type}, #{targetType}, #{targetId}, #{content}, #{title}, #{priority}, #{status}, #{batchId}, #{isRead}, #{createTime})")
     @Options(useGeneratedKeys = true,keyProperty = "id")
     void insert(Notification notification);
     // 批量插入通知（用于提升性能）
     @Insert("<script>" +
-            "INSERT INTO notification (user_id, from_user_id, type, target_type, target_id, content, is_read, create_time) VALUES " +
+            "INSERT INTO notification (user_id, from_user_id, type, target_type, target_id, content, title, priority, status, batch_id, is_read, create_time) VALUES " +
             "<foreach collection='list' item='item' separator=','>" +
-            "(#{item.userId}, #{item.fromUserId}, #{item.type}, #{item.targetType}, #{item.targetId}, #{item.content}, #{item.isRead}, #{item.createTime})" +
+            "(#{item.userId}, #{item.fromUserId}, #{item.type}, #{item.targetType}, #{item.targetId}, #{item.content}, #{item.title}, #{item.priority}, #{item.status}, #{item.batchId}, #{item.isRead}, #{item.createTime})" +
             "</foreach>" +
             "</script>")
     void batchInsert(List<Notification> notifications);
@@ -36,26 +36,26 @@ public interface NotificationMapper {
             "END as target_title " +
             "FROM notification n " +
             "LEFT JOIN user u ON n.from_user_id = u.id " +
-            "WHERE (n.user_id = #{userId} OR n.user_id = 0) " +
+            "WHERE n.user_id = #{userId} " +
             "ORDER BY n.create_time DESC " +
             "LIMIT #{offset}, #{pageSize}")
     List<Notification> findByUserId(@Param("userId") Integer userId,
                                     @Param("offset") Integer offset,
                                     @Param("pageSize") Integer pageSize);
 
-    @Select("SELECT COUNT(*) FROM notification WHERE user_id = #{userId} OR user_id = 0")
+    @Select("SELECT COUNT(*) FROM notification WHERE user_id = #{userId}")
     int countByUserId(Integer userId);
 
     // 统计未读通知数
-    @Select("SELECT COUNT(*) FROM notification WHERE (user_id = #{userId} OR user_id = 0) AND is_read = 0")
+    @Select("SELECT COUNT(*) FROM notification WHERE user_id = #{userId} AND is_read = 0")
     int countUnreadByUserId(Integer userId);
 
     // 标记通知为已读
-    @Update("UPDATE notification SET is_read = 1 WHERE id = #{id} AND (user_id = #{userId} OR user_id = 0)")
+    @Update("UPDATE notification SET is_read = 1 WHERE id = #{id} AND user_id = #{userId}")
     int markAsRead(@Param("id") Integer id, @Param("userId") Integer userId);
 
     // 批量标记已读
-    @Update("UPDATE notification SET is_read = 1 WHERE (user_id = #{userId} OR user_id = 0) AND is_read = 0")
+    @Update("UPDATE notification SET is_read = 1 WHERE user_id = #{userId} AND is_read = 0")
     int markAllAsRead(Integer userId);
 
     // 删除通知
@@ -67,13 +67,18 @@ public interface NotificationMapper {
     int deleteAllRead(Integer userId);
 
     // 获取最近的未读通知（用于红点提示）
-    @Select("SELECT * FROM notification WHERE (user_id = #{userId} OR user_id = 0) AND is_read = 0 ORDER BY create_time DESC LIMIT 5")
+    @Select("SELECT * FROM notification WHERE user_id = #{userId} AND is_read = 0 ORDER BY create_time DESC LIMIT 5")
     List<Notification> findRecentUnread(Integer userId);
 
     /**
      * 查询系统通知（管理员用）
      */
-    @Select("SELECT * FROM notification WHERE type = 5 ORDER BY create_time DESC")
+    @Select("SELECT n.*, " +
+            "(SELECT COUNT(*) FROM notification n2 WHERE n2.batch_id = n.id) AS recipient_count " +
+            "FROM notification n " +
+            "WHERE n.type = 5 " +
+            "AND n.user_id=0 " +  //  只查母版（id = batch_id）
+            "ORDER BY n.create_time DESC")
     List<Notification> findSystemNotifications();
 
     /**
@@ -87,6 +92,32 @@ public interface NotificationMapper {
     /**
      * 更新通知状态
      */
-    @Update("UPDATE notification SET status = #{status}, update_time = NOW() WHERE id = #{id}")
+    @Update("UPDATE notification SET status = #{status}, update_time = NOW() WHERE id = #{id} OR batch_id = #{id}")
     int updateStatus(@Param("id") Integer id, @Param("status") String status);
+
+    /**
+     * 更新广播通知（更新该广播下所有用户行的标题/内容/优先级/状态）
+     */
+    @Update("UPDATE notification SET title = #{title}, content = #{content}, priority = #{priority}, status = #{status}, update_time = NOW() " +
+            "WHERE type = 5 AND (id = #{id} OR batch_id = #{id})")
+    int updateBroadcast(Notification notification);
+
+    /**
+     * 删除系统通知（广播会连同所有用户行一起删除）
+     */
+    @Delete("DELETE FROM notification WHERE type = 5 AND (id = #{id} OR batch_id = #{id})")
+    int deleteSystemNotificationById(Integer id);
+
+    /**
+     * 回填广播分组ID
+     */
+    @Update("UPDATE notification SET batch_id = #{batchId} WHERE id = #{id}")
+    int updateBatchId(@Param("id") Integer id, @Param("batchId") Integer batchId);
+
+
+    /**
+     * 根据ID查询通知
+     */
+    @Select("SELECT * FROM notification WHERE id = #{id}")
+    Notification findById(@Param("id") Integer id);
 }

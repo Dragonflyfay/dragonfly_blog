@@ -26,6 +26,8 @@ public class SystemNotificationController {
      */
     @GetMapping
     public Result<List<Notification>> list() {
+        Map<String, Object> map = ThreadLocalUtil.get();
+        Integer userId = (Integer) map.get("id");
         List<Notification> notifications = notificationService.getSystemNotifications();
         return Result.success(notifications);
     }
@@ -47,6 +49,9 @@ public class SystemNotificationController {
      */
     @PutMapping
     public Result update(@RequestBody Notification notification) {
+        Map<String, Object> map = ThreadLocalUtil.get();
+        Integer userId = (Integer) map.get("id");
+        notification.setFromUserId(userId);
         notificationService.updateSystemNotification(notification);
         return Result.success();
     }
